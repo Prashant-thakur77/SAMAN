@@ -284,6 +284,23 @@ that could not be true:
   four as undeclared strays. The closure now follows the extras each requirement
   actually requested.
 
+### M8B findings
+
+- **The demo database was 1.5 GB for 12,000 items.** 348,932 refused pairs were
+  each carrying ~2.7 KB of veto and evidence JSON — and the same again in RAM,
+  since the whole insert list is held until it is written. Only the few hundred
+  most confident refusals are ever surfaced (the Auto-low tab samples 500), and
+  the §2B engine reads only the pair keys. Rows are still kept for every refusal;
+  the evidence is kept for the top 5,000. **1.5 GB → 159 MB**, with every metric
+  unchanged.
+- **`make demo` used whichever Tier-1 engine happened to be installed.** The
+  README claimed it ran rapidfuzz; with splink present it ran splink. Both are
+  fine engines and both pass the gate, but a demo that changes engine between
+  two laptops is not a demo. `SAMAN_TIER1_ENGINE` now pins it, `make demo` pins
+  rapidfuzz explicitly, `make demo-splink` runs the other, and both were
+  re-measured back-to-back for the README table — the old numbers there predated
+  the M3.5 fixes.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

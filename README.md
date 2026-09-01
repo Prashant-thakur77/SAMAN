@@ -90,6 +90,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M7 | Onboarding wizard, admin, audit explorer | **Done** |
 | M7.5 | Two-way ERP migration | **Done** |
 | M8 | Smart-Create, licensing | **Done** |
+| M8B | Demo survivability | Snapshot + storage done |
 | M8 | Smart-Create, licensing artefacts | Not started |
 | M8B | Demo survivability + performance | Not started |
 | M9 | Motion polish, a11y pass, screenshots | Not started |
@@ -163,24 +164,30 @@ and finds 3% of the duplicates.
 fallback. Both are implemented, and **both meet the gate on the same frozen
 threshold**. Measured on the demo profile, same machine:
 
-| Tier-1 engine | Precision | Recall | F1 | Wall clock | Peak memory |
-|---|---|---|---|---|---|
-| splink (Fellegi–Sunter) | 0.970 | 0.935 | 0.952 | 68 s | 5.0 GB |
-| **rapidfuzz (default)** | **0.975** | **0.938** | **0.957** | **45 s** | **1.6 GB** |
+| Tier-1 engine | Precision | Recall | F1 | Wall clock | Peak RSS | Database |
+|---|---|---|---|---|---|---|
+| splink (Fellegi–Sunter) | 0.9926 | 0.9308 | 0.9607 | 80 s | 4.0 GB | 256 MB |
+| **rapidfuzz (default)** | **0.9940** | **0.9331** | **0.9626** | **53 s** | **0.6 GB** | **159 MB** |
 
-The fallback wins on every axis here, so it is what `make demo` runs and what
-the demo uses. That is not a criticism of splink — it is what this dataset
-looks like. The veto layer and attribute agreement do most of the
-discriminating work, which leaves Tier 1 supplying a similarity signal, and
-splink compares descriptions with Jaro-Winkler (order-sensitive) where
-rapidfuzz uses `token_set_ratio` (order-insensitive) — and the CPSE style
-profiles reorder attributes deliberately.
+Both runs are back-to-back on one machine, same seed, same frozen threshold,
+same held-out split. The fallback wins on every axis, so `make demo` **pins**
+it — `SAMAN_TIER1_ENGINE=rapidfuzz` — rather than using whichever engine
+happens to be installed on the laptop in front of you. `make demo-splink` runs
+the same demo on the spec-named engine.
+
+That is not a criticism of splink — it is what this dataset looks like. The veto
+layer and attribute agreement do most of the discriminating work, which leaves
+Tier 1 supplying a similarity signal, and splink compares descriptions with
+Jaro-Winkler (order-sensitive) where rapidfuzz uses `token_set_ratio`
+(order-insensitive) — and the CPSE style profiles reorder attributes
+deliberately.
 
 splink is a real code path, not a credit in a table: `make deps-optional`
 installs it, `/api/health` reports which engine is live, and its
 Fellegi–Sunter match weights and per-comparison waterfall are persisted into
-the evidence object. `SAMAN_DISABLE_OPTIONAL=true` forces the fallbacks even
-when the accelerators are installed, so graceful degradation can be shown live.
+the evidence object. `SAMAN_DISABLE_OPTIONAL=true` forces every fallback at once, and
+`SAMAN_TIER1_ENGINE=auto|splink|rapidfuzz` pins Tier 1 alone; both are visible
+at `/api/health`, so graceful degradation can be shown live.
 
 ### Standardization
 

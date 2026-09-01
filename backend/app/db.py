@@ -73,3 +73,13 @@ def reset_db() -> None:
 
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+
+
+def dispose_engine() -> None:
+    """Close every pooled connection.
+
+    Restoring a snapshot replaces the database file underneath us; a connection
+    still holding the old file is how SQLite reports "database disk image is
+    malformed". The pool reopens lazily on the next session.
+    """
+    engine.dispose()

@@ -156,6 +156,33 @@ def cmd_tune(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_snapshot(_args: argparse.Namespace) -> int:
+    from .snapshot import capture, snapshot_dir
+
+    result = capture()
+    print(f"snapshot -> {snapshot_dir()}")
+    for name in result.files:
+        print(f"  {name}")
+    print(f"{result.bytes_written / 1_048_576:.0f} MB in {result.seconds:.2f}s")
+    print("Restore any time with `make demo-restore`.")
+    return 0
+
+
+def cmd_restore(_args: argparse.Namespace) -> int:
+    from .snapshot import restore, snapshot_dir
+
+    try:
+        result = restore()
+    except FileNotFoundError as exc:
+        print(exc)
+        return 1
+    print(f"restored from {snapshot_dir()}")
+    for name in result.files:
+        print(f"  {name}")
+    print(f"{result.bytes_written / 1_048_576:.0f} MB in {result.seconds:.2f}s")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="saman", description="SAMAN maintenance commands")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -173,6 +200,12 @@ def main(argv: list[str] | None = None) -> int:
 
     tune = sub.add_parser("tune", help="sweep match thresholds on the tuning split")
     tune.set_defaults(func=cmd_tune)
+
+    snap = sub.add_parser("snapshot", help="capture the databases as a restore point")
+    snap.set_defaults(func=cmd_snapshot)
+
+    restore = sub.add_parser("restore", help="restore the databases from the snapshot")
+    restore.set_defaults(func=cmd_restore)
 
     args = parser.parse_args(argv)
     return args.func(args)

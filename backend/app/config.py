@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     #: uninstalling anything, and demonstrating graceful degradation live.
     saman_disable_optional: bool = False
 
+    #: Which Tier-1 engine to use: "auto" takes splink when it is installed
+    #: (§0.4), "splink" and "rapidfuzz" pin one. Pinning matters for a live
+    #: demo, where "whichever happens to be installed on this laptop" is not an
+    #: answer, and for measuring the two against each other on one machine.
+    saman_tier1_engine: str = "auto"
+
     # Optional Tier-3 LLM. Unset => deterministic adjudicator + templated Copilot.
     ollama_url: str | None = None
     ollama_model: str = "qwen2.5:7b"

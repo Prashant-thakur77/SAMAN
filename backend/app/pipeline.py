@@ -10,6 +10,7 @@ which is what a single-laptop prototype needs.
 
 from __future__ import annotations
 
+import heapq
 import json
 import threading
 import time
@@ -17,7 +18,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from sqlalchemy import func, insert, select
+from sqlalchemy import bindparam, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from .extract import extract
@@ -29,6 +30,12 @@ BATCH = 1000
 #: How many auto-refused pairs to surface for spot-checking. Every refusal is
 #: recorded, but a queue of hundreds of thousands is not a queue.
 LOW_BAND_SAMPLE = 500
+
+#: How many refused pairs keep their full evidence. The Auto-low workbench tab
+#: samples the LOW_BAND_SAMPLE most confident refusals, so this is ten times the
+#: headroom it needs -- and three orders of magnitude less than storing all of
+#: them, which is what the demo profile was doing.
+LOW_BAND_EVIDENCE_KEPT = 5_000
 
 
 @dataclass
@@ -333,6 +340,9 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
     verdicts: dict[str, int] = {}
     accepted: list[tuple[int, int]] = []
     persist: list[dict] = []
+    #: Min-heap of the most confident refusals, so the evidence a reviewer can
+    #: actually reach survives while the other 99% is not written at all.
+    evidence_kept: list[tuple[float, int, int, str | None, str]] = []
     equivalence_candidates = 0
 
     for n, (a, b) in enumerate(pairs, start=1):
@@ -358,6 +368,30 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
             # relation engine with nothing to evaluate.
             or result.equivalence is not None
         ):
+            veto_json = (
+                json.dumps(result.veto, sort_keys=True, default=str) if result.veto else None
+            )
+            evidence_json = json.dumps(
+                {**result.evidence, "equivalence": result.equivalence},
+                sort_keys=True,
+                default=str,
+            )
+
+            # A refused pair's row is cheap and the §2B engine reads every one
+            # of them; its evidence is ~2.7 KB and only the few hundred most
+            # confident refusals are ever surfaced. Storing the rest cost 940 MB
+            # on the demo profile alone -- and the same again in RAM here, since
+            # this list is held until the inserts run. Keep the rows, keep the
+            # evidence for the top slice, and fill it in after the insert.
+            keep_evidence = result.band != "low"
+            if not keep_evidence:
+                heapq.heappush(
+                    evidence_kept,
+                    (result.confidence, result.item_a, result.item_b, veto_json, evidence_json),
+                )
+                if len(evidence_kept) > LOW_BAND_EVIDENCE_KEPT:
+                    heapq.heappop(evidence_kept)
+
             persist.append(
                 {
                     "item_a": result.item_a,
@@ -366,14 +400,8 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
                     "verdict": result.verdict,
                     "band": result.band,
                     "confidence": result.confidence,
-                    "veto_json": json.dumps(result.veto, sort_keys=True, default=str)
-                    if result.veto
-                    else None,
-                    "evidence_json": json.dumps(
-                        {**result.evidence, "equivalence": result.equivalence},
-                        sort_keys=True,
-                        default=str,
-                    ),
+                    "veto_json": veto_json if keep_evidence else None,
+                    "evidence_json": evidence_json if keep_evidence else "{}",
                 }
             )
         if n % 5000 == 0:
@@ -388,6 +416,33 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
         db.execute(insert(Pair), persist[i : i + BATCH])
     db.commit()
 
+    # The refusals a reviewer will actually be shown get their evidence back.
+    restored = [
+        {
+            "b_item_a": item_a,
+            "b_item_b": item_b,
+            "b_veto_json": veto_json,
+            "b_evidence_json": evidence_json,
+        }
+        for _, item_a, item_b, veto_json, evidence_json in evidence_kept
+    ]
+    for i in range(0, len(restored), BATCH):
+        # Core-level, keyed on the natural pair key: the ORM's bulk update
+        # wants primary keys we deliberately never read back.
+        db.execute(
+            update(Pair.__table__)
+            .where(
+                Pair.__table__.c.item_a == bindparam("b_item_a"),
+                Pair.__table__.c.item_b == bindparam("b_item_b"),
+            )
+            .values(
+                veto_json=bindparam("b_veto_json"),
+                evidence_json=bindparam("b_evidence_json"),
+            ),
+            restored[i : i + BATCH],
+        )
+    db.commit()
+
     stats = {
         "blocking": {**blocking_stats.as_dict(), **measure_blocking_recall(db, pairs)},
         "linkage": linkage.as_stats() if linkage else {"engine": "rapidfuzz"},
@@ -395,6 +450,7 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
         "verdicts": verdicts,
         "accepted_pairs": len(accepted),
         "persisted_pairs": len(persist),
+        "low_band_evidence_kept": len(restored),
         "equivalence_candidates": equivalence_candidates,
         "items": len(candidates),
     }

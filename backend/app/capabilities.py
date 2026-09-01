@@ -86,10 +86,16 @@ def detect() -> Capabilities:
     forced = settings.saman_disable_optional
     sovereign = sovereign_mode()
 
-    if _importable("splink") and not forced:
+    pinned = (settings.saman_tier1_engine or "auto").strip().lower()
+    if pinned == "rapidfuzz":
+        linkage = "rapidfuzz"
+        degraded.append("Tier 1 pinned to rapidfuzz by SAMAN_TIER1_ENGINE")
+    elif _importable("splink") and not forced:
         linkage = "splink"
     else:
         linkage = "rapidfuzz"
+        if pinned == "splink":
+            degraded.append("Tier 1 pinned to splink, but splink is not installed")
         degraded.append(
             "optional engines disabled — Tier 1 using rapidfuzz-only scoring"
             if forced
