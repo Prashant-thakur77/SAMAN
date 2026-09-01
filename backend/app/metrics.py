@@ -272,54 +272,96 @@ def _veto_metrics(db: Session, snap: Snapshot) -> dict:
 
 
 def _equivalence_metrics(db: Session, snap: Snapshot) -> dict:
-    """Directed equivalence (§2B). Reported as pending until M3.5 builds it."""
+    """Directed equivalence (§2B), measured on held-out pairs.
+
+    Ground truth is recorded once per *product* pair and expanded here across
+    every rendering of those products, using truth_group. Recording it per
+    rendering would multiply the table for no added information.
+    """
     from .models import Relation
+
+    predicted_rows = db.execute(
+        select(Relation.item_a, Relation.item_b, Relation.direction, Relation.basis).where(
+            Relation.rel_type.in_(("equivalent", "supersedes"))
+        )
+    ).all()
 
     truth_rows = db.execute(
         select(
             TruthEquivalence.raw_item_a,
             TruthEquivalence.raw_item_b,
             TruthEquivalence.direction,
-        ).where(TruthEquivalence.split == HOLDOUT)
-    ).all()
-
-    predicted_rows = db.execute(
-        select(Relation.item_a, Relation.item_b, Relation.direction).where(
-            Relation.rel_type.in_(("equivalent", "supersedes"))
         )
     ).all()
 
-    if not predicted_rows:
-        return {
-            "status": "not_built",
-            "note": "The equivalence engine lands in M3.5; truth is seeded and ready.",
-            "truth_pairs_holdout": len(truth_rows),
-        }
+    items_by_group: dict[str, list[int]] = defaultdict(list)
+    for item_id, group_id in snap.item_to_group.items():
+        if item_id in snap.holdout:
+            items_by_group[group_id].append(item_id)
 
     def key(a: int, b: int) -> tuple[int, int]:
         return (a, b) if a < b else (b, a)
 
     truth: dict[tuple[int, int], str] = {}
     for raw_a, raw_b, direction in truth_rows:
-        a, b = snap.raw_to_item.get(raw_a), snap.raw_to_item.get(raw_b)
+        a = snap.raw_to_item.get(raw_a)
+        b = snap.raw_to_item.get(raw_b)
         if a is None or b is None:
             continue
-        truth[key(a, b)] = direction if a < b else _flip(direction)
+        group_a = snap.item_to_group.get(a)
+        group_b = snap.item_to_group.get(b)
+        if group_a is None or group_b is None or group_a == group_b:
+            continue
+        for item_a in items_by_group.get(group_a, ()):
+            for item_b in items_by_group.get(group_b, ()):
+                # `direction` is stated from product A to product B; flip it if
+                # storing the pair the other way round.
+                truth[key(item_a, item_b)] = (
+                    direction if item_a < item_b else _flip(direction)
+                )
+
+    if not predicted_rows:
+        return {
+            "status": "not_built",
+            "note": "The equivalence engine lands in M3.5; truth is seeded and ready.",
+            "truth_pairs_holdout": len(truth),
+        }
 
     predicted: dict[tuple[int, int], str] = {}
-    for a, b, direction in predicted_rows:
-        if a in snap.holdout and b in snap.holdout:
-            predicted[key(a, b)] = direction if a < b else _flip(direction)
+    basis_counts: Counter[str] = Counter()
+    for a, b, direction, basis in predicted_rows:
+        if a not in snap.holdout or b not in snap.holdout:
+            continue
+        predicted[key(a, b)] = direction if a < b else _flip(direction)
+        basis_counts[basis] += 1
 
-    tp = len(set(truth) & set(predicted))
-    correct_direction = sum(1 for k in set(truth) & set(predicted) if truth[k] == predicted[k])
+    # The equivalence analogue of blocking recall: a pair the matcher never
+    # emitted is one the relation engine was never asked about, so reporting
+    # recall without it would leave the ceiling invisible (§0.6).
+    considered = {
+        key(a, b)
+        for a, b in db.execute(select(Pair.item_a, Pair.item_b)).all()
+        if a in snap.holdout and b in snap.holdout
+    }
+    reachable = set(truth) & considered
+
+    found = set(truth) & set(predicted)
+    correct_direction = sum(1 for k in found if truth[k] == predicted[k])
     return {
         "status": "measured",
-        "precision": round(tp / len(predicted), 4) if predicted else 0.0,
-        "recall": round(tp / len(truth), 4) if truth else 0.0,
-        "direction_accuracy": round(correct_direction / tp, 4) if tp else 0.0,
+        "precision": round(len(found) / len(predicted), 4) if predicted else 0.0,
+        "recall": round(len(found) / len(truth), 4) if truth else 0.0,
+        "direction_accuracy": round(correct_direction / len(found), 4) if found else 0.0,
         "truth_pairs_holdout": len(truth),
         "predicted_pairs_holdout": len(predicted),
+        "candidate_coverage": round(len(reachable) / len(truth), 4) if truth else 0.0,
+        "recall_of_reachable": (
+            round(len(found) / len(reachable), 4) if reachable else 0.0
+        ),
+        "by_basis": dict(basis_counts),
+        "note": (
+            "Equivalents keep distinct CNMCs; nothing here merges a cluster (§2B)."
+        ),
     }
 
 

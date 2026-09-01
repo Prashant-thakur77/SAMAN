@@ -67,6 +67,60 @@ def parse_bearing_designation(text: str) -> Designation | None:
 _THREAD = re.compile(r"\bM(\d{1,3})(?:\s*[Xx*]\s*(\d+(?:\.\d+)?))?\b")
 
 
+def _first_group(m: re.Match | None) -> str | None:
+    """Our patterns use alternatives, so take whichever group actually matched."""
+    if not m:
+        return None
+    return next((g for g in m.groups() if g is not None), None)
+
+
+_PIPE_DESIGNATION = re.compile(
+    r"\b(\d{1,4}(?:\.\d+)?)\s*(?:NB|DN|NOMINAL BORE)\b.{0,40}?"
+    r"\b(SCH(?:EDULE)?\s*[-]?\s*(?:20|40|80|160)|XXS|XS)\b",
+    re.DOTALL,
+)
+# Both orders occur, and "300#" has no word boundary after the hash.
+_FLANGE_CLASS = re.compile(
+    r"\b(?:ANSI|ASME)?\s*CLASS\s*(150|300|600|900|1500)\b"
+    r"|\b(?:ANSI|ASME)?\s*(150|300|600|900|1500)\s*(?:#|LB\b|POUND\b)"
+)
+_FASTENER_GRADE = re.compile(r"\b(?:GRADE|GR|CLASS|PROPERTY CLASS)\s*(4\.6|8\.8|10\.9|12\.9)\b")
+
+
+def parse_pipe_designation(text: str) -> Designation | None:
+    """`100NB SCH40` -> nominal bore 100 mm, schedule SCH40 (§2B source 1)."""
+    m = _PIPE_DESIGNATION.search(text)
+    if not m:
+        return None
+    schedule = re.sub(r"\s+|-", "", m.group(2)).replace("SCHEDULE", "SCH")
+    return Designation(
+        raw=f"{m.group(1)}NB {schedule}",
+        kind="pipe_schedule",
+        attrs={"nps_mm": float(m.group(1)), "schedule": schedule},
+    )
+
+
+def parse_flange_class(text: str) -> Designation | None:
+    """`ANSI 150#` -> pressure class 150."""
+    m = _FLANGE_CLASS.search(text)
+    if not m:
+        return None
+    value = _first_group(m)
+    return Designation(
+        raw=f"CLASS {value}", kind="flange_class", attrs={"pressure_class": value}
+    )
+
+
+def parse_fastener_grade(text: str) -> Designation | None:
+    """`GRADE 8.8` -> property class 8.8."""
+    m = _FASTENER_GRADE.search(text)
+    if not m:
+        return None
+    return Designation(
+        raw=f"GRADE {m.group(1)}", kind="fastener_grade", attrs={"grade": m.group(1)}
+    )
+
+
 def parse_metric_thread(text: str) -> Designation | None:
     """`M12x1.75` -> nominal 12 mm, pitch 1.75 mm."""
     m = _THREAD.search(text)
@@ -80,6 +134,20 @@ def parse_metric_thread(text: str) -> Designation | None:
         kind="metric_thread",
         attrs={"thread": label, "thread_nominal_mm": nominal, "thread_pitch_mm": pitch},
     )
+
+
+#: Per class, the designation parsers worth trying, most specific first.
+#: A designation is self-describing, which is what lets two items with wildly
+#: different text be recognised as the same specification (§2B source 1).
+DESIGNATION_PARSERS: dict[str, tuple] = {}
+
+
+def parse_designation(text: str, class_code: str) -> Designation | None:
+    """The best standard designation the text carries for its class."""
+    for parser in DESIGNATION_PARSERS.get(class_code, ()):
+        if found := parser(text):
+            return found
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -103,8 +171,14 @@ _P = {
         r"|\b(?:THK|THICKNESS)\s*(\d+(?:\.\d+)?)\s*MM\b"
     ),
     # Both orders occur: "GRADE 8.8" and "8.8 GRADE", "AR GRADE" and "GRADE AR".
+    # "GR" is also a common abbreviation before a numeric fastener grade. It is
+    # only ambiguous with the chemical grade "GR" in the abstract: a fastener
+    # grade is always numeric and a chemical grade always alphabetic, so the
+    # value disambiguates. (The abbreviation dictionary deliberately does not
+    # expand GR -> GRADE, because that would destroy the chemical attribute.)
     "grade": re.compile(
-        r"\bGRADE\s*(4\.6|8\.8|10\.9|12\.9)\b|\b(4\.6|8\.8|10\.9|12\.9)\s*GRADE\b"
+        r"\b(?:GRADE|GR)\s*(4\.6|8\.8|10\.9|12\.9)\b"
+        r"|\b(4\.6|8\.8|10\.9|12\.9)\s*GRADE\b"
         r"|\bGRADE\s*(LR|AR|GR|TECH)\b|\b(LR|AR|GR|TECH)\s*GRADE\b"
     ),
     "length_mm": re.compile(
@@ -181,13 +255,6 @@ _ENUM_TOKENS = {
 }
 
 
-def _first_group(m: re.Match | None) -> str | None:
-    """Our patterns use alternatives, so take whichever group actually matched."""
-    if not m:
-        return None
-    return next((g for g in m.groups() if g is not None), None)
-
-
 def _num(text: str, key: str) -> float | None:
     g = _first_group(_P[key].search(text))
     if g is None:
@@ -208,6 +275,21 @@ def _enum(text: str, field_name: str) -> str | None:
 # --------------------------------------------------------------------------
 # Classification
 # --------------------------------------------------------------------------
+
+
+def _register_designation_parsers() -> None:
+    DESIGNATION_PARSERS.update(
+        {
+            "bearing.ball.deep_groove": (parse_bearing_designation,),
+            "pipe.seamless": (parse_pipe_designation,),
+            "valve.gate": (parse_flange_class,),
+            "gasket.spiral_wound": (parse_flange_class,),
+            "fastener.bolt.hex": (parse_metric_thread, parse_fastener_grade),
+        }
+    )
+
+
+_register_designation_parsers()
 
 
 @dataclass(frozen=True)

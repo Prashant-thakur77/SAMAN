@@ -346,7 +346,14 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
         # only when the pair looked plausible in the first place — storing every
         # refused pair in a class would be a million rows for no added insight.
         looks_plausible = result.tier_scores.get("tier1_fuzzy", 0.0) >= 0.80
-        if result.band != "low" or (result.veto is not None and looks_plausible):
+        if (
+            result.band != "low"
+            or (result.veto is not None and looks_plausible)
+            # An equivalence candidate is refused as a duplicate but is exactly
+            # what the §2B engine reads next; dropping it here would leave the
+            # relation engine with nothing to evaluate.
+            or result.equivalence is not None
+        ):
             persist.append(
                 {
                     "item_a": result.item_a,
@@ -617,3 +624,103 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     for i in range(0, len(tasks), BATCH):
         db.execute(insert(ReviewTask), tasks[i : i + BATCH])
     db.commit()
+
+
+# --------------------------------------------------------------------------
+# Stage: directed functional equivalence (§2B)
+# --------------------------------------------------------------------------
+
+
+@register_stage("relations")
+def _stage_relations(db: Session, status: PipelineStatus) -> None:
+    """Evaluate equivalence over the pairs the matcher refused as duplicates.
+
+    Nothing here merges anything: equivalents keep distinct CNMCs and carry a
+    substitution link instead (§2B).
+    """
+    from .equivalence import Candidate, build_crossref_index, evaluate, parse_rules
+    from .models import ClusterMember, Crossref, Pair, Relation, SubstitutionRule
+    from .models import Item as ItemModel
+    from .taxonomy import get_schema
+
+    rules_by_class: dict[str, list] = {}
+    for class_code, rule_yaml in db.execute(
+        select(SubstitutionRule.class_code, SubstitutionRule.rule_yaml).where(
+            SubstitutionRule.active.is_(True)
+        )
+    ).all():
+        rules_by_class.setdefault(class_code, []).extend(parse_rules(rule_yaml))
+
+    crossrefs = build_crossref_index(
+        db.execute(select(Crossref.mpn_a, Crossref.mpn_b)).all()
+    )
+
+    items = {
+        item_id: Candidate(
+            id=item_id,
+            class_code=class_code,
+            norm_text=norm_text or "",
+            mpn_norm=mpn,
+            attrs={
+                k: v
+                for k, v in json.loads(attrs_json or "{}").items()
+                if not k.startswith("_")
+            },
+        )
+        for item_id, class_code, norm_text, mpn, attrs_json in db.execute(
+            select(
+                ItemModel.id,
+                ItemModel.class_code,
+                ItemModel.norm_text,
+                ItemModel.mpn_norm,
+                ItemModel.attrs_json,
+            )
+        ).all()
+    }
+
+    # Only pairs the matcher did not accept as duplicates can be equivalents.
+    candidate_pairs = db.execute(
+        select(Pair.item_a, Pair.item_b).where(Pair.verdict != "duplicate")
+    ).all()
+
+    # Two items in one cluster are already one material under one CNMC, so an
+    # "interchangeable with" link between them says nothing. This catches the
+    # transitive case: a pair the matcher refused can still be merged through a
+    # third item, and §2B is explicit that an equivalence is never a merge.
+    cluster_of = dict(
+        db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all()
+    )
+    status.rows_total = len(candidate_pairs)
+    status.rows_done = 0
+
+    db.query(Relation).delete()
+    db.commit()
+
+    rows: list[dict] = []
+    seen: set[tuple[int, int]] = set()
+    for n, (item_a, item_b) in enumerate(candidate_pairs, start=1):
+        a, b = items.get(item_a), items.get(item_b)
+        if a is None or b is None:
+            continue
+        cluster_a = cluster_of.get(item_a)
+        if cluster_a is not None and cluster_a == cluster_of.get(item_b):
+            continue
+        verdict = evaluate(
+            a, b, get_schema(a.class_code), rules_by_class.get(a.class_code, []), crossrefs
+        )
+        if verdict is None:
+            continue
+        row = verdict.as_row(item_a, item_b)
+        key = (row["item_a"], row["item_b"])
+        if key in seen:
+            continue
+        seen.add(key)
+        row["evidence_json"] = json.dumps(row["evidence_json"], sort_keys=True, default=str)
+        rows.append(row)
+        if n % 5000 == 0:
+            status.rows_done = n
+
+    for i in range(0, len(rows), BATCH):
+        db.execute(insert(Relation), rows[i : i + BATCH])
+    db.commit()
+    status.rows_done = len(candidate_pairs)

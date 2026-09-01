@@ -4,7 +4,7 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M3.4
+## Status: end of M3.5
 
 M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
 engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
@@ -15,7 +15,8 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 | Gap | Reason | Closes in |
 |---|---|---|
 | The LLM may not yet polish an unfilled template slot | §2D allows it, validated back against the template. Rendering drops unfilled segments cleanly instead, which is deterministic; the polish step needs the Ollama client | M6 |
-| The directed equivalence engine is not built | §2B; the truth is seeded and `GET /api/metrics` reports `equivalence.status = not_built` rather than a fabricated number | M3.5 |
+| Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | future tuning |
+| An LLM may not yet propose equivalences | §2B source 4, the lowest-trust one. It can only ever add review-queue suggestions, never auto-approve | M6 |
 | Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
 | All 12 in-shell routes still render empty states | Nothing may be faked (§10); screens fill as their engines land | M4–M7.5 |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
@@ -117,6 +118,35 @@ succeeds for a package installed without its own dependencies. `/api/health`
 was therefore willing to advertise `sentence-transformers` when importing it
 raised `ModuleNotFoundError: huggingface_hub`. Detection now performs a real
 import, so the health endpoint cannot claim an engine that will not run.
+
+### M3.5 findings
+
+Building the equivalence engine surfaced three things worth recording:
+
+- **A regression I introduced during the audit.** Removing `GR -> GRADE` from
+  the abbreviation dictionary (to stop it destroying the chemical grade `GR`)
+  silently broke fastener grades written as `GR 4.6`. Grade then extracted as
+  `None`, no veto fired, and a grade-4.6 bolt was called equivalent to a
+  grade-12.9 one. The pattern now accepts both spellings; the value
+  disambiguates, since a fastener grade is always numeric and a chemical grade
+  always alphabetic.
+- **A shared designation is not interchangeability.** Two 6205 bearings rated
+  200 kg and 500 kg agree on every field the designation encodes, and the first
+  implementation called them `equivalent bidirectional`. Direction is now
+  settled from the performance ratings whatever source produced the verdict —
+  getting this backwards is an unsafe substitution, not a near miss.
+- **A designation is not evidence about what it does not encode.** A metric
+  thread says nothing about a bolt's grade or material, so designation-based
+  equivalence now requires the remaining identity-critical attributes to be
+  comparable and to agree.
+
+Equivalence ground truth was also recomputed. The seed originally recorded only
+the planted traps, while the generator naturally produces thousands of genuinely
+equivalent pairs — two valves alike but for their temperature rating, say.
+Measured against that incomplete truth, precision read 0.07 for an engine that
+was largely right. Truth is now computed exhaustively over the product
+population and expanded across renderings at measurement time, which moved
+precision to 0.90.
 
 ### Measurement honesty
 

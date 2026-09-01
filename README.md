@@ -83,7 +83,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M2 | Models, auth, seed data, ingest, normalize, extract | **Done** |
 | M3 | Embeddings, blocking, tiered match, veto layer, clustering, CNMC, metrics | **Done** |
 | M3.4 | Golden-record standardization + provenance | **Done** |
-| M3.5 | Functional-equivalence engine | Not started |
+| M3.5 | Functional-equivalence engine | **Done** |
 | M4 | Workbench, decisions, role gates, audit chain | Not started |
 | M5 | Executive + Opportunity dashboards | Not started |
 | M6 | Copilot | Not started |
@@ -207,6 +207,42 @@ auto-approve: the cluster is flagged and routed to a steward, and `POST
 are held back this way, every one of them a same-part-number-different-
 specification data-quality error rather than a matching failure.
 
+### Equivalence is not duplication
+
+A duplicate is symmetric and gets merged into one CNMC. An equivalent is
+**directed** and keeps its own: a 500 bar valve can stand in for a 300 bar
+requirement, and the reverse is unsafe. Collapsing the two would erase a
+distinction CPSE material masters genuinely carry, so they are separate
+relations with separate metrics.
+
+Four evidence sources, in precision order — a published OEM interchange, a
+parsed standard designation, a per-class substitution rule, and (from M6) an
+LLM that may only *propose*:
+
+| | Held-out |
+|---|---|
+| Precision | 0.902 |
+| Recall | 0.607 |
+| **Direction accuracy** | **0.987** |
+| Candidate coverage | 0.796 |
+| Recall of reachable pairs | 0.762 |
+
+Recall is reported with its ceiling rather than on its own: 20% of true
+equivalence pairs never reach the engine because blocking is tuned for
+duplicates, and of those that do, some lack the extracted attributes to decide.
+Direction accuracy is the number that matters most — a substitution proposed the
+wrong way round is unsafe, not merely wrong.
+
+Rules are data, not code. A steward reads and edits them through `GET/POST
+/api/rules`:
+
+```yaml
+- class: bearing.ball.deep_groove
+  equivalent_if: [bore_mm ==, outer_dia_mm ==, width_mm ==, seal_type ==]
+  substitutable_if: [load_rating_kg >=, temp_max_c >=]   # directed: B substitutes A
+  never_if: [material !=]
+```
+
 **Veto layer**, on the planted near-miss traps: 380 of 380 correctly refused.
 
 | Trap | Accuracy |
@@ -231,7 +267,7 @@ are kept honest — partial is marked partial.
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine | Partial — duplicates done (P 0.98 / R 0.93); the directed equivalence engine is M3.5 |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.98 / R 0.94; directed equivalence P 0.90 / R 0.61, direction accuracy 0.99 |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |

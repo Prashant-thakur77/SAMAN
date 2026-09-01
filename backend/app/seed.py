@@ -865,6 +865,91 @@ def _plant_traps(
 
 
 # --------------------------------------------------------------------------
+# Equivalence ground truth (§2B)
+# --------------------------------------------------------------------------
+
+
+def _within_tolerance(spec, a: float, b: float) -> bool:
+    if spec.tolerance_pct:
+        return abs(a - b) <= spec.tolerance_pct / 100.0 * max(abs(a), abs(b))
+    return abs(a - b) <= abs(spec.tolerance or 0.0)
+
+
+def truth_relation(a: Product, b: Product, schema) -> tuple[str, str] | None:
+    """The relation two products genuinely have, from the generator's knowledge.
+
+    Called only for products that already agree on every identity_critical
+    attribute. What separates "interchangeable" from "substitutes for" is the
+    performance ratings: equal within tolerance means either can replace the
+    other, whereas one dominating means the substitution runs one way only.
+    """
+    b_covers_a = a_covers_b = True
+    differs = False
+
+    for spec in schema.performance:
+        left, right = a.attrs.get(spec.name), b.attrs.get(spec.name)
+        if left is None or right is None:
+            continue
+        left, right = float(left), float(right)
+        if _within_tolerance(spec, left, right):
+            continue
+        differs = True
+        if spec.direction != "higher_ok":
+            # An out-of-band difference on an undirected attribute means the
+            # two are simply not interchangeable.
+            return None
+        if right < left:
+            b_covers_a = False
+        if left < right:
+            a_covers_b = False
+
+    if not differs:
+        return ("equivalent", "bidirectional")
+    if b_covers_a and not a_covers_b:
+        return ("supersedes", "a_to_b")
+    if a_covers_b and not b_covers_a:
+        return ("supersedes", "b_to_a")
+    return None
+
+
+def build_equivalence_truth(products: list[Product]) -> list[tuple[Product, Product, str, str]]:
+    """Every genuinely equivalent or substitutable product pair.
+
+    Recording only the planted traps would make equivalence precision
+    meaningless: the generator also produces many naturally equivalent pairs —
+    two valves alike but for their temperature rating, say — and counting a
+    correct call on those as a false positive would misreport the engine.
+
+    Grouping by identity signature keeps this linear in the population rather
+    than quadratic: only products that already agree on every identity_critical
+    attribute can possibly be related.
+    """
+    from itertools import combinations
+
+    from .taxonomy import get_schema
+
+    by_identity: dict[tuple, list[Product]] = {}
+    for product in products:
+        schema = get_schema(product.class_code)
+        signature = (
+            product.class_code,
+            tuple(str(product.attrs.get(spec.name)) for spec in schema.identity_critical),
+        )
+        by_identity.setdefault(signature, []).append(product)
+
+    out: list[tuple[Product, Product, str, str]] = []
+    for (class_code, _), group in by_identity.items():
+        if len(group) < 2:
+            continue
+        schema = get_schema(class_code)
+        for a, b in combinations(group, 2):
+            relation = truth_relation(a, b, schema)
+            if relation:
+                out.append((a, b, relation[0], relation[1]))
+    return out
+
+
+# --------------------------------------------------------------------------
 # Product population
 # --------------------------------------------------------------------------
 
@@ -1006,6 +1091,7 @@ PROFILES = {
 }
 
 HOLDOUT_FRACTION = 0.40  # §0.6: 60% tuning / 40% held out
+TUNING, HOLDOUT = "tuning", "holdout"
 
 #: Combination indices held back for planted traps, so they never collide with
 #: the ordinary population.
@@ -1083,15 +1169,15 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
     # Evaluation split, assigned per product and forced to agree across a
     # trap pair so a trap is never split across tuning and held-out.
     splits: dict[str, str] = {
-        p.group_id: ("holdout" if rng.random() < HOLDOUT_FRACTION else "tuning")
+        p.group_id: (HOLDOUT if rng.random() < HOLDOUT_FRACTION else TUNING)
         for p in products
     }
     for trap in traps:
-        split = "holdout" if rng.random() < HOLDOUT_FRACTION else "tuning"
+        split = HOLDOUT if rng.random() < HOLDOUT_FRACTION else TUNING
         splits[trap.product_a.group_id] = split
         splits[trap.product_b.group_id] = split
     for p in trap_products:
-        splits.setdefault(p.group_id, "tuning")
+        splits.setdefault(p.group_id, TUNING)
 
     all_products = products + trap_products
 
@@ -1189,15 +1275,7 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
                         "expect_duplicate": trap.expect_duplicate, "split": split,
                     }
                 )
-                if trap.equivalence:
-                    direction, basis = trap.equivalence
-                    equiv_rows.append(
-                        {
-                            "raw_item_a": a_id, "raw_item_b": b_id,
-                            "rel_type": "supersedes" if direction == "a_to_b" else "equivalent",
-                            "direction": direction, "basis": basis, "split": split,
-                        }
-                    )
+
     for product in products:
         if product.group_id not in inband:
             continue
@@ -1218,6 +1296,32 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
         )
 
     _bulk(db, TruthTrap, trap_rows)
+
+    # §2B ground truth, computed exhaustively over the product population and
+    # recorded once per product pair. Metrics expand it across renderings via
+    # truth_group, which keeps this table small and the measurement complete.
+    for a, b, rel_type, direction in build_equivalence_truth(all_products):
+        codes_a = renderings.get(a.group_id, [])
+        codes_b = renderings.get(b.group_id, [])
+        if not codes_a or not codes_b:
+            continue
+        # A pair is held out if either side is: measuring it otherwise would
+        # let a tuning-set product influence a held-out number.
+        split = (
+            HOLDOUT
+            if HOLDOUT in (splits.get(a.group_id), splits.get(b.group_id))
+            else TUNING
+        )
+        equiv_rows.append(
+            {
+                "raw_item_a": raw_id_by_code[codes_a[0]],
+                "raw_item_b": raw_id_by_code[codes_b[0]],
+                "rel_type": rel_type,
+                "direction": direction,
+                "basis": "designation" if a.brand != b.brand else "rule",
+                "split": split,
+            }
+        )
     _bulk(db, TruthEquivalence, equiv_rows)
 
     # --- cross-reference table (§2B evidence source 2) ---
