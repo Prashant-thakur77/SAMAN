@@ -10,6 +10,7 @@ from .audit import ensure_genesis
 from .config import get_settings
 from .db import SessionLocal, init_db
 from .routers import (
+    admin,
     auth,
     clusters,
     cnmc,
@@ -20,6 +21,7 @@ from .routers import (
     metrics,
     pipeline,
     relations,
+    search,
     workbench,
 )
 
@@ -55,6 +57,8 @@ app.include_router(relations.router, prefix="/api")
 app.include_router(workbench.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(copilot.router, prefix="/api")
+app.include_router(search.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 
 @app.on_event("startup")

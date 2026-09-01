@@ -58,10 +58,32 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
-        """Sovereign mode wins over OLLAMA_URL (spec 5.12)."""
-        return bool(self.ollama_url) and not self.saman_sovereign_mode
+        """Sovereign mode wins over OLLAMA_URL (spec 6.13)."""
+        return bool(self.ollama_url) and not sovereign_mode()
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+#: A runtime toggle of sovereign mode, set from /admin (spec 6.13).
+#:
+#: It cannot live on the cached Settings object: capability detection clears
+#: that cache to re-read the environment, which would silently discard the
+#: operator's choice moments after they made it. None means "no override --
+#: use whatever the environment says".
+_SOVEREIGN_OVERRIDE: bool | None = None
+
+
+def sovereign_mode() -> bool:
+    if _SOVEREIGN_OVERRIDE is not None:
+        return _SOVEREIGN_OVERRIDE
+    return get_settings().saman_sovereign_mode
+
+
+def set_sovereign_mode(enabled: bool | None) -> bool:
+    """Set, or with None clear, the runtime override. Returns the new value."""
+    global _SOVEREIGN_OVERRIDE
+    _SOVEREIGN_OVERRIDE = enabled
+    return sovereign_mode()

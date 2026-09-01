@@ -44,7 +44,7 @@ def seeded():
     """
     from sqlalchemy import func, select
 
-    from app.models import Item, RawItem, TruthGroup
+    from app.models import Cpse, Item, RawItem, TruthGroup, User
 
     with SessionLocal() as db:
         summary = seed_database(db, profile="test")
@@ -54,6 +54,8 @@ def seeded():
             .outerjoin(Item, Item.raw_item_id == RawItem.id)
             .where(Item.id.is_(None))
         ).scalar()
+        summary["cpses_at_seed"] = db.execute(select(func.count(Cpse.id))).scalar()
+        summary["users_at_seed"] = db.execute(select(func.count(User.id))).scalar()
         summary["raw_without_truth"] = db.execute(
             select(func.count(RawItem.id))
             .outerjoin(TruthGroup, TruthGroup.raw_item_id == RawItem.id)

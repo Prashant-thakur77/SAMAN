@@ -20,7 +20,7 @@ import importlib.util
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from .config import get_settings
+from .config import get_settings, sovereign_mode
 
 
 def _importable(module: str) -> bool:
@@ -84,6 +84,7 @@ def detect() -> Capabilities:
     degraded: list[str] = []
 
     forced = settings.saman_disable_optional
+    sovereign = sovereign_mode()
 
     if _importable("splink") and not forced:
         linkage = "splink"
@@ -109,7 +110,7 @@ def detect() -> Capabilities:
         llm = "ollama"
     else:
         llm = "deterministic"
-        if settings.saman_sovereign_mode:
+        if sovereign:
             degraded.append("sovereign mode ON — Tier 3 forced to rule-based adjudicator")
         else:
             degraded.append("OLLAMA_URL unset — Tier 3 using rule-based adjudicator")
@@ -118,7 +119,7 @@ def detect() -> Capabilities:
         linkage_mode=linkage,
         embedding_mode=embedding,
         llm_mode=llm,
-        sovereign_mode=settings.saman_sovereign_mode,
+        sovereign_mode=sovereign,
         degraded=degraded,
     )
 

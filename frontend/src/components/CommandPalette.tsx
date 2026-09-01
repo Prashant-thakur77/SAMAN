@@ -2,17 +2,23 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { searchItems, type SearchHit } from '../lib/api'
 import { cn } from '../lib/cn'
 import { paletteVariants, scrimVariants } from '../lib/motion'
 import { NAV } from '../lib/nav'
 
 /**
- * ⌘K palette (spec §1.3, §1.5). In M1 it navigates; from M3 the same input also
- * runs the global item search, so /search and the palette share one entry point.
+ * ⌘K palette (spec §1.3, §1.5, §6.3).
+ *
+ * One input for both jumping between screens and searching the catalogue, so
+ * /search and the palette are the same entry point rather than two behaviours
+ * that can drift apart.
  */
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(0)
+  const [hits, setHits] = useState<SearchHit[]>([])
+  const [searching, setSearching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const reduce = useReducedMotion() ?? false
@@ -38,10 +44,50 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     setCursor(0)
   }, [query])
 
+  // Search the catalogue alongside the page list. Debounced, and stale
+  // responses are discarded so a slow reply cannot overwrite a newer one.
+  useEffect(() => {
+    const term = query.trim()
+    if (term.length < 2) {
+      setHits([])
+      return
+    }
+    let alive = true
+    setSearching(true)
+    const timer = window.setTimeout(() => {
+      searchItems({ search: term, limit: 6 })
+        .then((response) => alive && setHits(response.items))
+        .catch(() => alive && setHits([]))
+        .finally(() => alive && setSearching(false))
+    }, 180)
+    return () => {
+      alive = false
+      window.clearTimeout(timer)
+    }
+  }, [query])
+
   const go = (path: string) => {
     onClose()
     navigate(path)
   }
+
+  // One flat list so the arrow keys move through pages and results alike.
+  const options: { key: string; path: string; label: string; hint: string; kind: string }[] = [
+    ...results.map((item) => ({
+      key: `nav-${item.path}`,
+      path: item.path,
+      label: item.label,
+      hint: item.path,
+      kind: 'page',
+    })),
+    ...hits.map((hit) => ({
+      key: `item-${hit.item_id}`,
+      path: `/items/${hit.item_id}`,
+      label: hit.description,
+      hint: `${hit.cpse} · ${hit.legacy_code}`,
+      kind: 'item',
+    })),
+  ]
 
   return (
     <AnimatePresence>
@@ -74,44 +120,55 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 if (e.key === 'Escape') onClose()
                 if (e.key === 'ArrowDown') {
                   e.preventDefault()
-                  setCursor((c) => Math.min(c + 1, results.length - 1))
+                  setCursor((c) => Math.min(c + 1, options.length - 1))
                 }
                 if (e.key === 'ArrowUp') {
                   e.preventDefault()
                   setCursor((c) => Math.max(c - 1, 0))
                 }
-                if (e.key === 'Enter' && results[cursor]) go(results[cursor].path)
+                if (e.key === 'Enter' && options[cursor]) go(options[cursor].path)
               }}
               placeholder="Search SAMAN — pages, items, CNMC codes"
               aria-label="Search SAMAN"
               className="h-12 w-full border-b border-hairline bg-transparent px-4 font-mono text-sm text-ink placeholder:text-muted focus-visible:ring-0"
             />
             <ul className="max-h-80 overflow-y-auto py-1" role="listbox">
-              {results.map((item, i) => (
-                <li key={item.path}>
+              {options.map((option, i) => (
+                <li key={option.key}>
                   <button
                     type="button"
                     role="option"
                     aria-selected={i === cursor}
                     onMouseEnter={() => setCursor(i)}
-                    onClick={() => go(item.path)}
+                    onClick={() => go(option.path)}
                     className={cn(
                       'flex h-10 w-full items-center gap-3 px-4 text-left text-sm',
                       i === cursor ? 'bg-surface text-ink' : 'text-muted',
                     )}
                   >
-                    <item.icon className="shrink-0" />
-                    <span>{item.label}</span>
-                    <span className="ml-auto font-mono text-xs text-muted">{item.path}</span>
+                    <span className="micro-label w-10 shrink-0">{option.kind}</span>
+                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                    <span className="ml-auto shrink-0 font-mono text-xs text-muted">
+                      {option.hint}
+                    </span>
                   </button>
                 </li>
               ))}
-              {results.length === 0 && (
+              {options.length === 0 && (
                 <li className="px-4 py-6 text-sm text-muted">
-                  No page matches “{query}”. Item search arrives with the matching engine (M3).
+                  {searching ? 'Searching…' : `Nothing matches “${query}”.`}
                 </li>
               )}
             </ul>
+            {hits.length > 0 && (
+              <button
+                type="button"
+                onClick={() => go(`/search?q=${encodeURIComponent(query.trim())}`)}
+                className="w-full border-t border-hairline px-4 py-2 text-left text-xs text-muted hover:text-ink"
+              >
+                See all results for “{query.trim()}”
+              </button>
+            )}
           </motion.div>
         </div>
       )}

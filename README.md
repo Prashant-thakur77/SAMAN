@@ -87,7 +87,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M4 | Workbench, decisions, role gates, audit chain | **Done** |
 | M5 | Executive + Opportunity dashboards | **Done** |
 | M6 | Copilot | **Done** |
-| M7 | Onboarding wizard, admin, audit explorer | Not started |
+| M7 | Onboarding wizard, admin, audit explorer | **Done** |
 | M7.5 | Two-way ERP migration | Not started |
 | M8 | Smart-Create, licensing artefacts | Not started |
 | M8B | Demo survivability + performance | Not started |
@@ -242,6 +242,16 @@ Rules are data, not code. A steward reads and edits them through `GET/POST
   substitutable_if: [load_rating_kg >=, temp_max_c >=]   # directed: B substitutes A
   never_if: [material !=]
 ```
+
+### Onboarding a new CPSE
+
+A registrar registers the CPSE, uploads its catalogue, confirms the column
+mapping — SAP field names like `MATNR` and `MAKTX` are guessed — and reviews a
+dry run before anything is written. The dry run is the same code path as the
+real ingest with the write suppressed, so what it reports is what will happen
+rather than a separate estimate that could drift from it. Ingest then runs the
+pipeline with a determinate progress bar, and the new rows arrive in the review
+queue.
 
 ### Copilot
 

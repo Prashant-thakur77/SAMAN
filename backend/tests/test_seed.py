@@ -12,7 +12,6 @@ import json
 from sqlalchemy import func, select
 
 from app.models import (
-    Cpse,
     Crossref,
     Item,
     PurchaseHistory,
@@ -21,16 +20,17 @@ from app.models import (
     TruthEquivalence,
     TruthGroup,
     TruthTrap,
-    User,
 )
 from app.seed import CLASS_SPACES, HOLDOUT_FRACTION, allocate, class_capacity
 from app.taxonomy import get_schema
 
 
 class TestSeedShape:
-    def test_every_cpse_and_user_is_created(self, db, seeded):
-        assert db.execute(select(func.count(Cpse.id))).scalar() == seeded["cpses"]
-        assert db.execute(select(func.count(User.id))).scalar() == 7
+    def test_every_cpse_and_user_is_created(self, seeded):
+        # Counted at seed time: the onboarding and admin tests add CPSEs and
+        # users to the same database, so a later count would be order-dependent.
+        assert seeded["cpses_at_seed"] == seeded["cpses"]
+        assert seeded["users_at_seed"] == 7
 
     def test_every_raw_row_produced_an_item(self, seeded):
         assert seeded["raw_items"] == seeded["items"]

@@ -4,7 +4,7 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M6
+## Status: end of M7
 
 M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
 engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
@@ -19,7 +19,7 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 | Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | future tuning |
 | An LLM may not yet propose equivalences | §2B source 4, the lowest-trust one. It can only ever add review-queue suggestions, never auto-approve | M6 |
 | Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
-| Search, Onboard, Migration and Admin still render empty states | Nothing may be faked (§10); screens fill as their engines land | M7–M7.5 |
+| Migration still renders an empty state | Nothing may be faked (§10) | M7.5 |
 | No frontend test runner | The API is covered by 473 pytest cases and the UI is type-checked and built, but component behaviour is unverified | polish pass |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale; worth batching if the queue view is ever paged deeply | M8B |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
@@ -215,6 +215,18 @@ that could not be true:
 - **The README credited duckdb for "analytics views backing the Copilot"**,
   which was never true — the Copilot's queries run on SQLite. Corrected to what
   duckdb actually does here: splink's execution backend.
+
+### M7 findings
+
+- **Sovereign mode forgot itself the moment it was set.** The toggle mutated
+  the cached `Settings` object, and capability detection then cleared that cache
+  to re-read the environment — silently discarding the operator's choice. The
+  override now lives beside the cache rather than inside it, with a test that
+  it survives a refresh.
+- **Searching "6205" returned a cable**, because a plain `LIKE '%6205%'` matched
+  a barcode that happened to contain those digits. Search now anchors each term
+  to a token start, so it still matches `6205-2Z` and `6205ZZ` and no longer
+  matches mid-barcode.
 
 ### Measurement honesty
 

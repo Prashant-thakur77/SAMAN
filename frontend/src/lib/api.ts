@@ -439,3 +439,151 @@ export type CopilotSuggestions = {
 export const getCopilotSuggestions = () => api.get<CopilotSuggestions>('/copilot/suggestions')
 export const askCopilot = (question: string) =>
   api.post<CopilotAnswer>('/copilot/query', { question })
+
+// ---- search (§6.3) ----
+
+export type SearchHit = {
+  item_id: number
+  normalized: string
+  description: string
+  legacy_code: string
+  cpse: string
+  class_code: string
+  mpn_norm: string | null
+  brand: string | null
+  cluster_id: number | null
+  cluster_size: number
+  cnmc: string | null
+}
+
+export type SearchResponse = {
+  total: number
+  offset: number
+  limit: number
+  items: SearchHit[]
+}
+
+export type Facets = {
+  cpses: { code: string; name: string; items: number }[]
+  classes: { class_code: string; label: string; items: number }[]
+  totals: { items: number; clusters: number; cnmcs: number }
+}
+
+export const searchItems = (params: {
+  search?: string
+  cpse?: string
+  class?: string
+  has_cnmc?: boolean
+  limit?: number
+  offset?: number
+}) => {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  if (params.cpse) query.set('cpse', params.cpse)
+  if (params.class) query.set('class', params.class)
+  if (params.has_cnmc !== undefined) query.set('has_cnmc', String(params.has_cnmc))
+  query.set('limit', String(params.limit ?? 25))
+  query.set('offset', String(params.offset ?? 0))
+  return api.get<SearchResponse>(`/items?${query}`)
+}
+export const getFacets = () => api.get<Facets>('/facets')
+
+// ---- ingest & admin (§6.11, §6.13) ----
+
+export type IngestReport = {
+  cpse_code: string
+  dry_run: boolean
+  rows_read: number
+  rows_accepted: number
+  rows_rejected: number
+  duplicates_in_file: number
+  already_present: number
+  column_mapping: Record<string, string>
+  unmapped_columns: string[]
+  rejected: { row_number: number; reason: string }[]
+  samples: {
+    legacy_code: string
+    original: string
+    normalized: string
+    class_code: string
+    class_confidence: number
+    attrs: Record<string, unknown>
+  }[]
+}
+
+export async function ingestCsv(
+  file: File,
+  cpseCode: string,
+  dryRun: boolean,
+  mapping?: Record<string, string>,
+): Promise<IngestReport> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('cpse_code', cpseCode)
+  form.append('dry_run', String(dryRun))
+  if (mapping) form.append('mapping', JSON.stringify(mapping))
+  const res = await fetch('/api/ingest', { method: 'POST', body: form, credentials: 'include' })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
+  return body as IngestReport
+}
+
+export type PipelineStatus = {
+  state: string
+  stage: string | null
+  stages_done: string[]
+  rows_done: number
+  rows_total: number
+  percent: number
+  eta_seconds: number | null
+  elapsed_seconds: number | null
+  error: string | null
+}
+
+export const runPipeline = () => api.post<PipelineStatus>('/pipeline/run')
+export const getPipelineStatus = () => api.get<PipelineStatus>('/pipeline/status')
+
+export type AdminUser = {
+  id: number
+  email: string
+  name: string
+  role: Role
+  cpse_code: string | null
+  active: boolean
+}
+
+export const getUsers = () => api.get<{ roles: Role[]; count: number; users: AdminUser[] }>('/users')
+export const createUser = (body: {
+  email: string
+  name: string
+  role: string
+  cpse_code?: string | null
+}) => api.post<AdminUser>('/users', body)
+export async function patchUser(id: number, body: { role?: string; active?: boolean }) {
+  const res = await fetch(`/api/users/${id}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const parsed = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, String(parsed?.detail ?? res.statusText), parsed)
+  return parsed as AdminUser
+}
+
+export const getCpses = () => api.get<{ cpses: { code: string; name: string; items: number }[] }>('/cpses')
+export const createCpse = (code: string, name: string) =>
+  api.post<{ code: string; name: string }>('/cpses', { code, name })
+
+export type HealthPanel = {
+  capabilities: Health['capabilities']
+  sovereign_mode: boolean
+  ollama_configured: boolean
+  database: string
+  counts: Record<string, number>
+  audit: VerifyResponse
+}
+
+export const getHealthPanel = () => api.get<HealthPanel>('/settings/health')
+export const setSovereign = (enabled: boolean) =>
+  api.post<{ sovereign_mode: boolean; note: string }>('/settings/sovereign', { enabled })

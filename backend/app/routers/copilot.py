@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .. import copilot
 from ..auth import current_user_optional
 from ..capabilities import detect
-from ..config import get_settings
+from ..config import get_settings, sovereign_mode
 from ..db import get_db
 from ..models import User
 from ..visibility import scope_for
@@ -26,7 +26,6 @@ class Query(BaseModel):
 @router.get("/suggestions")
 def suggestions() -> dict:
     """The prompt row on the copilot screen, drawn from the whitelist itself."""
-    settings = get_settings()
     return {
         "prompts": copilot.suggested_prompts(),
         "templates": [
@@ -34,7 +33,7 @@ def suggestions() -> dict:
             for t in copilot.TEMPLATES
         ],
         "mode": detect().llm_mode,
-        "sovereign_mode": settings.saman_sovereign_mode,
+        "sovereign_mode": sovereign_mode(),
         "note": (
             "Questions never become SQL. Each one selects a reviewed query and "
             "its parameters, or searches the golden records."
