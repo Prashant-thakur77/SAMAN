@@ -1,0 +1,10 @@
+# SAMAN backend — OPTIONAL accelerators. The app runs fully without these and
+# reports the degraded mode at GET /api/health (spec 0.4).
+#
+#   splink absent               -> Tier 1 degrades to rapidfuzz-only scoring
+#   sentence-transformers absent -> Tier 2 degrades to scikit-learn TF-IDF char 3-5grams
+#
+# Install with:  make deps-optional
+
+splink==4.0.7                    # MIT       (Tier 1 probabilistic linkage, DuckDB backend)
+sentence-transformers==3.3.1     # Apache-2.0 (Tier 2 semantic embeddings, all-MiniLM-L6-v2)

@@ -1,0 +1,24 @@
+# SAMAN backend — core runtime. All permissive licenses (MIT / BSD / Apache-2.0).
+# No GPL/AGPL. See THIRD_PARTY_LICENSES.md and `make licenses`.
+
+fastapi==0.115.6            # MIT
+uvicorn[standard]==0.34.0   # BSD-3-Clause
+sqlalchemy==2.0.36          # MIT
+pydantic==2.10.4            # MIT
+pydantic-settings==2.7.0    # MIT
+python-multipart==0.0.20    # Apache-2.0
+itsdangerous==2.2.0         # BSD-3-Clause
+httpx==0.28.1               # BSD-3-Clause  (localhost-only Ollama client)
+
+# --- matching stack (Tier 0-2 core; always required) ---
+rapidfuzz==3.11.0           # MIT
+scikit-learn==1.6.0         # BSD-3-Clause
+numpy==2.2.1                # BSD-3-Clause
+duckdb==1.1.3               # MIT
+pint==0.24.4                # BSD-3-Clause  (unit-aware numeric comparators, spec 2A)
+pyyaml==6.0.2               # MIT           (class schemas, description templates, rule DSL)
+
+# --- tooling ---
+pytest==8.3.4               # MIT
+pytest-asyncio==0.25.0      # Apache-2.0
+pip-licenses==5.0.0         # MIT

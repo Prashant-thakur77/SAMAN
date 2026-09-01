@@ -1,0 +1,16 @@
+[project]
+name = "saman-backend"
+version = "0.1.0"
+description = "SAMAN — Standardised Asset & Material Analysis Network. Harmonizes material codes across Indian CPSEs and issues the CNMC."
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

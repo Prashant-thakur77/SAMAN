@@ -1,0 +1,42 @@
+# SAMAN — `docker compose up` brings up both services (spec §0.1).
+# No external network is required at runtime; the SQLite file lives on a bind
+# mount so seeded data survives a restart.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./data:/srv/data
+      - ./backend:/srv/backend
+    environment:
+      SAMAN_DB_PATH: /srv/data/app.db
+      # Ollama stays unset: the demo must run without it (spec §0.4 Tier 3).
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./frontend/src:/srv/frontend/src
+    environment:
+      VITE_API_BASE: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy

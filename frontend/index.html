@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="SAMAN — Standardised Asset & Material Analysis Network. One Nation, One Material Code."
+    />
+    <title>SAMAN</title>
+    <script>
+      // Apply the persisted theme before first paint so there is no flash.
+      // Mirrors lib/theme.tsx; defaults to prefers-color-scheme (spec 1.4).
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('saman.theme')
+          var dark = stored
+            ? stored === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {
+          /* private mode / storage blocked — fall through to light */
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

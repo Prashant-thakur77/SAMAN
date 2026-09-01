@@ -1,0 +1,62 @@
+/* Self-hosted fonts — no runtime network (spec §1.3, §9). */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans text-sm;
+  }
+
+  /* Visible focus ring everywhere — keyboard-first (spec §0.9). Two-tone so it
+     stays visible against both --bg and --inverse fills. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-bg;
+  }
+
+  ::selection {
+    @apply bg-ink text-bg;
+  }
+
+  /* Hairline dividers only — never a heavier rule. */
+  hr {
+    @apply border-0 border-t border-hairline;
+  }
+}
+
+@layer components {
+  /* Uppercase section micro-label that opens every page header (spec §5). */
+  .micro-label {
+    @apply text-micro font-medium uppercase text-muted;
+  }
+
+  /* CNMC and every issued code: Plex Mono in a 1px-border chip (spec §1.3). */
+  .code-chip {
+    @apply inline-flex items-center border border-hairline px-2 py-0.5 font-mono text-xs;
+  }
+}
+
+/* Respect prefers-reduced-motion globally; framer-motion variants additionally
+   collapse to opacity-only via lib/motion.ts (spec §1.5). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
