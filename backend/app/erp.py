@@ -348,6 +348,12 @@ def seed_from_catalogue(db, path: Path | None = None, open_po_rate: float = 0.12
         conn.executemany("INSERT INTO mbew VALUES (?,?,?,?)", mbew)
         conn.executemany("INSERT INTO ekpo VALUES (?,?,?,?,?,?)", ekpo)
 
+    # DELETE leaves the pages behind: a reseeded mock ERP was 54 MB of which
+    # 92% was free list. It matters here because the file is an artefact people
+    # copy around, and because `fingerprint()` reads every page of it.
+    with connect(path) as conn:
+        conn.execute("VACUUM")
+
     return {
         "materials": len(mara),
         "stock_rows": len(mard),
