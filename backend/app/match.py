@@ -5,7 +5,8 @@ Tier 1  probabilistic linkage: splink Fellegi-Sunter match weight when it is
         available, otherwise rapidfuzz token_set_ratio (spec §0.4)
 Tier 2  semantic similarity over the embedding vectors
 VETO    §2A hard constraints, applied to candidates from EVERY tier
-Tier 3  adjudication of the grey band (deterministic, or Ollama when configured)
+Tier 3  adjudication of the grey band, in `adjudicate.py`: a deterministic
+        recommendation with its reasons, optionally rephrased by a local model
 
 Two rules do most of the precision work, and neither is a similarity score:
 

@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import audit, inventory, opportunity, review
+from ..adjudicate import adjudicate
 from ..auth import current_user_optional, require_roles, require_user
 from ..db import get_db
 from ..models import (
@@ -141,6 +142,17 @@ def _task_card(db: Session, task: ReviewTask) -> dict:
             "attribute_diff": diff,
             "agreement": attributes.get("agreement"),
             "items": [left, right],
+            # Tier 3 (§0.4): a recommendation with its reasons, so the reviewer
+            # starts from a position rather than from a score. It never decides.
+            "adjudication": adjudicate(
+                evidence,
+                json.loads(pair.tier_scores_json or "{}"),
+                pair.confidence,
+                pair.verdict,
+                veto,
+            ).as_dict()
+            if task.band == "grey"
+            else None,
         }
     )
     return card

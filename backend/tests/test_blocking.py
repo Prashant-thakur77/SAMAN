@@ -103,12 +103,12 @@ class TestAnnPass:
 
 
 class TestOversizedBuckets:
-    """Skipping a bucket outright cost 0.09 of blocking recall at 150k rows."""
+    """An undiscriminating key is skipped, not compared pairwise."""
 
-    def _stats(self, buckets, cap, **kwargs):
+    def _stats(self, buckets, cap):
         out: set[tuple[int, int]] = set()
         stats = blocking.BlockingStats()
-        blocking._pairs_from_buckets(buckets, out, stats, "test", cap=cap, **kwargs)
+        blocking._pairs_from_buckets(buckets, out, stats, "test", cap=cap)
         return out, stats
 
     def test_a_bucket_within_its_cap_is_compared_fully(self):
@@ -116,33 +116,15 @@ class TestOversizedBuckets:
         assert out == {(1, 2), (1, 3), (2, 3)}
         assert stats.oversized_buckets == 0
 
-    def test_an_oversized_bucket_is_windowed_rather_than_dropped(self):
-        members = list(range(1, 41))
-        out, stats = self._stats({"k": members}, cap=10)
-        assert stats.oversized_buckets == 1
-        assert out, "a skipped bucket contributes nothing at all"
-        # Bounded: every member paired with at most `window` neighbours.
-        assert len(out) <= len(members) * blocking.OVERSIZED_WINDOW
-
-    def test_the_window_is_bounded_not_quadratic(self):
-        """The whole point: a 46,000-member bucket must not cost 1.1 billion
-        comparisons."""
-        members = list(range(2_000))
-        out, _ = self._stats({"k": members}, cap=10)
-        assert len(out) < len(members) * (blocking.OVERSIZED_WINDOW + 1)
-        assert len(out) < len(members) * (len(members) - 1) // 2
-
-    def test_the_bucket_is_sorted_before_windowing(self):
-        """Item order is load order, which groups a CPSE's own rows together —
-        the least useful ordering, since duplicates live across CPSEs."""
-        members = [1, 2, 3, 4]
-        sort_key = {1: "ZZZ", 2: "AAA", 3: "ZZY", 4: "AAB"}
-        out, _ = self._stats({"k": members}, cap=2, sort_key=sort_key)
-        # Sorted order is 2, 4, 3, 1 — so the AAA/AAB pair must be present.
-        assert (2, 4) in out
-
-    def test_a_pass_can_opt_out_of_windowing(self):
-        """A token bucket overflows because the token is "BEARING"."""
-        out, stats = self._stats({"k": list(range(50))}, cap=5, window_oversized=False)
+    def test_an_oversized_bucket_is_skipped_and_counted(self):
+        """Comparing a 46,000-member bucket pairwise is 1.1 billion
+        comparisons; the ANN and anchor passes still cover those items."""
+        out, stats = self._stats({"k": list(range(500))}, cap=10)
         assert stats.oversized_buckets == 1
         assert out == set()
+
+    def test_the_largest_bucket_is_reported_even_when_skipped(self):
+        """The number a tuning decision is made from must not be hidden by the
+        cap that skipped it."""
+        _, stats = self._stats({"k": list(range(500))}, cap=10)
+        assert stats.largest_bucket == 500

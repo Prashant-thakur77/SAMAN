@@ -38,15 +38,25 @@ TOKEN_MAX_BUCKET = 100  # inverted token index — common tokens are useless key
 #: pair of any pass, so it is worth running wide.
 ANN_K = 50
 
-#: How far each member of an oversized bucket is compared, once the bucket has
-#: been sorted. Skipping such a bucket entirely was measurably wrong at scale:
-#: on the 150k benchmark every (class, band) bucket exceeded its cap -- the
-#: largest held 46,911 members -- so the class-band pass contributed 2,207
-#: pairs instead of hundreds of thousands, and blocking recall fell to 0.897.
-#: Sorting the bucket puts near-identical descriptions next to each other, so a
-#: window recovers most of what a full pairwise comparison would find at
-#: O(size x window) instead of O(size squared).
-OVERSIZED_WINDOW = 12
+#: Sub-blocking an oversized bucket: measured, and rejected.
+#:
+#: An oversized bucket could be salvaged rather than
+#: skipped: sort it by normalized text and compare each member with its next
+#: dozen neighbours, at O(size x window) instead of O(size squared). It looked
+#: like the fix for the 150k benchmark, where every (class, band) bucket
+#: exceeds its cap -- the largest holds 46,911 members -- and blocking recall
+#: falls to 0.897.
+#:
+#: It was built and measured back to back on the same machine:
+#:
+#:   150k benchmark   recall 0.8965 -> 0.9005, 921s -> 1014s, 6.98 -> 7.59 GB
+#:   12k demo         recall 0.9842 -> 0.9845, +6.5% candidate pairs
+#:
+#: Four thousandths of blocking recall for a tenth of the wall clock and a
+#: tenth of the memory. The ANN pass already covers this space -- it produced
+#: 4.35M of the 5.29M candidate pairs -- so the window was mostly re-finding
+#: what it had found. Recorded here rather than left in the code, so the next
+#: person to have the idea has the numbers instead of the work.
 
 #: Tokens shorter than this are too common to discriminate.
 MIN_TOKEN_LEN = 3
@@ -100,8 +110,6 @@ def _pairs_from_buckets(
     stats: BlockingStats,
     pass_name: str,
     cap: int = MAX_BUCKET,
-    sort_key: dict[int, str] | None = None,
-    window_oversized: bool = True,
 ) -> None:
     added = 0
     for members in buckets.values():
@@ -111,19 +119,10 @@ def _pairs_from_buckets(
         stats.largest_bucket = max(stats.largest_bucket, size)
         if size > cap:
             # Comparing a 46,000-member bucket pairwise is 1.1 billion
-            # comparisons. Skipping it outright was the original answer and it
-            # cost 0.09 of blocking recall at scale; a sorted window is the
-            # bounded middle ground.
-            #
-            # Only for keys that are *meant* to discriminate, though. A class
-            # plus its defining attribute overflows because the corpus is
-            # dense, and salvaging it is worth the pairs. A token bucket
-            # overflows because the token is "BEARING" -- windowing that buys
-            # 52% more candidate pairs on the demo profile for 0.0003 of
-            # recall, which is the wrong trade.
+            # comparisons for a key that clearly is not discriminating. The
+            # other passes still cover these items — see the note above the
+            # bucket caps for the sub-blocking alternative and why it lost.
             stats.oversized_buckets += 1
-            if window_oversized:
-                added += _window_pairs(members, out, sort_key)
             continue
         for i in range(size):
             for j in range(i + 1, size):
@@ -132,32 +131,6 @@ def _pairs_from_buckets(
                     out.add(pair)
                     added += 1
     stats.per_pass[pass_name] = stats.per_pass.get(pass_name, 0) + added
-
-
-def _window_pairs(
-    members: list[int],
-    out: set[tuple[int, int]],
-    sort_key: dict[int, str] | None,
-    window: int = OVERSIZED_WINDOW,
-) -> int:
-    """Pairs from an oversized bucket, sorted then compared within a window.
-
-    Without a sort key the member order is by item id, which for a catalogue
-    loaded CPSE by CPSE puts the same CPSE's rows together — the least useful
-    ordering, since duplicates live *across* CPSEs. Sorting by normalized text
-    puts near-identical descriptions adjacent regardless of who catalogued them.
-    """
-    if sort_key is not None:
-        members = sorted(members, key=lambda item_id: sort_key.get(item_id, ""))
-    added = 0
-    size = len(members)
-    for i in range(size):
-        for j in range(i + 1, min(i + 1 + window, size)):
-            pair = _ordered(members[i], members[j])
-            if pair not in out:
-                out.add(pair)
-                added += 1
-    return added
 
 
 def content_tokens(norm_text: str) -> set[str]:
@@ -188,9 +161,6 @@ def generate_candidates(
     """Return candidate pairs and the stats behind them."""
     out: set[tuple[int, int]] = set()
     stats = BlockingStats()
-    #: Used to order an oversized bucket before windowing it, so that
-    #: near-identical descriptions end up adjacent.
-    by_text_key = {item.id: item.norm_text for item in items}
 
     # --- pass 1: exact anchor key (MPN, then GTIN) ---
     by_mpn: dict[str, list[int]] = defaultdict(list)
@@ -200,23 +170,21 @@ def generate_candidates(
             by_mpn[item.mpn_norm].append(item.id)
         if item.gtin:
             by_gtin[item.gtin].append(item.id)
-    _pairs_from_buckets(by_mpn, out, stats, "mpn", sort_key=by_text_key)
-    _pairs_from_buckets(by_gtin, out, stats, "gtin", sort_key=by_text_key)
+    _pairs_from_buckets(by_mpn, out, stats, "mpn")
+    _pairs_from_buckets(by_gtin, out, stats, "gtin")
 
     # --- pass 2: identical normalized text ---
     by_text: dict[str, list[int]] = defaultdict(list)
     for item in items:
         by_text[item.norm_hash].append(item.id)
-    _pairs_from_buckets(by_text, out, stats, "text", sort_key=by_text_key)
+    _pairs_from_buckets(by_text, out, stats, "text")
 
     # --- pass 3: class + the class's coarse blocking attribute ---
     by_band: dict[tuple[str, str], list[int]] = defaultdict(list)
     for item in items:
         if item.block_value is not None:
             by_band[(item.class_code, item.block_value)].append(item.id)
-    _pairs_from_buckets(
-        by_band, out, stats, "class_band", cap=BAND_MAX_BUCKET, sort_key=by_text_key
-    )
+    _pairs_from_buckets(by_band, out, stats, "class_band", cap=BAND_MAX_BUCKET)
 
     # --- pass 4: inverted token index, one bucket per distinct token ---
     # A rare token ("6205", "SS316-GRAPHITE") is a strong key; a common one
@@ -225,9 +193,7 @@ def generate_candidates(
     for item in items:
         for token in content_tokens(item.norm_text):
             by_token[(item.class_code, token)].append(item.id)
-    _pairs_from_buckets(
-        by_token, out, stats, "token", cap=TOKEN_MAX_BUCKET, window_oversized=False
-    )
+    _pairs_from_buckets(by_token, out, stats, "token", cap=TOKEN_MAX_BUCKET)
 
     # --- pass 5: embedding neighbours, within class ---
     if vectors is not None and index_by_id and len(items) > 1:

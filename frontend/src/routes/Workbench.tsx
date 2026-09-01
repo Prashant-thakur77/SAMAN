@@ -31,6 +31,13 @@ type Band = (typeof BANDS)[number]['key']
  * rises into place. Decisions post to the API, which is what enforces the role
  * gate — the disabled button here is a courtesy, not the boundary.
  */
+const ADJUDICATION_TONE = {
+  lean_merge: 'ok',
+  lean_review: 'neutral',
+  lean_split: 'danger',
+  flag_conflict: 'danger',
+} as const
+
 export default function Workbench() {
   const [band, setBand] = useState<Band>('grey')
   const [queue, setQueue] = useState<QueueResponse | null>(null)
@@ -211,6 +218,36 @@ export default function Workbench() {
                 </div>
               </div>
             </header>
+
+            {task.adjudication && (
+              <section className="border border-hairline px-4 py-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="micro-label">Tier 3 · recommendation</p>
+                  <StatusChip tone={ADJUDICATION_TONE[task.adjudication.recommendation]}>
+                    {task.adjudication.recommendation.replace(/_/g, ' ')}
+                  </StatusChip>
+                  <span className="font-mono text-xs text-muted">
+                    {(task.adjudication.confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <p className="max-w-prose pt-2 text-sm">{task.adjudication.summary}</p>
+                {task.adjudication.reasons.length > 1 && (
+                  <ul className="space-y-1 pt-2">
+                    {task.adjudication.reasons.slice(1).map((reason) => (
+                      <li key={reason} className="text-xs text-muted">
+                        · {reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="pt-2 text-xs text-muted">
+                  {task.adjudication.note}
+                  {task.adjudication.prose_by === 'ollama'
+                    ? ' Wording by the local model; the recommendation is not.'
+                    : ''}
+                </p>
+              </section>
+            )}
 
             {task.conflict && (
               <p className="border border-hairline bg-surface px-4 py-3 text-sm text-ink">

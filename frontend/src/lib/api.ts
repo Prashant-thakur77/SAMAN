@@ -145,6 +145,16 @@ export type TaskCard = {
   tier_scores?: TierScores
   veto?: { vetoed_by: { attr: string; a: unknown; b: unknown; reason: string }[] } | null
   refused_because?: string[]
+  adjudication?: {
+    recommendation: 'lean_merge' | 'lean_review' | 'lean_split' | 'flag_conflict'
+    confidence: number
+    reasons: string[]
+    summary: string
+    prose_by: string
+    prose_note: string | null
+    decides: boolean
+    note: string
+  } | null
   equivalence?: { basis: string; direction: string | null } | null
   route?: string
   conflict?: string

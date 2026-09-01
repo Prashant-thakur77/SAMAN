@@ -4,27 +4,24 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M7
+## Status: M1–M10 complete
 
-M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
-engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
-issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
+Every milestone in §8 is built, including the M10 stretch. 752 backend tests and
+19 frontend tests pass; `make check` runs what CI runs. The four §8 M3 gates
+pass on the held-out split of the demo profile.
 
-### Not built yet
+### Not built, or built only as far as stated
 
-| Gap | Reason | Closes in |
+| Gap | Where it stands | Why it is here |
 |---|---|---|
-| The LLM may not yet polish an unfilled template slot | §2D allows it, validated back against the template. Rendering drops unfilled segments cleanly instead, which is deterministic | not planned — the deterministic renderer is better here |
-| No Ollama model is installed on this machine | The Tier-3 path is implemented and unit-tested against a stubbed model, including its rejection guard, but has not been run against a real one | before the demo, if a model is wanted |
-| Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | future tuning |
-| An LLM may not yet propose equivalences | §2B source 4, the lowest-trust one. It can only ever add review-queue suggestions, never auto-approve | M6 |
-| Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
-| Migration still renders an empty state | Nothing may be faked (§10) | M7.5 |
-| No frontend test runner | The API is covered by 473 pytest cases and the UI is type-checked and built, but component behaviour is unverified | polish pass |
-| Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale; worth batching if the queue view is ever paged deeply | M8B |
-| `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
-| Tables are not virtualized; search is not paginated | Needed only once the UI renders large result sets | M8B |
-| No screenshots or README demo script | Requires working screens | M9 |
+| No Ollama model is installed on this machine | Both LLM paths — Copilot prose and Tier-3 rephrasing — are implemented and unit-tested against a stubbed model, including their rejection guards, but neither has run against a real one | Nothing in the demo depends on it; `/api/health` reports the deterministic path honestly |
+| The ERP is a mock | `ErpAdapter` is a named contract and `MockErpAdapter` implements it over the five SAP tables a consolidation touches. No real SAP system has been connected | A prototype cannot ship a certified SAP connector; the contract is the deliverable |
+| Blocking recall is 0.897 at 150k rows | The bucket caps are tuned for the demo profile. Sub-blocking was measured and rejected (see README "Data"); scaling the caps with corpus size is the honest next step | Reported rather than hidden — the gate is met on the profile everything else is measured on |
+| Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | Honest ceiling beats a flattering number |
+| An LLM never *proposes* equivalences | §2B names it as source 4, the lowest-trust one. The basis and its 0.50 weight exist; nothing emits it | Would need a model installed, and it can only ever add review-queue suggestions |
+| Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale | Worth batching if the queue view is ever paged deeply |
+| Restricted mode is quadratic | 300 x 300 records is 90,000 comparisons, and there is no plaintext to block on | A real cost of the privacy guarantee, which is why it is a periodic overlap report and not the live matching path |
+| Login throttling is in-process | Eight failures per (client, account) per five minutes, held in memory | SAMAN is a single-process deployment by design; a multi-worker one would need shared storage |
 
 ### Deliberate deviations from the spec
 
@@ -36,6 +33,8 @@ Recorded rather than silently substituted, per the "how to use this spec" note.
 | Benchmark profile multiplicity | §7 implies the same 1–4 renderings for `seed-large` | Eight equipment classes cannot express 150k *distinct* products (capacity ~14,200). The benchmark profile raises multiplicity instead. It is only ever used for the §8A performance run, never for metrics. |
 | Optional dependencies | §0.4 names `splink` and `sentence-transformers` | Both sit in `requirements-optional.txt`, so the §0.4 degraded paths are what CI and the demo exercise by default. `make deps-optional` installs them and `/api/health` reports the change. |
 | Tier-2 model download | §0.4 says use `sentence-transformers` "if importable" | Importable is not sufficient: the library downloads weights from Hugging Face on first use, which would break the no-network guarantee (§9). The model is loaded in offline mode only and falls back to TF-IDF if the weights are not already cached. |
+| PPRL feature mode | §5 specifies "character-3gram Bloom-filter encodings" | Both modes ship. Character 3-grams measured F1 0.64–0.78 — a 25 mm and a 30 mm bore differ in two characters out of seventy while two house styles differ in thirty. Encoding the extracted attributes reaches 0.91–0.92, so it is the default; the n-gram mode remains selectable and is measured beside it. |
+| Tier-3 adjudication | §0.4 lists Tier 3 as "Ollama or deterministic" | Deterministic always, LLM never. The model may rephrase the sentence and nothing else; if it introduces a fact that is not in the evidence its output is discarded. A model that decides which materials are the same is one that will eventually decide wrongly and unaccountably. |
 | First-three-token blocking key | §2A.1 lists "first-3-token sort key" as a blocking pass | Implemented and measured at **0.11** recall for 419k candidate pairs — CPSE style profiles reorder attributes, so leading tokens rarely survive. Replaced with an inverted token index (rare tokens make strong keys, common ones overflow their cap), which reaches 0.56 for 170k pairs. The original is kept in `blocking.py` with its measurement recorded. |
 
 ### Judgement calls worth knowing about
@@ -398,6 +397,19 @@ that could not be true:
   bad render left an empty document — nothing to read, nothing to navigate away
   from, in front of an audience. The boundary keeps the shell standing, names
   what broke and offers both ways out.
+
+- **Tier 3 was claimed in a docstring and never built.** `match.py` said the
+  grey band was adjudicated "deterministically or by Ollama"; nothing
+  adjudicated anything, and grey pairs went straight to the queue. Now built —
+  and the first version of it had exactly the bug the project keeps finding: it
+  matched result names that do not exist (`conflict`, `exact`), so every
+  negative branch was unreachable and it recommended merging a pair the veto
+  layer had refused. It reads `vetoed_by` now, which removes the chance to
+  disagree with §2A at all.
+- **KNOWN_GAPS.md itself was stale.** It still read "Status: end of M7" and
+  listed the frontend test runner, table virtualization, screenshots and
+  `make licenses` as unbuilt. A gaps file that understates what exists is as
+  misleading as one that overstates it, in the other direction.
 
 ### Measurement honesty
 

@@ -143,11 +143,31 @@ metrics do.
 | Planted near-miss traps | 400 products / 1,020 pairs | same |
 | Purchase-history rows | ~21,300 | ~279,500 |
 | Seed + normalize + extract | **2.4 s** | **29.5 s** (~5,300 rows/s) |
-| Full pipeline (`make demo`) | **84 s** | not run — benchmark profile is for load testing only |
+| Full pipeline | **61 s** (`make demo`) | **15 min 21 s** (`make seed-large`) |
+| Peak resident memory | **0.6 GB** | **7.0 GB** |
+| Database on disk | **159 MB** | 5.29M candidate pairs scored |
+| Duplicate precision / recall | 0.994 / 0.939 | 0.995 / 0.946 |
+| Blocking recall | 0.984 | **0.897** — see below |
 
 Measured on a laptop CPU, single process, no GPU. The demo profile is what every
 screenshot, demo flow and metric gate uses; the benchmark profile exists only
 for the §8A performance run.
+
+**At 150,000 rows, blocking recall falls to 0.897 and the gate would not pass.**
+The per-pass bucket caps are tuned for the demo profile's density; at six times
+the volume every (class, defining-attribute) bucket exceeds its cap — the
+largest holds 46,911 members — so that pass contributes 2,207 candidate pairs
+instead of hundreds of thousands, and the ANN pass carries 4.35M of the 5.29M
+on its own. Duplicate precision and recall are, if anything, *better* at scale;
+it is the blocker that thins out.
+
+Sub-blocking those oversized buckets was built and measured rather than
+assumed: sorting each by normalized text and comparing within a window moved
+blocking recall from 0.8965 to 0.9005, for 10% more wall clock and 10% more
+memory — and 0.0003 on the demo profile. It was reverted, with the numbers
+recorded in `blocking.py` so the next person to have the idea inherits the
+measurement instead of the work. Scaling the caps with corpus size is the
+honest next step and is not done.
 
 Each of ~7,000 real products is rendered into 1–4 CPSE-specific descriptions
 through per-CPSE style profiles: different abbreviation sets, attribute
@@ -171,7 +191,7 @@ against these numbers.
 |---|---|---|
 | Duplicate precision | **0.994** | ≥ 0.92 |
 | Duplicate recall | **0.939** | ≥ 0.80 |
-| Blocking recall | **0.985** | ≥ 0.97 |
+| Blocking recall | **0.984** | ≥ 0.97 |
 | Veto precision on planted traps | **1.000** | ≥ 0.98 |
 
 A single averaged number would hide more than it shows, so the full report at
@@ -478,6 +498,32 @@ eliminating it. The filter is deliberately kept ~38% full rather than sparse —
 with only eight features across a large filter there are almost no collisions to
 shelter behind. A privacy claim that oversells itself is worse than none,
 because someone will rely on it.
+
+### Tier 3: what the platform thinks, and why
+
+Tiers 0–2 produce a number and the veto layer produces a refusal. Neither
+explains a **grey** pair — and grey is exactly where a reviewer is about to
+spend their attention. Tier 3 reads the same evidence a person would and states
+a position: *"Not enough to decide automatically — size nb mm could not be read
+from one of the two rows, the attribute that most decides identity here. What
+could be compared agrees: pressure class, body material, end connection."*
+
+Three rules govern it:
+
+1. **The recommendation is deterministic.** It comes from the attribute
+   comparison, never from a model. An LLM that decides which materials are the
+   same is one that will eventually decide wrongly and unaccountably.
+2. **It never decides.** The pair stays in the queue; a person still approves or
+   rejects. The payload says so in a field.
+3. **The veto is authoritative.** An early version re-derived disagreement from
+   the per-attribute results using result names that do not exist, so every
+   negative branch was unreachable and it recommended merging a pair §2A had
+   already refused. It now reads the veto's own list, which removes the chance
+   to disagree with it.
+
+With `OLLAMA_URL` set, a local model rephrases the sentence — and only the
+sentence. If it introduces a figure that is not in the evidence, its output is
+discarded and the deterministic wording stands, the same guard the Copilot uses.
 
 ---
 
