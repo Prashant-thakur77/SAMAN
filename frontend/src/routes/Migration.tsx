@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
+import { useVirtualRows } from '../lib/useVirtualRows'
 import { formatRupees } from '../components/charts/CountUp'
 import { Button } from '../components/primitives/Button'
 import { CodeChip, StatusChip } from '../components/primitives/Chip'
@@ -79,6 +80,16 @@ export default function Migration() {
     }
   }
 
+  async function turnPage(direction: 1 | -1) {
+    if (!plan) return
+    const size = plan.limit ?? plan.changes.length
+    const next = Math.max(0, (plan.offset ?? 0) + direction * size)
+    await run(
+      async () => setPlan(await migrationDryRun(undefined, { offset: next, limit: size })),
+      `Showing changes from ${next + 1}.`,
+    )
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -90,7 +101,10 @@ export default function Migration() {
             variant="secondary"
             disabled={busy}
             onClick={() =>
-              void run(async () => setPlan(await migrationDryRun()), 'Dry run complete.')
+              void run(
+                async () => setPlan(await migrationDryRun(undefined, { offset: 0 })),
+                'Dry run complete.',
+              )
             }
           >
             Run a dry run
@@ -138,17 +152,20 @@ export default function Migration() {
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="micro-label">
-              Dry run · {plan.summary.total} changes across {plan.clusters} clusters
+              Dry run · {plan.summary.total.toLocaleString('en-IN')} changes across{' '}
+              {plan.clusters.toLocaleString('en-IN')} clusters
             </h2>
             {can('registrar', 'admin') && plan.would_apply ? (
               <Button
                 variant="primary"
                 disabled={busy}
                 onClick={() =>
-                  void run(
-                    () => migrationApply().then((r) => setPlan(null) ?? r),
-                    'Batch applied. The journal below can roll it back.',
-                  )
+                  void run(async () => {
+                    await migrationApply()
+                    // The plan described the ERP as it was a moment ago; leaving
+                    // it on screen would invite a second apply of the same rows.
+                    setPlan(null)
+                  }, 'Batch applied. The journal below can roll it back.')
                 }
               >
                 Apply {plan.would_apply} safe change{plan.would_apply === 1 ? '' : 's'}
@@ -187,70 +204,35 @@ export default function Migration() {
             </p>
           )}
 
-          <Table>
-            <THead>
-              <TH>Material</TH>
-              <TH>Action</TH>
-              <TH>Impact</TH>
-              <TH align="right">Open POs</TH>
-              <TH align="right">Stock</TH>
-              <TH align="right">Value</TH>
-              <TH>Change</TH>
-            </THead>
-            <TBody>
-              {plan.changes.map((change) => (
-                <TR key={change.matnr}>
-                  <TD mono>
-                    {change.matnr}
-                    <Link
-                      to={`/clusters/${change.cluster_id}`}
-                      className="micro-label ml-2 underline underline-offset-2 hover:text-ink"
-                    >
-                      cluster
-                    </Link>
-                  </TD>
-                  <TD>
-                    {change.action === 'crossref' ? (
-                      <>
-                        surviving master · <CodeChip code={change.cnmc} />
-                      </>
-                    ) : (
-                      <span className="text-muted">
-                        block against {change.surviving_matnr}
-                      </span>
-                    )}
-                  </TD>
-                  <TD>
-                    <StatusChip
-                      tone={
-                        change.impact === 'safe'
-                          ? 'ok'
-                          : change.impact === 'valuation_conflict'
-                            ? 'danger'
-                            : 'neutral'
-                      }
-                    >
-                      {IMPACT_LABEL[change.impact]}
-                    </StatusChip>
-                  </TD>
-                  <TD mono align="right" className={cn(change.open_po_lines > 0 && 'text-ink')}>
-                    {change.open_po_lines || '—'}
-                  </TD>
-                  <TD mono align="right">{change.stock_qty.toLocaleString('en-IN')}</TD>
-                  <TD mono align="right" title={change.price_withheld ? 'Another CPSE\u2019s valuation is not shown at your role.' : undefined}>
-                    {change.total_value === null ? 'withheld' : formatRupees(change.total_value)}
-                  </TD>
-                  <TD mono className="text-muted">
-                    {change.diff && Object.keys(change.diff).length > 0
-                      ? Object.entries(change.diff)
-                          .map(([field, d]) => `${field}: ${d.before || '∅'} → ${d.after}`)
-                          .join('; ')
-                      : 'no change'}
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
+          <PlanTable plan={plan} />
+
+          {(plan.truncated || (plan.offset ?? 0) > 0) && (
+            <div className="flex flex-wrap items-center justify-between gap-4 border border-hairline px-4 py-3">
+              <p className="font-mono text-xs text-muted">
+                showing {(plan.offset ?? 0) + 1}–
+                {(plan.offset ?? 0) + plan.changes.length} of{' '}
+                {(plan.total_changes ?? plan.changes.length).toLocaleString('en-IN')} changes
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy || (plan.offset ?? 0) === 0}
+                  onClick={() => void turnPage(-1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy || !plan.truncated}
+                  onClick={() => void turnPage(1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -361,6 +343,97 @@ export default function Migration() {
           </Table>
         </section>
       )}
+    </div>
+  )
+}
+
+const PLAN_COLUMNS = 7
+const PLAN_ROW_HEIGHT = 40
+
+/**
+ * The change set, windowed. A full rollout plans one row per catalogue row, so
+ * this must stay bounded whether it is handed 20 rows or 2,000.
+ */
+function PlanTable({ plan }: { plan: MigrationPlan }) {
+  const { scrollProps, body } = useVirtualRows({
+    rows: plan.changes,
+    rowHeight: PLAN_ROW_HEIGHT,
+    columns: PLAN_COLUMNS,
+    render: (change) => (
+      <TR key={change.matnr}>
+        <TD mono>
+          {change.matnr}
+          <Link
+            to={`/clusters/${change.cluster_id}`}
+            className="micro-label ml-2 underline underline-offset-2 hover:text-ink"
+          >
+            cluster
+          </Link>
+        </TD>
+        <TD>
+          {change.action === 'crossref' ? (
+            <>
+              surviving master · <CodeChip code={change.cnmc} />
+            </>
+          ) : (
+            <span className="text-muted">block against {change.surviving_matnr}</span>
+          )}
+        </TD>
+        <TD>
+          <StatusChip
+            tone={
+              change.impact === 'safe'
+                ? 'ok'
+                : change.impact === 'valuation_conflict'
+                  ? 'danger'
+                  : 'neutral'
+            }
+          >
+            {IMPACT_LABEL[change.impact]}
+          </StatusChip>
+        </TD>
+        <TD mono align="right" className={cn(change.open_po_lines > 0 && 'text-ink')}>
+          {change.open_po_lines || '—'}
+        </TD>
+        <TD mono align="right">
+          {change.stock_qty.toLocaleString('en-IN')}
+        </TD>
+        <TD
+          mono
+          align="right"
+          title={
+            change.price_withheld
+              ? 'Another CPSE’s valuation is not shown at your role.'
+              : undefined
+          }
+        >
+          {change.total_value === null ? 'withheld' : formatRupees(change.total_value)}
+        </TD>
+        <TD mono className="text-muted">
+          {change.diff && Object.keys(change.diff).length > 0
+            ? Object.entries(change.diff)
+                .map(([field, d]) => `${field}: ${d.before || '∅'} → ${d.after}`)
+                .join('; ')
+            : 'no change'}
+        </TD>
+      </TR>
+    ),
+  })
+
+  return (
+    <div {...scrollProps}>
+      <Table>
+        <THead>
+          <TH>Material</TH>
+          <TH>Action</TH>
+          <TH>Impact</TH>
+          <TH align="right">Open POs</TH>
+          <TH align="right">Stock</TH>
+          <TH align="right">Value</TH>
+          <TH>Change</TH>
+        </THead>
+        <TBody>{body}</TBody>
+      </Table>
     </div>
   )
 }

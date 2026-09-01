@@ -156,6 +156,15 @@ class ErpAdapter(Protocol):
 
     def restore(self, matnr: str, before: dict) -> None: ...
 
+    # Bulk forms. A rollout writes thousands of rows at once and a real
+    # connector would batch them into one BAPI call for exactly the reason the
+    # mock does: a round trip per material does not scale.
+    def write_crossref_many(self, pairs: list[tuple[str, str]]) -> int: ...
+
+    def block_material_many(self, pairs: list[tuple[str, str]]) -> int: ...
+
+    def restore_many(self, rows: list[tuple[str, dict]]) -> int: ...
+
 
 class MockErpAdapter:
     """The in-repo SAP stand-in. Every write is reversible from its before-image."""
@@ -238,16 +247,53 @@ class MockErpAdapter:
 
     def restore(self, matnr: str, before: dict) -> None:
         """Put a row back exactly as it was, from its before-image."""
+        self.restore_many([(matnr, before)])
+
+    # -- bulk writes ------------------------------------------------------
+    #
+    # A national rollout writes thousands of rows in one batch. Row-at-a-time
+    # meant a connection and a commit — an fsync — per material, which cost 14
+    # seconds for 2,109 rows and would have been a blocking HTTP request of the
+    # same length. One transaction, one executemany. A real SAP adapter would
+    # batch for the same reason; the Protocol says so.
+
+    def write_crossref_many(self, pairs: list[tuple[str, str]]) -> int:
+        if not pairs:
+            return 0
         with connect(self.path) as conn:
-            conn.execute(
-                "UPDATE mara SET lvorm = ?, zz_cnmc = ?, zz_supersedes = ? WHERE matnr = ?",
-                (
-                    before.get("lvorm", ""),
-                    before.get("zz_cnmc", ""),
-                    before.get("zz_supersedes", ""),
-                    matnr,
-                ),
+            conn.executemany(
+                "UPDATE mara SET zz_cnmc = ? WHERE matnr = ?",
+                [(cnmc, matnr) for matnr, cnmc in pairs],
             )
+        return len(pairs)
+
+    def block_material_many(self, pairs: list[tuple[str, str]]) -> int:
+        if not pairs:
+            return 0
+        with connect(self.path) as conn:
+            conn.executemany(
+                "UPDATE mara SET lvorm = 'X', zz_supersedes = ? WHERE matnr = ?",
+                [(supersedes, matnr) for matnr, supersedes in pairs],
+            )
+        return len(pairs)
+
+    def restore_many(self, rows: list[tuple[str, dict]]) -> int:
+        if not rows:
+            return 0
+        with connect(self.path) as conn:
+            conn.executemany(
+                "UPDATE mara SET lvorm = ?, zz_cnmc = ?, zz_supersedes = ? WHERE matnr = ?",
+                [
+                    (
+                        before.get("lvorm", ""),
+                        before.get("zz_cnmc", ""),
+                        before.get("zz_supersedes", ""),
+                        matnr,
+                    )
+                    for matnr, before in rows
+                ],
+            )
+        return len(rows)
 
 
 def seed_from_catalogue(db, path: Path | None = None, open_po_rate: float = 0.12) -> dict:

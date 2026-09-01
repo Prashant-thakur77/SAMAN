@@ -90,7 +90,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M7 | Onboarding wizard, admin, audit explorer | **Done** |
 | M7.5 | Two-way ERP migration | **Done** |
 | M8 | Smart-Create, licensing | **Done** |
-| M8B | Demo survivability | Snapshot + storage done |
+| M8B | Demo survivability | **Done** |
 | M8 | Smart-Create, licensing artefacts | Not started |
 | M8B | Demo survivability + performance | Not started |
 | M9 | Motion polish, a11y pass, screenshots | Not started |

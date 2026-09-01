@@ -72,6 +72,13 @@ def cmd_demo(args: argparse.Namespace) -> int:
             return 1
         print(f"  stages: {' -> '.join(status.stages_done)}")
 
+        # A registry with nothing approved has nothing to show. Bring the estate
+        # to a realistic mid-flight state: some clusters coded, the rest still
+        # in the queue where a reviewer can work them.
+        from .seed import seed_registry_activity
+
+        _print_table("Registry activity", seed_registry_activity(db))
+
         report = compute_metrics(db)
 
     print_metrics(report)

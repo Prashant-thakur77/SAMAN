@@ -301,6 +301,19 @@ that could not be true:
   re-measured back-to-back for the README table — the old numbers there predated
   the M3.5 fixes.
 
+- **A fresh `make demo` had zero CNMCs.** Nothing was approved, so the registry,
+  the item pages, the executive KPIs and the entire migration screen were empty
+  until someone clicked through the workbench — which is not what anyone wants
+  to discover thirty seconds into a demo. The demo now arrives mid-flight: 747
+  clusters coded, 1,389 still in the queue. The codes are minted through
+  `cnmc.issue_code`, the same path the registrar's button takes, so nothing is
+  written that the application could not have written.
+- **Applying a realistic batch took 14 seconds.** Every ERP write opened its own
+  connection and committed — an fsync per material — and the plan came back as
+  one unbounded list. Bulk writes took apply from 14.3s to 0.3s and rollback
+  from 13.5s to 0.2s, still byte-identical; the plan is now windowed server-side
+  with whole-plan totals, and rendered through a fixed-height virtualiser.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

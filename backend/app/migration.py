@@ -207,6 +207,41 @@ def _summarise(changes: list[PlannedChange]) -> dict:
     }
 
 
+#: Exceptions first. A reviewer scrolling a 12,000-row plan should meet the
+#: stranded valuations and the held purchase orders before the safe majority.
+IMPACT_ORDER = {IMPACT_CONFLICT: 0, IMPACT_HOLD: 1, IMPACT_SAFE: 2}
+
+#: The default window the API returns. A full national rollout plans one change
+#: per catalogue row -- 11,778 on the demo profile and 150,000 on the benchmark
+#: one -- and neither the wire nor the browser should be handed all of them.
+DEFAULT_PAGE = 200
+MAX_PAGE = 2_000
+
+
+def paginate(planned: dict, limit: int | None = DEFAULT_PAGE, offset: int = 0) -> dict:
+    """Return a window of the change set with every total left intact.
+
+    The summary, `would_apply` and `would_hold` are computed over the whole
+    plan and stay that way: a paginated count is a wrong count, and the traffic
+    light is the reason anyone opens this screen.
+    """
+    changes = sorted(
+        planned["changes"],
+        key=lambda c: (IMPACT_ORDER.get(c["impact"], 9), c["matnr"]),
+    )
+    total = len(changes)
+    offset = max(0, offset)
+    window = changes[offset:] if limit is None else changes[offset : offset + limit]
+    return {
+        **planned,
+        "changes": window,
+        "total_changes": total,
+        "offset": offset,
+        "limit": limit,
+        "truncated": len(window) < total,
+    }
+
+
 def dry_run(db: Session, cluster_ids: list[int] | None = None, adapter=None) -> dict:
     """The plan, plus the per-record diff the apply would write (§2C)."""
     adapter = adapter or MockErpAdapter()
@@ -253,6 +288,14 @@ def apply(
     db.flush()
 
     applied = held = skipped = 0
+    # One read for the whole batch, and the writes collected for one round trip
+    # each. Row-at-a-time cost an fsync per material and turned a 2,000-row
+    # rollout into a fourteen-second blocking request.
+    targets = [c["matnr"] for c in preview["changes"] if c["will_apply"] or include_held]
+    current_masters = adapter.read_masters(targets)
+    crossrefs: list[tuple[str, str]] = []
+    blocks: list[tuple[str, str]] = []
+
     for change in preview["changes"]:
         if not change["will_apply"] and not include_held:
             db.add(
@@ -268,13 +311,13 @@ def apply(
             held += 1
             continue
 
-        current = adapter.read_masters([change["matnr"]]).get(change["matnr"], {})
+        current = current_masters.get(change["matnr"], {})
         if all(current.get(k) == v for k, v in change["after"].items()):
             skipped += 1  # already in the target state
         elif change["action"] == "crossref":
-            adapter.write_crossref(change["matnr"], change["cnmc"])
+            crossrefs.append((change["matnr"], change["cnmc"]))
         else:
-            adapter.block_material(change["matnr"], change["surviving_matnr"])
+            blocks.append((change["matnr"], change["surviving_matnr"]))
 
         db.add(
             MigrationChange(
@@ -287,6 +330,9 @@ def apply(
             )
         )
         applied += 1
+
+    _write_crossrefs(adapter, crossrefs)
+    _block_materials(adapter, blocks)
 
     batch.status = "applied"
     audit.record(
@@ -316,6 +362,39 @@ def apply(
     }
 
 
+def _write_crossrefs(adapter, pairs: list[tuple[str, str]]) -> None:
+    """Bulk if the adapter offers it, row-at-a-time if not.
+
+    The Protocol declares the bulk forms, but an adapter written against an
+    older revision -- or a test double -- may only have the singular ones, and
+    a migration that refused to run against it would be the wrong failure.
+    """
+    bulk = getattr(adapter, "write_crossref_many", None)
+    if bulk is not None:
+        bulk(pairs)
+        return
+    for matnr, cnmc in pairs:
+        adapter.write_crossref(matnr, cnmc)
+
+
+def _block_materials(adapter, pairs: list[tuple[str, str]]) -> None:
+    bulk = getattr(adapter, "block_material_many", None)
+    if bulk is not None:
+        bulk(pairs)
+        return
+    for matnr, supersedes in pairs:
+        adapter.block_material(matnr, supersedes)
+
+
+def _restore(adapter, rows: list[tuple[str, dict]]) -> None:
+    bulk = getattr(adapter, "restore_many", None)
+    if bulk is not None:
+        bulk(rows)
+        return
+    for matnr, before in rows:
+        adapter.restore(matnr, before)
+
+
 def rollback(db: Session, batch_id: int, user: User, adapter=None) -> dict:
     """Restore every applied row in a batch from its before-image (§2C)."""
     adapter = adapter or MockErpAdapter()
@@ -330,8 +409,8 @@ def rollback(db: Session, batch_id: int, user: User, adapter=None) -> dict:
     ).scalars().all()
 
     before_fingerprint = fingerprint()
+    _restore(adapter, [(c.erp_key, json.loads(c.before_json or "{}")) for c in changes])
     for change in changes:
-        adapter.restore(change.erp_key, json.loads(change.before_json or "{}"))
         change.state = STATE_ROLLED_BACK
 
     batch.status = "rolled_back"

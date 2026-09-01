@@ -123,3 +123,81 @@ def next_code(class_code: str, existing_serials: set[int]) -> str:
 def serial_of(code: str) -> int | None:
     match = CODE_PATTERN.match((code or "").strip().upper())
     return int(match.group(3)) if match else None
+
+
+class ConflictError(RuntimeError):
+    """The cluster still has an unresolved identity-critical conflict."""
+
+
+def issue_code(db, golden, user) -> dict:
+    """Allocate and record a CNMC for an approved golden record.
+
+    Shared by the registrar endpoint and the demo seeder so the two cannot
+    drift: a code minted by the seeder is allocated, check-digited, approved
+    and audited by exactly the same path a registrar's click takes.
+
+    Idempotent: a retried request returns the existing code rather than minting
+    a second one for the same record.
+    """
+    from sqlalchemy import select
+
+    from . import audit
+    from .models import ClusterMember, Cnmc, Item
+
+    existing = db.execute(
+        select(Cnmc).where(Cnmc.golden_id == golden.id)
+    ).scalar_one_or_none()
+    if existing:
+        return {
+            "code": existing.code,
+            "golden_id": golden.id,
+            "already_issued": True,
+        }
+
+    if golden.status == "conflict":
+        raise ConflictError(
+            "This cluster has an unresolved conflict on an identity-critical "
+            "attribute. Resolve it in the workbench before issuing a code."
+        )
+
+    class_code = db.execute(
+        select(Item.class_code)
+        .join(ClusterMember, ClusterMember.item_id == Item.id)
+        .where(ClusterMember.cluster_id == golden.cluster_id)
+        .limit(1)
+    ).scalar_one_or_none() or "unclassified"
+
+    family, _segment = family_for(class_code)
+    used = {
+        serial
+        for code in db.execute(select(Cnmc.code)).scalars()
+        if code.startswith(family) and (serial := serial_of(code)) is not None
+    }
+    code = next_code(class_code, used)
+
+    db.add(Cnmc(golden_id=golden.id, code=code, status="active", issued_by=user.id))
+    if golden.status == "draft":
+        golden.status = "approved"
+        golden.approved_by = user.id
+    audit.record(
+        db,
+        action="cnmc.issue",
+        entity=f"cnmc:{code}",
+        payload={
+            "code": code,
+            "golden_id": golden.id,
+            "cluster_id": golden.cluster_id,
+            "class_code": class_code,
+            "std_description": golden.std_description,
+        },
+        user=user.email,
+        commit=False,
+    )
+    db.commit()
+    return {
+        "code": code,
+        "golden_id": golden.id,
+        "class_code": class_code,
+        "issued_by": user.name,
+        "already_issued": False,
+    }

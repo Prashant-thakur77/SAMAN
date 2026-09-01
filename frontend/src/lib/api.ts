@@ -626,6 +626,10 @@ export type MigrationPlan = {
   visibility?: { role: string; cpse: string | null; sees_attributed_prices: boolean }
   would_apply?: number
   would_hold?: number
+  total_changes?: number
+  offset?: number
+  limit?: number
+  truncated?: boolean
   erp_fingerprint?: string
   note: string
 }
@@ -658,8 +662,14 @@ export type BatchDetail = {
 }
 
 export const getErpState = () => api.get<ErpState>('/migration/erp')
-export const migrationDryRun = (clusterIds?: number[]) =>
-  api.post<MigrationPlan>('/migration/dryrun', { cluster_ids: clusterIds ?? null })
+export const migrationDryRun = (
+  clusterIds?: number[],
+  page: { limit?: number; offset?: number } = {},
+) =>
+  api.post<MigrationPlan>('/migration/dryrun', {
+    cluster_ids: clusterIds ?? null,
+    ...page,
+  })
 export const migrationApply = (clusterIds?: number[], includeHeld = false) =>
   api.post<{ batch_id: number; applied: number; held: number }>('/migration/apply', {
     cluster_ids: clusterIds ?? null,

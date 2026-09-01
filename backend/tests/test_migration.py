@@ -124,6 +124,29 @@ class TestPlanAndDryRun:
         for change in preview["changes"]:
             assert change["will_apply"] == (change["impact"] == migration.IMPACT_SAFE)
 
+    def test_exceptions_are_ordered_before_the_safe_majority(self, db, migratable):
+        windowed = migration.paginate(migration.dry_run(db))
+        ranks = [migration.IMPACT_ORDER[c["impact"]] for c in windowed["changes"]]
+        assert ranks == sorted(ranks), "a reviewer meets the exceptions first"
+
+    def test_a_window_keeps_the_totals_whole(self, db, migratable):
+        """A paginated count is a wrong count, and the traffic light is the
+        reason anyone opens this screen."""
+        full = migration.dry_run(db)
+        windowed = migration.paginate(full, limit=2)
+        assert len(windowed["changes"]) == 2
+        assert windowed["total_changes"] == full["summary"]["total"]
+        assert windowed["summary"] == full["summary"]
+        assert windowed["would_apply"] == full["would_apply"]
+        assert windowed["truncated"] is True
+
+    def test_the_window_walks_the_whole_plan(self, db, migratable):
+        full = migration.dry_run(db)
+        seen = []
+        for offset in range(0, full["summary"]["total"], 3):
+            seen += [c["matnr"] for c in migration.paginate(full, 3, offset)["changes"]]
+        assert sorted(seen) == sorted(c["matnr"] for c in full["changes"])
+
     def test_the_conflict_threshold_is_stated(self, db, migratable):
         assert "₹" in migration.dry_run(db)["thresholds"]["note"]
 
@@ -210,6 +233,72 @@ class TestApplyAndRollback:
         db.expire_all()
         assert db.execute(select(func.count(AuditEvent.id))).scalar() == before + 2
 
+    def test_an_adapter_without_bulk_writes_still_works(self, db, registrar, migratable):
+        """The Protocol declares bulk forms; an older adapter may not have them,
+        and refusing to migrate against it would be the wrong failure."""
+
+        class SingularOnly:
+            """Exposes only the row-at-a-time methods."""
+
+            def __init__(self):
+                self._inner = erp.MockErpAdapter()
+
+            def read_masters(self, matnrs):
+                return self._inner.read_masters(matnrs)
+
+            def read_open_transactions(self, matnrs):
+                return self._inner.read_open_transactions(matnrs)
+
+            def write_crossref(self, matnr, cnmc):
+                return self._inner.write_crossref(matnr, cnmc)
+
+            def block_material(self, matnr, supersedes):
+                return self._inner.block_material(matnr, supersedes)
+
+            def restore(self, matnr, before):
+                return self._inner.restore(matnr, before)
+
+        adapter = SingularOnly()
+        before = erp.fingerprint()
+        result = migration.apply(db, registrar, adapter=adapter)
+        assert result["applied"] > 0
+        assert erp.fingerprint() != before
+        migration.rollback(db, result["batch_id"], registrar, adapter=adapter)
+        assert erp.fingerprint() == before
+
+    def test_bulk_and_singular_writes_produce_the_same_erp(self, db, registrar, migratable):
+        adapter = erp.MockErpAdapter()
+        baseline = erp.fingerprint()
+
+        bulk = migration.apply(db, registrar)
+        bulk_fingerprint = erp.fingerprint()
+        migration.rollback(db, bulk["batch_id"], registrar)
+        assert erp.fingerprint() == baseline
+
+        pairs_crossref, pairs_block = [], []
+        preview = migration.dry_run(db)
+        for change in preview["changes"]:
+            if not change["will_apply"]:
+                continue
+            if change["action"] == "crossref":
+                pairs_crossref.append((change["matnr"], change["cnmc"]))
+            else:
+                pairs_block.append((change["matnr"], change["surviving_matnr"]))
+        for matnr, cnmc in pairs_crossref:
+            adapter.write_crossref(matnr, cnmc)
+        for matnr, supersedes in pairs_block:
+            adapter.block_material(matnr, supersedes)
+
+        assert erp.fingerprint() == bulk_fingerprint
+        adapter.restore_many(
+            [
+                (c["matnr"], c["before"])
+                for c in preview["changes"]
+                if c["will_apply"]
+            ]
+        )
+        assert erp.fingerprint() == baseline
+
     def test_the_journal_holds_a_before_image_for_every_row(self, db, registrar, migratable):
         result = migration.apply(db, registrar)
         try:
@@ -246,6 +335,19 @@ class TestMigrationApi:
         assert applied["applied"] > 0
         rolled = as_registrar.post(f"/api/migration/rollback/{applied['batch_id']}")
         assert rolled.status_code == 200
+
+    def test_the_api_windows_a_plan(self, as_registrar, migratable):
+        body = as_registrar.post("/api/migration/dryrun", json={"limit": 2}).json()
+        assert len(body["changes"]) == 2 and body["truncated"] is True
+        assert body["total_changes"] > 2
+
+    def test_applying_is_never_windowed(self, as_registrar, migratable):
+        """An apply that acted on page one only would be a data-integrity bug."""
+        applied = as_registrar.post("/api/migration/apply", json={"limit": 1}).json()
+        try:
+            assert applied["applied"] + applied["held"] > 1
+        finally:
+            as_registrar.post(f"/api/migration/rollback/{applied['batch_id']}")
 
     def test_an_unknown_batch_is_404(self, as_registrar, migratable):
         assert as_registrar.post("/api/migration/rollback/999999").status_code == 404

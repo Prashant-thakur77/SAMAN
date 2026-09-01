@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .. import erp, migration, visibility
@@ -21,6 +21,18 @@ PLANNER = ("registrar", "admin", "approver", "steward")
 
 class Selection(BaseModel):
     cluster_ids: list[int] | None = None
+
+
+class PlanIn(Selection):
+    """Reading a plan is windowed; applying one never is.
+
+    A full rollout plans one change per catalogue row, so the response and the
+    DOM both need a bound — but an apply that silently acted on page one only
+    would be a data-integrity bug, so `ApplyIn` deliberately has no window.
+    """
+
+    limit: int = Field(default=migration.DEFAULT_PAGE, ge=1, le=migration.MAX_PAGE)
+    offset: int = Field(default=0, ge=0)
 
 
 class ApplyIn(Selection):
@@ -78,20 +90,22 @@ def _scoped(planned: dict, user: User) -> dict:
 
 @router.post("/plan")
 def plan(
-    body: Selection,
+    body: PlanIn,
     user: Annotated[User, Depends(require_roles(*PLANNER))],
     db: Session = Depends(get_db),
 ) -> dict:
-    return _scoped(migration.plan(db, body.cluster_ids), user)
+    planned = migration.plan(db, body.cluster_ids)
+    return _scoped(migration.paginate(planned, body.limit, body.offset), user)
 
 
 @router.post("/dryrun")
 def dryrun(
-    body: Selection,
+    body: PlanIn,
     user: Annotated[User, Depends(require_roles(*PLANNER))],
     db: Session = Depends(get_db),
 ) -> dict:
-    return _scoped(migration.dry_run(db, body.cluster_ids), user)
+    planned = migration.dry_run(db, body.cluster_ids)
+    return _scoped(migration.paginate(planned, body.limit, body.offset), user)
 
 
 @router.post("/apply")

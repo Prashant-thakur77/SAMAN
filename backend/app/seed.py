@@ -28,13 +28,14 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from sqlalchemy import insert, select
+from sqlalchemy import func, insert, select
 from sqlalchemy.orm import Session
 
 from .auth import hash_password
 from .data.bearings import DEEP_GROOVE_DIMS
 from .db import reset_db
 from .models import (
+    ClusterMember,
     Cpse,
     Crossref,
     Item,
@@ -1422,4 +1423,71 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
         "stock": len(stock_rows),
         "users": len(SEED_USERS),
         "holdout_fraction": HOLDOUT_FRACTION,
+    }
+
+
+# --------------------------------------------------------------------------
+# Demo activity
+# --------------------------------------------------------------------------
+
+#: What share of coded-ready clusters the demo arrives with already approved.
+#: Not 100%: a registry that is finished has nothing to show a reviewer, and
+#: the workbench, the approval queue and the pending counts are half the story.
+DEMO_APPROVED_FRACTION = 0.35
+
+
+def seed_registry_activity(db: Session, fraction: float = DEMO_APPROVED_FRACTION) -> dict:
+    """Approve and code a share of the golden records, as a registrar would.
+
+    Without this a fresh `make demo` has zero CNMCs, so the registry, the item
+    pages, the executive KPIs and the whole migration screen are empty until
+    someone clicks through the workbench — which is not what anyone wants to
+    discover thirty seconds into a demo.
+
+    Codes are minted through `cnmc.issue_code`, the same path the registrar's
+    button takes: allocated, check-digited, approved and appended to the audit
+    chain. Nothing here writes a row the application could not have written.
+    """
+    from .cnmc import ConflictError, issue_code
+    from .models import Cnmc, GoldenRecord, User
+
+    registrar = db.execute(
+        select(User).where(User.email == "registrar@min.gov.in")
+    ).scalar_one_or_none()
+    if registrar is None:
+        return {"issued": 0, "skipped": 0, "note": "no registrar seeded"}
+
+    # Deterministic, and biased towards the clusters worth showing: a code on a
+    # single-member cluster demonstrates nothing.
+    candidates = db.execute(
+        select(GoldenRecord.id)
+        .join(ClusterMember, ClusterMember.cluster_id == GoldenRecord.cluster_id)
+        .outerjoin(Cnmc, Cnmc.golden_id == GoldenRecord.id)
+        .where(GoldenRecord.status == "draft", Cnmc.id.is_(None))
+        .group_by(GoldenRecord.id)
+        .having(func.count(ClusterMember.id) >= 2)
+        .order_by(func.count(ClusterMember.id).desc(), GoldenRecord.id)
+    ).scalars().all()
+
+    wanted = int(len(candidates) * fraction)
+    issued = skipped = 0
+    for golden_id in candidates[:wanted]:
+        golden = db.get(GoldenRecord, golden_id)
+        # Separation of duties still holds: the registrar never proposed these.
+        if golden is None or golden.proposed_by == registrar.id:
+            skipped += 1
+            continue
+        try:
+            issue_code(db, golden, registrar)
+            issued += 1
+        except ConflictError:
+            # An unresolved identity-critical conflict is exactly the state the
+            # workbench exists for. Leave it there.
+            skipped += 1
+
+    return {
+        "clusters_eligible": len(candidates),
+        "cnmcs_issued": issued,
+        "left_for_review": len(candidates) - issued,
+        "skipped_conflicts": skipped,
     }

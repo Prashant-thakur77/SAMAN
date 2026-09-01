@@ -13,11 +13,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import audit
 from ..auth import enforce_separation_of_duties, require_roles
-from ..cnmc import family_for, is_valid, next_code, serial_of
+from ..cnmc import ConflictError, is_valid, issue_code
 from ..db import get_db
-from ..models import Cluster, ClusterMember, Cnmc, GoldenRecord, Item, User
+from ..models import Cluster, ClusterMember, Cnmc, GoldenRecord, User
 
 router = APIRouter(prefix="/cnmc", tags=["cnmc"])
 
@@ -32,67 +31,15 @@ def issue(
     if golden is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No golden record {golden_id}.")
 
-    existing = db.execute(
-        select(Cnmc).where(Cnmc.golden_id == golden_id)
-    ).scalar_one_or_none()
-    if existing:
-        # Issuance is idempotent rather than an error: a retried request must
-        # never mint a second code for the same record.
-        return {"code": existing.code, "golden_id": golden_id, "already_issued": True}
-
     # §0.9: whoever proposed or edited this record may not also approve it.
+    # Checked before issuance because separation of duties is an authorisation
+    # question, not a data question.
     enforce_separation_of_duties(golden, user)
 
-    if golden.status == "conflict":
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "This cluster has an unresolved conflict on an identity-critical "
-            "attribute. Resolve it in the workbench before issuing a code.",
-        )
-
-    class_code = db.execute(
-        select(Item.class_code)
-        .join(ClusterMember, ClusterMember.item_id == Item.id)
-        .where(ClusterMember.cluster_id == golden.cluster_id)
-        .limit(1)
-    ).scalar_one_or_none() or "unclassified"
-
-    family, _segment = family_for(class_code)
-    used = {
-        serial
-        for code in db.execute(select(Cnmc.code)).scalars()
-        if code.startswith(family) and (serial := serial_of(code)) is not None
-    }
-    code = next_code(class_code, used)
-
-    record = Cnmc(golden_id=golden_id, code=code, status="active", issued_by=user.id)
-    db.add(record)
-    if golden.status == "draft":
-        golden.status = "approved"
-        golden.approved_by = user.id
-    audit.record(
-        db,
-        action="cnmc.issue",
-        entity=f"cnmc:{code}",
-        payload={
-            "code": code,
-            "golden_id": golden_id,
-            "cluster_id": golden.cluster_id,
-            "class_code": class_code,
-            "std_description": golden.std_description,
-        },
-        user=user.email,
-        commit=False,
-    )
-    db.commit()
-
-    return {
-        "code": code,
-        "golden_id": golden_id,
-        "class_code": class_code,
-        "issued_by": user.name,
-        "already_issued": False,
-    }
+    try:
+        return issue_code(db, golden, user)
+    except ConflictError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
 @router.get("/validate/{code}")
