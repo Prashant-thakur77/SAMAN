@@ -104,3 +104,10 @@ def as_registrar(client, seeded):
     r = client.post("/api/auth/login", json={"email": "registrar@min.gov.in", "password": "demo"})
     assert r.status_code == 200, r.text
     return client
+
+
+@pytest.fixture
+def as_viewer(client, seeded):
+    r = client.post("/api/auth/login", json={"email": "viewer@min.gov.in", "password": "demo"})
+    assert r.status_code == 200, r.text
+    return client

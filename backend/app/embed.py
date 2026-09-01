@@ -117,6 +117,34 @@ class Embedder:
         return EmbeddingResult(vectors, "tfidf", vectors.shape[1])
 
 
+    def transform(self, texts: list[str]) -> np.ndarray:
+        """Embed new text with the already-fitted model.
+
+        Smart-Create needs this: a description being typed into SAP has never
+        been part of the corpus, and re-fitting the whole vectoriser to score
+        one probe would both cost seconds and move every existing vector.
+
+        Raises ``RuntimeError`` if the embedder was never fitted, which is a
+        programming error rather than a degradation to absorb silently.
+        """
+        if not texts:
+            return np.zeros((0, EMBED_DIM), dtype=np.float32)
+
+        if self.mode == "sentence-transformers" and self._model is not None:
+            vectors = self._model.encode(
+                texts, batch_size=64, show_progress_bar=False, convert_to_numpy=True
+            )
+            return _l2_normalize(np.asarray(vectors, dtype=np.float32))
+
+        if self._vectorizer is None:
+            raise RuntimeError("Embedder.transform() before fit_transform()")
+
+        sparse = self._vectorizer.transform(texts)
+        if self._svd is None:
+            return _l2_normalize(np.asarray(sparse.todense(), dtype=np.float32))
+        return _l2_normalize(self._svd.transform(sparse).astype(np.float32))
+
+
 def pack(vector: np.ndarray) -> bytes:
     return np.asarray(vector, dtype=np.float32).tobytes()
 

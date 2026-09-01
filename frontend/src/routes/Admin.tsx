@@ -145,6 +145,19 @@ export default function Admin() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4 border border-hairline p-4">
+            <StatusChip tone={health.smart_create.prevented > 0 ? 'ok' : 'neutral'}>
+              {health.smart_create.prevented} duplicates prevented at source
+            </StatusChip>
+            <span className="max-w-prose font-mono text-xs text-muted">
+              {health.smart_create.checks} checks ·{' '}
+              {health.smart_create.created_anyway} overridden ·{' '}
+              {health.smart_create.prevention_rate === null
+                ? 'no decided checks yet'
+                : `${Math.round(health.smart_create.prevention_rate * 100)}% prevention rate`}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 border border-hairline p-4">
             <StatusChip tone={health.audit.valid ? 'ok' : 'danger'}>
               {health.audit.valid ? 'audit chain intact' : 'audit chain broken'}
             </StatusChip>

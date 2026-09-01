@@ -336,6 +336,38 @@ class MigrationChange(Base):
     state: Mapped[str] = mapped_column(String(16), default="planned")  # applied|held|rolled_back
 
 
+class SmartCreateCheck(Base):
+    """One duplicate-prevention check at the point of creation (§5).
+
+    Kept as a row rather than an audit event because the outcome is *counted*:
+    the prevention rate on the health dashboard is the honest measure of whether
+    the platform stops duplicates being born, and it needs the denominator --
+    every check -- as much as the numerator.
+    """
+
+    __tablename__ = "smart_create_check"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    cpse_id: Mapped[int | None] = mapped_column(ForeignKey("cpse.id"), nullable=True)
+    description: Mapped[str] = mapped_column(Text)
+    norm_text: Mapped[str] = mapped_column(Text)
+    class_code: Mapped[str] = mapped_column(String(64), default="unclassified")
+    top_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    candidates: Mapped[int] = mapped_column(Integer, default=0)
+    #: open | prevented | created_anyway
+    outcome: Mapped[str] = mapped_column(String(16), default="open", index=True)
+    #: The existing item reused, when the outcome is `prevented`.
+    reused_item_id: Mapped[int | None] = mapped_column(ForeignKey("item.id"), nullable=True)
+    #: The raw row created, when the outcome is `created_anyway`.
+    created_raw_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("raw_item.id"), nullable=True
+    )
+    #: Why the requester overrode a high-confidence match. Required by the API.
+    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 # --------------------------------------------------------------------------
 # Governance
 # --------------------------------------------------------------------------

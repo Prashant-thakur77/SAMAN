@@ -581,6 +581,7 @@ export type HealthPanel = {
   ollama_configured: boolean
   database: string
   counts: Record<string, number>
+  smart_create: SmartCreateStats
   audit: VerifyResponse
 }
 
@@ -669,3 +670,78 @@ export const migrationRollback = (batchId: number) =>
 export const getMigrationBatches = () =>
   api.get<{ batches: MigrationBatch[] }>('/migration/batches')
 export const getBatchDetail = (id: number) => api.get<BatchDetail>(`/migration/batches/${id}`)
+
+// ---- Smart-Create: duplicate prevention at source (§5) ----
+
+export type SmartCreateMatch = {
+  item_id: number
+  confidence: number
+  band: string
+  verdict: string
+  description: string
+  cpse: string | null
+  cnmc: string | null
+  class_code: string
+  tier_scores: Record<string, unknown>
+  veto: Record<string, unknown> | null
+  why: string
+}
+
+export type SmartCreateResult = {
+  check_id: number
+  probe: {
+    norm_text: string
+    class_code: string
+    class_confidence: number
+    mpn_norm: string | null
+    gtin: string | null
+    uom_base: string | null
+    pack_qty: number | null
+    attrs: Record<string, string | number>
+  }
+  suggestions: SmartCreateMatch[]
+  equivalents: SmartCreateMatch[]
+  ruled_out: SmartCreateMatch[]
+  recommendation: {
+    action: 'reuse' | 'review' | 'create'
+    reason: string
+    override_requires_reason: boolean
+  }
+  create_token: string
+  token_expires_in: number
+}
+
+export type SmartCreateStats = {
+  checks: number
+  prevented: number
+  created_anyway: number
+  open: number
+  prevention_rate: number | null
+  note: string
+}
+
+export const smartCreateCheck = (body: {
+  description: string
+  mpn?: string
+  uom?: string
+}) => api.post<SmartCreateResult>('/smart-create/check', body)
+
+export const smartCreateReuse = (check_id: number, item_id: number) =>
+  api.post<{ check_id: number; outcome: string; reused_item_id: number }>(
+    '/smart-create/reuse',
+    { check_id, item_id },
+  )
+
+export const smartCreateCreate = (body: {
+  create_token: string
+  legacy_code: string
+  description: string
+  uom?: string
+  reason?: string
+}) =>
+  api.post<{ outcome: string; raw_item_id: number; legacy_code: string; note: string }>(
+    '/smart-create/create',
+    body,
+  )
+
+export const getSmartCreateStats = () => api.get<SmartCreateStats>('/smart-create/stats')

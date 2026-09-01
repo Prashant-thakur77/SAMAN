@@ -23,6 +23,7 @@ from .routers import (
     pipeline,
     relations,
     search,
+    smart_create,
     workbench,
 )
 
@@ -61,6 +62,7 @@ app.include_router(copilot.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(migration.router, prefix="/api")
+app.include_router(smart_create.router, prefix="/api")
 
 
 @app.on_event("startup")

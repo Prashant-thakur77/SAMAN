@@ -246,6 +246,25 @@ that could not be true:
   order and the suite compares the hash before the apply with the hash after the
   rollback.
 
+### M8 findings
+
+- **Retrieval by shared tokens buried the real match.** Ranking 1,500 bearings
+  by token overlap put every other 6205 above the one that mattered, because
+  they share the same words. Smart-Create now ranks the way blocking pass 5
+  does — cosine against the probe's embedding, with tokens breaking ties —
+  which needed `Embedder.transform()`, since a description being typed into SAP
+  has never been part of the corpus.
+- **A defining attribute was compared as a string.** A bore read from
+  "25MM BORE" is `25.0`; one derived from designation `6005` is `25`. As strings
+  those differ, so the block-attribute boost never fired and the FAG record
+  written in another CPSE's house style dropped out of retrieval entirely. The
+  same class of bug as the fit-class comparison in M3.
+- **Zero-confidence results were being dropped, and with them the most useful
+  answer.** A different manufacturer's 6205 scores 0.0 as a duplicate — that is
+  correct — but silently discarding it hid exactly what a buyer about to raise a
+  code needs to see. Equivalents and vetoed near-misses are now returned in
+  their own lists.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

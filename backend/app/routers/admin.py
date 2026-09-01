@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import audit
+from .. import audit, smart_create
 from ..auth import ROLES, hash_password, require_roles
 from ..capabilities import detect, refresh
 from ..config import get_settings, set_sovereign_mode, sovereign_mode
@@ -245,11 +245,16 @@ def health_panel(
         ).scalar() or 0,
         "audit_events": db.execute(select(func.count(AuditEvent.id))).scalar() or 0,
     }
+    prevention = smart_create.stats(db)
+    counts["duplicates_prevented"] = prevention["prevented"]
     return {
         "capabilities": detect().as_dict(),
         "sovereign_mode": sovereign_mode(),
         "ollama_configured": bool(settings.ollama_url),
         "database": str(settings.db_file),
         "counts": counts,
+        # §5: the counter belongs next to the engine health, because it is the
+        # one number that says whether duplicates are still being created.
+        "smart_create": prevention,
         "audit": audit.verify(db),
     }

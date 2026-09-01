@@ -83,6 +83,14 @@ export const IconMigration = (p: IconProps) => (
   </Svg>
 )
 
+export const IconSmartCreate = (p: IconProps) => (
+  <Svg {...p}>
+    {/* a new record, checked before it is written */}
+    <path d="M4 3h8l4 4v10H4z" />
+    <path d="M7 11.5l2 2 4-4.5" />
+  </Svg>
+)
+
 export const IconAudit = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 3h9l3 3v11H4V3Z" />

@@ -89,6 +89,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M6 | Copilot | **Done** |
 | M7 | Onboarding wizard, admin, audit explorer | **Done** |
 | M7.5 | Two-way ERP migration | **Done** |
+| M8 | Smart-Create, licensing | Smart-Create done |
 | M8 | Smart-Create, licensing artefacts | Not started |
 | M8B | Demo survivability + performance | Not started |
 | M9 | Motion polish, a11y pass, screenshots | Not started |
@@ -361,6 +362,33 @@ if someone edited a migrated row behind the platform's back.
 A plan names every duplicate nationally, which would otherwise hand a steward a
 competitor's stock valuation, so it goes through the same §0.9b visibility gate
 as the dashboards and the Copilot: the rows stay, the money is withheld.
+
+### Stopping duplicates being created
+
+Every other part of SAMAN cleans up duplicates that already exist. Smart-Create
+is the part that stops them being born: before a buyer raises a new material
+master, the description they are typing is run through **the same matcher, the
+same veto layer and the same evidence** the pipeline uses.
+
+It answers in three parts, because a buyer needs three different answers:
+
+- **Already in the catalogue** — reuse this instead of raising a code.
+- **Interchangeable parts** — a different manufacturer's equivalent exists. Not
+  the same record (§2B), but worth knowing before you buy.
+- **Checked and ruled out** — items that looked close, each with the attribute
+  that refused it: *"Close, but bore mm is 20, not 25 — this is a different
+  item."* That line is the whole argument that this is specification matching
+  and not string matching.
+
+Overriding is allowed and recorded. "Create new anyway" is an HMAC-signed token
+bound to the check, the exact description and a 15-minute window; overriding a
+strong match additionally requires a written reason, which lands in the audit
+chain. The override becomes an ordinary catalogue row and is matched by the next
+pipeline run like any other — a business decision, not an exemption.
+
+The **prevented-duplicate counter** on the health panel is the honest measure:
+prevented, overridden, and a prevention rate whose denominator is decided checks
+only, so an unanswered check cannot flatter it.
 
 ---
 

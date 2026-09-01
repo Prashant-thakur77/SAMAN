@@ -17,6 +17,7 @@ import {
   IconMigration,
   IconOpportunity,
   IconSearch,
+  IconSmartCreate,
   IconUpload,
   IconWorkbench,
 } from '../components/Icons'
@@ -53,6 +54,13 @@ export const NAV: NavItem[] = [
     roles: null,
   },
 
+  {
+    label: 'Smart-Create',
+    path: '/smart-create',
+    icon: IconSmartCreate,
+    group: 'Tools',
+    roles: ['registrar', 'admin', 'approver', 'steward'],
+  },
   { label: 'Copilot', path: '/copilot', icon: IconCopilot, group: 'Tools', roles: null },
   { label: 'Onboard', path: '/onboard', icon: IconUpload, group: 'Tools', roles: null },
   {

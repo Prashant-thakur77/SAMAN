@@ -21,6 +21,7 @@ import Migration from './routes/Migration'
 import NotFound from './routes/NotFound'
 import Onboard from './routes/Onboard'
 import Search from './routes/Search'
+import SmartCreate from './routes/SmartCreate'
 import Workbench from './routes/Workbench'
 
 /** Every route inside the shell, wrapped in the §1.5 route transition. */
@@ -38,6 +39,7 @@ const SHELL_ROUTES = [
   // Read-only for a steward: the apply and rollback controls are role-gated
   // inside the screen, and other CPSEs' valuations are withheld server-side.
   { path: '/migration', element: <Migration /> },
+  { path: '/smart-create', element: <SmartCreate /> },
   {
     path: '/admin',
     element: (
