@@ -31,6 +31,30 @@ router = APIRouter(tags=["ingest"])
 
 MAX_UPLOAD_BYTES = 64 * 1024 * 1024
 
+#: Read size. Small enough that the cap is enforced long before memory is at
+#: risk, large enough that a 64 MB file is a few hundred reads.
+UPLOAD_CHUNK = 1024 * 1024
+
+
+async def _read_capped(file: UploadFile) -> bytes:
+    """Read an upload, refusing it as soon as it exceeds the cap.
+
+    Reading the whole body and *then* checking its length is the wrong order:
+    the check never runs on the upload that matters, because the process is
+    already out of memory. Streaming means a 10 GB body costs 64 MB and a 413.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(UPLOAD_CHUNK):
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                f"File exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
 #: Target field -> header spellings seen in real CPSE extracts.
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "legacy_code": (
@@ -87,9 +111,7 @@ async def ingest(
     if cpse is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown CPSE code {cpse_code!r}.")
 
-    payload = await file.read()
-    if len(payload) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File exceeds 64 MB.")
+    payload = await _read_capped(file)
 
     try:
         text = payload.decode("utf-8-sig")

@@ -3,6 +3,7 @@
 import pytest
 from fastapi import HTTPException
 
+from app import auth
 from app.auth import (
     enforce_separation_of_duties,
     hash_password,
@@ -120,3 +121,124 @@ class TestSeparationOfDuties:
         user = User(id=8, email="b@b", name="B", role="approver", password_hash="x")
         golden = GoldenRecord(id=1, cluster_id=1, std_description="X", proposed_by=None)
         enforce_separation_of_duties(golden, user)
+
+
+class TestSessionExpiry:
+    """A signature without a timestamp is a credential that never expires."""
+
+    def test_a_session_token_expires_on_its_own(self, client, seeded, monkeypatch):
+        client.post(
+            "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
+        )
+        assert client.get("/api/auth/me").status_code == 200
+
+        # Move the clock past the signature's own lifetime. The cookie is still
+        # in the jar; the point is that the server stops accepting it.
+        import itsdangerous.timed
+
+        real = itsdangerous.timed.time.time
+        monkeypatch.setattr(
+            itsdangerous.timed.time, "time", lambda: real() + auth.SESSION_MAX_AGE + 60
+        )
+        assert client.get("/api/auth/me").status_code == 401
+
+    def test_a_tampered_token_is_rejected(self, client, seeded):
+        client.post(
+            "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
+        )
+        token = client.cookies.get(auth.SESSION_COOKIE)
+        client.cookies.set(auth.SESSION_COOKIE, token[:-2] + "xy")
+        assert client.get("/api/auth/me").status_code == 401
+
+    def test_the_cookie_is_http_only(self, client, seeded):
+        """A session readable from JavaScript is one an injected script steals."""
+        response = client.post(
+            "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
+        )
+        cookie = response.headers["set-cookie"]
+        assert "HttpOnly" in cookie and "SameSite=lax" in cookie
+
+
+class TestLoginThrottle:
+    """An unlimited-guess password endpoint is a brute-force invitation."""
+
+    def test_repeated_failures_lock_the_account_out(self, client, seeded):
+        for _ in range(auth.LOGIN_ATTEMPTS):
+            response = client.post(
+                "/api/auth/login",
+                json={"email": "steward@cpcl.in", "password": "wrong"},
+            )
+            assert response.status_code == 401
+
+        blocked = client.post(
+            "/api/auth/login", json={"email": "steward@cpcl.in", "password": "wrong"}
+        )
+        assert blocked.status_code == 429
+        assert "Retry-After" in blocked.headers
+
+    def test_the_lockout_holds_even_with_the_right_password(self, client, seeded):
+        """Otherwise a guesser learns when they have found it."""
+        for _ in range(auth.LOGIN_ATTEMPTS):
+            client.post(
+                "/api/auth/login",
+                json={"email": "steward@cpcl.in", "password": "wrong"},
+            )
+        assert (
+            client.post(
+                "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
+            ).status_code
+            == 429
+        )
+
+    def test_a_success_clears_the_count(self, client, seeded):
+        """The throttle stops guessing; it does not punish a typo."""
+        for _ in range(auth.LOGIN_ATTEMPTS - 1):
+            client.post(
+                "/api/auth/login",
+                json={"email": "steward@cpcl.in", "password": "wrong"},
+            )
+        assert (
+            client.post(
+                "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
+            ).status_code
+            == 200
+        )
+        for _ in range(auth.LOGIN_ATTEMPTS - 1):
+            assert (
+                client.post(
+                    "/api/auth/login",
+                    json={"email": "steward@cpcl.in", "password": "wrong"},
+                ).status_code
+                == 401
+            )
+
+    def test_one_account_being_attacked_does_not_lock_out_another(self, client, seeded):
+        for _ in range(auth.LOGIN_ATTEMPTS + 2):
+            client.post(
+                "/api/auth/login",
+                json={"email": "steward@cpcl.in", "password": "wrong"},
+            )
+        assert (
+            client.post(
+                "/api/auth/login",
+                json={"email": "registrar@min.gov.in", "password": "demo"},
+            ).status_code
+            == 200
+        )
+
+    def test_the_window_expires(self, client, seeded, monkeypatch):
+        for _ in range(auth.LOGIN_ATTEMPTS):
+            client.post(
+                "/api/auth/login",
+                json={"email": "steward@cpcl.in", "password": "wrong"},
+            )
+        real = auth.time.time
+        monkeypatch.setattr(
+            auth.time, "time", lambda: real() + auth.LOGIN_WINDOW_SECONDS + 1
+        )
+        assert (
+            client.post(
+                "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
+            ).status_code
+            == 200
+        )

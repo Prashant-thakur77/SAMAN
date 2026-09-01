@@ -363,6 +363,28 @@ that could not be true:
   because it is the failure mode of every scripted screenshot: waiting for the
   first thing that appears rather than the last.
 
+### Post-milestone audit findings
+
+- **The session cookie never expired.** The token was signed with
+  `URLSafeSerializer`, which carries no timestamp, so the twelve-hour `max-age`
+  bound the browser and nothing else — a copied cookie stayed valid forever.
+  Now `URLSafeTimedSerializer` with the same lifetime enforced inside the
+  signature, plus a `SAMAN_SECURE_COOKIES` setting for any deployment that is
+  not localhost HTTP.
+- **The upload size cap fired after the read.** `await file.read()` buffered the
+  entire body and *then* checked it against 64 MB, so the check never ran on the
+  upload that mattered — the process was already out of memory. Reading in
+  chunks means a 10 GB body costs 64 MB and a 413.
+- **The login endpoint allowed unlimited guesses.** Eight failures per
+  (client, account) now lock that pair out for five minutes; a success clears
+  the count, and one account under attack does not lock out another.
+- **§8A's "Load demo data" button did not exist**, and could not have worked as
+  specified: a fresh database has no users, so nobody can sign in, so no
+  role-gated button helps. The bootstrap endpoint is therefore the one
+  unauthenticated write in SAMAN, with a rule narrow enough to state in a
+  sentence — seeding is permitted only while the database contains no users at
+  all, and the first seed closes the door permanently.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

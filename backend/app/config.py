@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     saman_secret_key: str = "saman-dev-secret-change-me"
     saman_sovereign_mode: bool = False
 
+    #: Set the Secure flag on the session cookie. Off by default because the
+    #: demo is served over plain HTTP on localhost, where a Secure cookie would
+    #: never be sent at all; any real deployment must turn it on.
+    saman_secure_cookies: bool = False
+
     #: Force the §0.4 fallback engines even when the optional accelerators are
     #: installed. Two uses: exercising the degraded path in CI without
     #: uninstalling anything, and demonstrating graceful degradation live.

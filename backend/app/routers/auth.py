@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import (
     authenticate,
+    clear_login_failures,
     clear_session,
     current_user_optional,
     issue_session,
+    login_blocked,
+    record_login_failure,
     require_user,
 )
 from ..db import get_db
@@ -33,10 +36,29 @@ def _to_out(user: User) -> UserOut:
 
 
 @router.post("/login", response_model=UserOut)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)) -> UserOut:
-    user = authenticate(db, body.email.strip().lower(), body.password)
+def login(
+    body: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> UserOut:
+    email = body.email.strip().lower()
+    client = request.client.host if request.client else "unknown"
+
+    retry_after = login_blocked(client, email)
+    if retry_after:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Too many failed sign-ins. Try again in {retry_after} seconds.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    user = authenticate(db, email, body.password)
     if user is None:
+        record_login_failure(client, email)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect user or password.")
+
+    clear_login_failures(client, email)
     issue_session(response, user)
     return _to_out(user)
 

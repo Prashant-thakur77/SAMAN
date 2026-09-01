@@ -12,6 +12,7 @@ from .db import SessionLocal, init_db
 from .routers import (
     admin,
     auth,
+    bootstrap,
     clusters,
     cnmc,
     copilot,
@@ -50,6 +51,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api")
+app.include_router(bootstrap.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
 app.include_router(pipeline.router, prefix="/api")

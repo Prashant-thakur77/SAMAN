@@ -1,11 +1,19 @@
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { Field, Input } from '../components/primitives/Field'
-import { ApiError, getDemoUsers, login, type DemoUser } from '../lib/api'
+import {
+  ApiError,
+  getDemoUsers,
+  getPipelineStatus,
+  loadDemoData,
+  login,
+  type DemoUser,
+  type PipelineStatus,
+} from '../lib/api'
 import { cn } from '../lib/cn'
 import { shakeAnimation } from '../lib/motion'
 import { useSession } from '../lib/session'
@@ -28,21 +36,56 @@ export default function Login() {
   const reduce = useReducedMotion() ?? false
   const navigate = useNavigate()
   const { refresh } = useSession()
+  const [seeding, setSeeding] = useState<PipelineStatus | null>(null)
+  const [seedError, setSeedError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let alive = true
-    getDemoUsers()
-      .then((list) => {
-        if (!alive) return
-        setUsers(list)
-        setEmail((current) => current || list[0]?.email || '')
-      })
+  const loadUsers = useCallback(async () => {
+    try {
+      const list = await getDemoUsers()
+      setUsers(list)
+      setEmail((current) => current || list[0]?.email || '')
+      return list.length
+    } catch {
       // No seeded users yet is a normal first-run state, not an error.
-      .catch(() => alive && setUsers([]))
-    return () => {
-      alive = false
+      setUsers([])
+      return 0
     }
   }, [])
+
+  useEffect(() => {
+    void loadUsers()
+  }, [loadUsers])
+
+  // While a first-run seed is running, poll until it finishes and then bring
+  // the accounts in behind it, so nobody has to know to reload the page.
+  useEffect(() => {
+    if (!seeding || seeding.state === 'done' || seeding.state === 'failed') return
+    const timer = window.setInterval(async () => {
+      try {
+        const next = await getPipelineStatus()
+        setSeeding(next)
+        if (next.state === 'done') {
+          window.clearInterval(timer)
+          await loadUsers()
+        }
+      } catch {
+        /* the API restarting mid-seed is survivable; the next tick retries */
+      }
+    }, 1500)
+    return () => window.clearInterval(timer)
+  }, [seeding, loadUsers])
+
+  async function seedDemoData() {
+    setSeedError(null)
+    try {
+      await loadDemoData()
+      setSeeding(await getPipelineStatus())
+    } catch (err) {
+      setSeedError(
+        err instanceof ApiError ? err.message : 'Could not start the demo load.',
+      )
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -116,10 +159,41 @@ export default function Login() {
                   ))}
                 </ul>
               ) : (
-                <p className="border border-hairline px-3 py-4 text-sm text-muted">
-                  No users yet. Run <span className="font-mono text-xs">make seed</span> to create
-                  the demo accounts.
-                </p>
+                <div className="space-y-3 border border-hairline px-3 py-4">
+                  <p className="text-sm text-muted">
+                    This database is empty. Load the demo estate — four CPSEs, about 12,000
+                    catalogue rows — or run{' '}
+                    <span className="font-mono text-xs">make demo</span> from the repository.
+                  </p>
+                  {seeding && seeding.state !== 'done' ? (
+                    <div className="space-y-2">
+                      <p className="font-mono text-xs">
+                        {seeding.stage} · {seeding.rows_done.toLocaleString('en-IN')} of{' '}
+                        {seeding.rows_total.toLocaleString('en-IN')}
+                      </p>
+                      <div className="h-1 w-full bg-hairline">
+                        <div
+                          className="h-1 bg-ink transition-[width] duration-300 ease-saman"
+                          style={{
+                            width: `${
+                              seeding.rows_total
+                                ? Math.min(100, (seeding.rows_done / seeding.rows_total) * 100)
+                                : 5
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted">
+                        About a minute. The page picks up the accounts when it finishes.
+                      </p>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="primary" onClick={() => void seedDemoData()}>
+                      Load demo data
+                    </Button>
+                  )}
+                  {seedError && <p className="text-xs text-danger">{seedError}</p>}
+                </div>
               )}
             </Field>
 

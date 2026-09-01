@@ -86,6 +86,17 @@ def db():
         yield session
 
 
+@pytest.fixture(autouse=True)
+def _clean_login_throttle():
+    """Failed sign-ins are counted per process; one test must not lock out the
+    next."""
+    from app.auth import reset_login_throttle
+
+    reset_login_throttle()
+    yield
+    reset_login_throttle()
+
+
 @pytest.fixture
 def client():
     with TestClient(app) as c:

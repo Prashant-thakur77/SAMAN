@@ -819,3 +819,18 @@ export const pprlEvaluate = (left: string, right: string, mode: string) =>
   api.get<PprlEvaluation>(
     `/pprl/evaluate?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}&mode=${mode}`,
   )
+
+// ---- First-run bootstrap (§8A) ----
+
+export type BootstrapStatus = {
+  empty: boolean
+  users: number
+  cpses: number
+  raw_items: number
+  profile: string
+  pipeline: PipelineStatus
+}
+
+export const getBootstrapStatus = () => api.get<BootstrapStatus>('/bootstrap/status')
+export const loadDemoData = () =>
+  api.post<{ started: boolean; profile: string; note: string }>('/bootstrap/demo-data', {})

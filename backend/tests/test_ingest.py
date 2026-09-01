@@ -161,3 +161,36 @@ class TestPipelineEndpoint:
         db.expire_all()
         after = db.execute(select(func.count(Item.id))).scalar()
         assert after > before
+
+
+class TestUploadLimits:
+    def test_an_oversized_file_is_refused_without_being_buffered(
+        self, as_registrar, seeded, monkeypatch
+    ):
+        """The cap has to fire during the read, not after it.
+
+        The limit is lowered rather than a 64 MB body constructed: the point
+        under test is the ordering, not the constant.
+        """
+        from app.routers import ingest as ingest_router
+
+        monkeypatch.setattr(ingest_router, "MAX_UPLOAD_BYTES", 1024)
+        monkeypatch.setattr(ingest_router, "UPLOAD_CHUNK", 256)
+
+        body = b"legacy_code,description\n" + b"X,LONG DESCRIPTION HERE\n" * 500
+        response = as_registrar.post(
+            "/api/ingest",
+            data={"cpse_code": "CPCL", "dry_run": "true"},
+            files={"file": ("big.csv", body, "text/csv")},
+        )
+        assert response.status_code == 413
+        assert "MB" in response.json()["detail"]
+
+    def test_a_file_inside_the_limit_still_ingests(self, as_registrar, seeded):
+        body = b"legacy_code,description,uom\nUP-1,BEARING BALL 6205 ZZ SKF,NOS\n"
+        response = as_registrar.post(
+            "/api/ingest",
+            data={"cpse_code": "CPCL", "dry_run": "true"},
+            files={"file": ("small.csv", body, "text/csv")},
+        )
+        assert response.status_code == 200

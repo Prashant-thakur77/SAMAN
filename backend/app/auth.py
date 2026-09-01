@@ -14,10 +14,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import time
 from typing import Annotated
 
 from fastapi import Cookie, Depends, HTTPException, Response, status
-from itsdangerous import BadSignature, URLSafeSerializer
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,6 +27,11 @@ from .db import get_db
 from .models import GoldenRecord, User
 
 SESSION_COOKIE = "saman_session"
+
+#: How long a session is valid, enforced *inside the signature* and not only by
+#: the cookie's max-age. A browser honours max-age; a copied token does not, so
+#: a signature without a timestamp is a credential that never expires.
+SESSION_MAX_AGE = 60 * 60 * 12
 
 ROLES = ("registrar", "admin", "approver", "steward", "auditor", "viewer")
 
@@ -61,8 +67,8 @@ def verify_password(password: str, stored: str) -> bool:
 # --------------------------------------------------------------------------
 
 
-def _serializer() -> URLSafeSerializer:
-    return URLSafeSerializer(get_settings().saman_secret_key, salt="saman-session")
+def _serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(get_settings().saman_secret_key, salt="saman-session")
 
 
 def issue_session(response: Response, user: User) -> None:
@@ -72,7 +78,10 @@ def issue_session(response: Response, user: User) -> None:
         token,
         httponly=True,
         samesite="lax",
-        max_age=60 * 60 * 12,
+        # Off by default because the demo is served over plain HTTP on
+        # localhost, where a Secure cookie would simply never be sent.
+        secure=get_settings().saman_secure_cookies,
+        max_age=SESSION_MAX_AGE,
         path="/",
     )
 
@@ -85,8 +94,10 @@ def _user_from_token(token: str | None, db: Session) -> User | None:
     if not token:
         return None
     try:
-        payload = _serializer().loads(token)
-    except BadSignature:
+        payload = _serializer().loads(token, max_age=SESSION_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        # SignatureExpired is a subclass of BadSignature, but naming it says
+        # that expiry is deliberate rather than incidental.
         return None
     user = db.get(User, payload.get("uid"))
     return user if user and user.active else None
@@ -156,3 +167,50 @@ def authenticate(db: Session, email: str, password: str) -> User | None:
     if user is None or not user.active:
         return None
     return user if verify_password(password, user.password_hash) else None
+
+
+# --------------------------------------------------------------------------
+# Login throttling
+# --------------------------------------------------------------------------
+
+#: Failed attempts allowed per (client, email) before the pair is locked out.
+LOGIN_ATTEMPTS = 8
+
+#: How long the window lasts, and therefore how long a lockout lasts.
+LOGIN_WINDOW_SECONDS = 300
+
+#: In-process, because SAMAN is a single-process deployment by design. A real
+#: multi-worker deployment would put this in shared storage; what must not
+#: happen either way is an unlimited-guess password endpoint.
+_FAILURES: dict[tuple[str, str], list[float]] = {}
+
+
+def _prune(bucket: list[float], now: float) -> list[float]:
+    return [t for t in bucket if now - t < LOGIN_WINDOW_SECONDS]
+
+
+def login_blocked(client: str, email: str) -> int:
+    """Seconds remaining on a lockout, or 0 if the attempt may proceed."""
+    key = (client, email.lower())
+    now = time.time()
+    bucket = _prune(_FAILURES.get(key, []), now)
+    _FAILURES[key] = bucket
+    if len(bucket) < LOGIN_ATTEMPTS:
+        return 0
+    return max(1, int(LOGIN_WINDOW_SECONDS - (now - bucket[0])))
+
+
+def record_login_failure(client: str, email: str) -> None:
+    key = (client, email.lower())
+    now = time.time()
+    _FAILURES[key] = [*_prune(_FAILURES.get(key, []), now), now]
+
+
+def clear_login_failures(client: str, email: str) -> None:
+    """A success wipes the slate: the throttle exists to stop guessing, not to
+    punish someone who mistyped their password twice."""
+    _FAILURES.pop((client, email.lower()), None)
+
+
+def reset_login_throttle() -> None:
+    _FAILURES.clear()
