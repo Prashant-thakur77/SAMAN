@@ -1,18 +1,13 @@
-import { useNavigate } from 'react-router-dom'
-
 import { DegradedChip } from './DegradedChip'
 import { IconSearch } from './Icons'
 import { ThemeToggle } from './ThemeToggle'
+import { UserChip } from './UserChip'
 
 /**
  * Top command bar (spec §1.3): global search input that opens the ⌘K palette,
  * degraded-mode status chip (§8A), theme toggle, user chip.
- *
- * The user chip is a placeholder until auth lands in M2 — it shows no invented
- * identity, per the "never fake data" guardrail (§10).
  */
 export function CommandBar({ onOpenPalette }: { onOpenPalette: () => void }) {
-  const navigate = useNavigate()
   const isMac =
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '')
 
@@ -34,13 +29,7 @@ export function CommandBar({ onOpenPalette }: { onOpenPalette: () => void }) {
       <div className="ml-auto flex items-center gap-3">
         <DegradedChip />
         <ThemeToggle />
-        <button
-          type="button"
-          onClick={() => navigate('/login')}
-          className="h-8 border border-hairline px-3 text-xs text-muted hover:text-ink"
-        >
-          Sign in
-        </button>
+        <UserChip />
       </div>
     </header>
   )

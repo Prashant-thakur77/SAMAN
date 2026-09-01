@@ -23,8 +23,13 @@ optional dependency degrades to a working fallback rather than failing.
 
 ```bash
 make setup     # creates backend/.venv on Python 3.12, installs both apps
+make seed      # generates the synthetic catalogue estate (~12k items, 4 CPSEs)
 make dev       # API on :8000, UI on :5173
 ```
+
+Sign in with any seeded account — `steward@cpcl.in`, `registrar@min.gov.in`,
+`approver@min.gov.in` and others are listed on the login screen. Every one uses
+the password `demo`.
 
 Or with Docker:
 
@@ -63,7 +68,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | Milestone | Scope | Status |
 |---|---|---|
 | M1 | Scaffold, design tokens, theme, shell, routing + transitions | **Done** |
-| M2 | Models, auth, seed data, ingest, normalize, extract | Not started |
+| M2 | Models, auth, seed data, ingest, normalize, extract | **Done** |
 | M3 | Embeddings, blocking, tiered match, veto layer, clustering, CNMC, metrics | Not started |
 | M3.4 | Golden-record standardization + provenance | Not started |
 | M3.5 | Functional-equivalence engine | Not started |
@@ -79,6 +84,37 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 
 ---
 
+## Data
+
+`make seed` builds a synthetic estate with full ground truth, reproducibly from
+a fixed seed. Nothing in the application ever reads the truth tables — only the
+metrics do.
+
+| | Demo profile (`make seed`) | Benchmark profile (`make seed-large`) |
+|---|---|---|
+| CPSEs | 4 — CPCL, IOCL, GAIL, ONGC | 6 — adds HPCL, SAIL |
+| Raw catalogue rows | ~11,800 | ~156,400 |
+| Ground-truth products | 7,000 | 14,161 |
+| Planted near-miss traps | 400 products / 1,020 pairs | same |
+| Purchase-history rows | ~21,400 | ~279,500 |
+| Seed + normalize + extract | **2.4 s** | **29.5 s** (~5,300 rows/s) |
+
+Measured on a laptop CPU, single process, no GPU. The demo profile is what every
+screenshot, demo flow and metric gate uses; the benchmark profile exists only
+for the §8A performance run.
+
+Each of ~7,000 real products is rendered into 1–4 CPSE-specific descriptions
+through per-CPSE style profiles: different abbreviation sets, attribute
+orderings and unit spellings, an 8% typo rate, a 10% Hindi token mix, and an 8%
+pack-basis quirk (`BOX OF 100` against `EA`). Ground truth records which rows
+are the same product, which planted pairs the veto layer must refuse, and which
+are directed substitutes.
+
+Thresholds are tuned on a 60% split; every reported number comes from the
+held-out 40% (§0.6).
+
+---
+
 ## Problem-statement traceability
 
 Every capability named in SIH26099, and where it lives in this build. Statuses
@@ -89,16 +125,16 @@ are kept honest — partial is marked partial.
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | Not started (M3) |
 | Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine | Not started (M3, M3.5) |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | Not started (M3.4) |
-| Intelligent classification and categorization | taxonomy + class assignment with confidence gate | Not started (M2) |
+| Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | Not started (M3) |
 | Mapping of existing CPSE codes to the common national code | mapping block on the item page | Not started (M3.4) |
 | Legacy code rationalization and migration support | plan → dry-run → apply → rollback | Not started (M7.5) |
-| User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | Not started (M4) |
+| User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | Partial — separation of duties enforced (§0.9); workbench lands in M4 |
 | Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | Not started (M5) |
 | Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | Not started (M4) |
 | Integration capability with SAP/ERP | `ErpAdapter` + mock ERP write-back | Not started (M7.5) |
-| Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | Not started (M2, M5) |
-| Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | Not started (M2) |
+| Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | Partial — data seeded and authoritative; analytics land in M5 |
+| Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done** — pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |
 | Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | Not started (M5) |
 | Inter-CPSE collaboration | sharing engine + joint tenders | Not started (M5) |
 | Faster procurement/specification finalization | Smart-Create + standardized specs | Not started (M8) |

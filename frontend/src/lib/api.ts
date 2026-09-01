@@ -69,3 +69,21 @@ export type Health = {
 }
 
 export const getHealth = () => api.get<Health>('/health')
+
+export type Role = 'registrar' | 'admin' | 'approver' | 'steward' | 'auditor' | 'viewer'
+
+export type User = {
+  id: number
+  email: string
+  name: string
+  role: Role
+  cpse_code: string | null
+}
+
+export type DemoUser = Omit<User, 'id'>
+
+export const getDemoUsers = () => api.get<DemoUser[]>('/auth/demo-users')
+export const login = (email: string, password: string) =>
+  api.post<User>('/auth/login', { email, password })
+export const logout = () => api.post<{ ok: boolean }>('/auth/logout')
+export const getSession = () => api.get<User | null>('/auth/session')

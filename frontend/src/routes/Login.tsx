@@ -1,42 +1,65 @@
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { Field, Input } from '../components/primitives/Field'
-import { ApiError, api } from '../lib/api'
+import { ApiError, getDemoUsers, login, type DemoUser } from '../lib/api'
+import { cn } from '../lib/cn'
 import { shakeAnimation } from '../lib/motion'
 
 /**
  * /login — spec §6.1. The wordmark is expanded exactly once, here, with the
  * tagline beneath it (spec §1.2).
  *
- * The user picker is populated from the seeded users endpoint once auth exists
- * (M2). Until then this page does not invent a user list (spec §10); the form
- * posts to the real endpoint, and a failure shakes the card by 4px.
+ * The picker lists the seeded users returned by the API — it invents nobody
+ * (spec §10). A failed sign-in shakes the card by 4px, collapsing to an
+ * opacity pulse under prefers-reduced-motion.
  */
 export default function Login() {
-  const [password, setPassword] = useState('')
+  const [users, setUsers] = useState<DemoUser[]>([])
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const controls = useAnimationControls()
   const reduce = useReducedMotion() ?? false
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    let alive = true
+    getDemoUsers()
+      .then((list) => {
+        if (!alive) return
+        setUsers(list)
+        setEmail((current) => current || list[0]?.email || '')
+      })
+      // No seeded users yet is a normal first-run state, not an error.
+      .catch(() => alive && setUsers([]))
+    return () => {
+      alive = false
+    }
+  }, [])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    setBusy(true)
     try {
-      await api.post('/auth/login', { email, password })
-      window.location.assign('/')
+      await login(email, password)
+      navigate('/')
     } catch (err) {
-      const message =
-        err instanceof ApiError && err.status === 404
-          ? 'Sign-in is not available yet — the authentication layer lands in M2.'
+      setError(
+        err instanceof ApiError && err.status === 401
+          ? 'Incorrect user or password.'
           : err instanceof ApiError
             ? err.message
-            : 'Sign-in failed.'
-      setError(message)
+            : 'Sign-in failed.',
+      )
       controls.start(shakeAnimation(reduce))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -46,8 +69,8 @@ export default function Login() {
         <ThemeToggle />
       </div>
 
-      <main className="flex flex-1 items-center justify-center px-6 pb-24">
-        <motion.div animate={controls} className="w-full max-w-sm space-y-8">
+      <main className="flex flex-1 items-start justify-center px-6 pb-24 pt-8">
+        <motion.div animate={controls} className="w-full max-w-md space-y-8">
           <div className="space-y-3">
             <h1 className="font-sans text-lg font-medium uppercase tracking-wordmark text-ink">
               SAMAN
@@ -58,20 +81,46 @@ export default function Login() {
 
           <hr />
 
-          <form onSubmit={onSubmit} className="space-y-5">
-            <Field label="User" htmlFor="email" hint="Seeded demo users are listed from M2 onward.">
-              <Input
-                id="email"
-                type="email"
-                autoComplete="username"
-                placeholder="steward@cpcl.in"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+          <form onSubmit={onSubmit} className="space-y-6">
+            <Field label="Sign in as" hint="Seeded demo accounts.">
+              {users.length > 0 ? (
+                <ul className="divide-y divide-hairline border border-hairline">
+                  {users.map((u) => (
+                    <li key={u.email}>
+                      <button
+                        type="button"
+                        onClick={() => setEmail(u.email)}
+                        aria-pressed={email === u.email}
+                        className={cn(
+                          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
+                          email === u.email ? 'bg-surface text-ink' : 'text-muted hover:text-ink',
+                        )}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            'h-1.5 w-1.5 shrink-0 rounded-full',
+                            email === u.email ? 'bg-ink' : 'bg-hairline',
+                          )}
+                        />
+                        <span className="min-w-0 flex-1 truncate">{u.name}</span>
+                        <span className="micro-label shrink-0">
+                          {u.role}
+                          {u.cpse_code ? ` · ${u.cpse_code}` : ''}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="border border-hairline px-3 py-4 text-sm text-muted">
+                  No users yet. Run <span className="font-mono text-xs">make seed</span> to create
+                  the demo accounts.
+                </p>
+              )}
             </Field>
 
-            <Field label="Password" htmlFor="password" hint="All seeded demo users use “demo”.">
+            <Field label="Password" htmlFor="password" hint="Every seeded account uses “demo”.">
               <Input
                 id="password"
                 type="password"
@@ -88,8 +137,8 @@ export default function Login() {
               </p>
             )}
 
-            <Button type="submit" variant="primary" className="w-full">
-              Sign in
+            <Button type="submit" variant="primary" className="w-full" disabled={busy || !email}>
+              {busy ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
         </motion.div>

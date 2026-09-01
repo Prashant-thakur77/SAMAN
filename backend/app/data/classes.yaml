@@ -1,0 +1,146 @@
+# SAMAN class schemas — spec §2A (attribute roles) and §2D (description grammar).
+#
+# This file is DATA, not code. It is the single source of truth for:
+#   * which attributes exist per class and how they are extracted (§2A)
+#   * which of them can veto a duplicate match (role: identity_critical)
+#   * how the canonical golden description is rendered (§2D template)
+#   * which numeric attribute forms the coarse blocking band (§2A.1, block_on)
+#
+# Attribute roles:
+#   identity_critical  any mismatch vetoes the pair — it can never be a duplicate
+#   performance        compared within a tolerance band; outside it, a candidate
+#                      for directed equivalence (§2B) if `direction` allows
+#   cosmetic           never vetoes; contributes to confidence only
+
+version: 1
+
+classes:
+  bearing.ball.deep_groove:
+    label: Ball bearing, deep groove
+    noun: BEARING
+    keywords: [bearing, brg, brng, bearng, ball bearing, deep groove, dgbb]
+    block_on: bore_mm
+    template: '{noun}, BALL DEEP GROOVE, {bore_mm}MM BORE, {outer_dia_mm}MM OD, {width_mm}MM W, {seal_type}, {brand} {mpn}'
+    attributes:
+      bore_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      outer_dia_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      width_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      seal_type: {type: enum, role: identity_critical, values: [ZZ, 2RS, OPEN]}
+      load_rating_kg: {type: numeric, unit: kg, role: performance, tolerance_pct: 5, direction: higher_ok}
+      temp_max_c: {type: numeric, unit: degC, role: performance, tolerance_pct: 10, direction: higher_ok}
+      brand: {type: categorical, role: cosmetic}
+
+  valve.gate:
+    label: Gate valve
+    noun: VALVE
+    keywords: [valve, vlv, vv, gate valve, gt valve]
+    block_on: size_nb_mm
+    template: '{noun}, GATE, {size_nb_mm}NB, CLASS {pressure_class}, {body_material}, {end_connection}, {brand} {mpn}'
+    attributes:
+      size_nb_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      pressure_class: {type: enum, role: identity_critical, values: ['150', '300', '600', '900']}
+      body_material: {type: enum, role: identity_critical, values: [WCB, CS, SS316, SS304, CI]}
+      end_connection: {type: enum, role: identity_critical, values: [FLANGED, THREADED, BUTTWELD, SOCKETWELD]}
+      pressure_bar: {type: numeric, unit: bar, role: performance, tolerance_pct: 5, direction: higher_ok}
+      temp_max_c: {type: numeric, unit: degC, role: performance, tolerance_pct: 10, direction: higher_ok}
+      brand: {type: categorical, role: cosmetic}
+
+  gasket.spiral_wound:
+    label: Spiral-wound gasket
+    noun: GASKET
+    keywords: [gasket, gskt, gsk, spiral wound, swg]
+    block_on: size_nb_mm
+    template: '{noun}, SPIRAL WOUND, {size_nb_mm}NB, CLASS {pressure_class}, {material}, {thickness_mm}MM THK, {brand} {mpn}'
+    attributes:
+      size_nb_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      pressure_class: {type: enum, role: identity_critical, values: ['150', '300', '600', '900']}
+      material: {type: enum, role: identity_critical, values: [SS316-GRAPHITE, SS304-PTFE, SS316-PTFE, CAF]}
+      thickness_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      temp_max_c: {type: numeric, unit: degC, role: performance, tolerance_pct: 10, direction: higher_ok}
+      brand: {type: categorical, role: cosmetic}
+
+  pipe.seamless:
+    label: Seamless pipe
+    noun: PIPE
+    keywords: [pipe, ppe, seamless, smls, tube]
+    block_on: nps_mm
+    template: '{noun}, SEAMLESS, {nps_mm}NB, {schedule}, {material}, {brand} {mpn}'
+    attributes:
+      nps_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      schedule: {type: enum, role: identity_critical, values: [SCH20, SCH40, SCH80, SCH160, XS]}
+      material: {type: enum, role: identity_critical, values: [CS-A106B, SS316, SS304, CS-A53]}
+      pressure_bar: {type: numeric, unit: bar, role: performance, tolerance_pct: 5, direction: higher_ok}
+      length_m: {type: numeric, unit: m, role: cosmetic}
+      brand: {type: categorical, role: cosmetic}
+
+  fastener.bolt.hex:
+    label: Hexagon head bolt
+    noun: BOLT
+    keywords: [bolt, blt, hex bolt, hexagon, screw, stud]
+    block_on: length_mm
+    template: '{noun}, HEX HEAD, {thread}, {length_mm}MM LG, GRADE {grade}, {material}, {brand} {mpn}'
+    attributes:
+      thread: {type: enum, role: identity_critical, values: []}
+      length_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
+      grade: {type: enum, role: identity_critical, values: ['4.6', '8.8', '10.9', '12.9']}
+      material: {type: enum, role: identity_critical, values: [CS, SS316, SS304]}
+      finish: {type: enum, role: cosmetic, values: [ZINC, PLAIN, HDG]}
+      brand: {type: categorical, role: cosmetic}
+
+  cable.power:
+    label: Power cable
+    noun: CABLE
+    keywords: [cable, cbl, wire, armoured, unarmoured, conductor]
+    block_on: csa_mm2
+    template: '{noun}, POWER, {cores}C X {csa_mm2}SQMM, {conductor}, {insulation}, {voltage_v}V, {brand} {mpn}'
+    attributes:
+      cores: {type: numeric, unit: dimensionless, role: identity_critical, tolerance: 0}
+      csa_mm2: {type: numeric, unit: mm**2, role: identity_critical, tolerance: 0}
+      voltage_v: {type: numeric, unit: V, role: identity_critical, tolerance: 0}
+      conductor: {type: enum, role: identity_critical, values: [CU, AL]}
+      insulation: {type: enum, role: identity_critical, values: [PVC, XLPE]}
+      temp_max_c: {type: numeric, unit: degC, role: performance, tolerance_pct: 10, direction: higher_ok}
+      brand: {type: categorical, role: cosmetic}
+
+  chemical.reagent:
+    label: Laboratory / process chemical
+    noun: CHEMICAL
+    keywords: [chemical, acid, caustic, solvent, reagent, hydroxide, chloride, carbonate,
+               sulphuric, nitric, phosphoric, acetic, methanol, ethanol, alcohol,
+               isopropyl, acetone, sodium, potassium, calcium]
+    block_on: concentration_pct
+    template: '{noun}, {substance}, {grade} GRADE, {concentration_pct}PCT, {brand} {mpn}'
+    attributes:
+      substance: {type: enum, role: identity_critical, values: []}
+      grade: {type: enum, role: identity_critical, values: [LR, AR, GR, TECH]}
+      concentration_pct: {type: numeric, unit: percent, role: performance, tolerance_pct: 2, direction: higher_ok}
+      brand: {type: categorical, role: cosmetic}
+
+  ppe.helmet:
+    label: Safety helmet
+    noun: HELMET
+    keywords: [helmet, hard hat, safety helmet, ppe, hat]
+    block_on: null
+    template: '{noun}, SAFETY, CLASS {helmet_class}, {shell_material}, {harness_type}, {chin_strap}, {ventilation}, {brim}, {standard}, {brand} {mpn}'
+    attributes:
+      helmet_class: {type: enum, role: identity_critical, values: [A, B, C, E]}
+      standard: {type: enum, role: identity_critical, values: [IS2925, EN397]}
+      shell_material: {type: enum, role: identity_critical, values: [HDPE, ABS, FRP]}
+      harness_type: {type: enum, role: identity_critical, values: [RATCHET, PINLOCK]}
+      chin_strap: {type: enum, role: identity_critical, values: [2-POINT, 4-POINT]}
+      ventilation: {type: enum, role: identity_critical, values: [VENTED, NON-VENTED]}
+      brim: {type: enum, role: identity_critical, values: [FULL BRIM, PEAK]}
+      colour: {type: categorical, role: cosmetic}
+      brand: {type: categorical, role: cosmetic}
+
+  unclassified:
+    label: Unclassified
+    noun: ITEM
+    keywords: []
+    block_on: null
+    # No schema means no identity_critical fields, so the veto layer cannot
+    # protect this item. Spec §2A.1: only exact anchor-key matching is allowed
+    # here, and the workbench shows a "class uncertain" warning.
+    template: '{noun}, {brand} {mpn}'
+    attributes:
+      brand: {type: categorical, role: cosmetic}
