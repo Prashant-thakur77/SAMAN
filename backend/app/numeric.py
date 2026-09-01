@@ -46,7 +46,7 @@ class ParsedNumber:
     fit_class: str | None = None
     raw: str = ""
 
-    def to_unit(self, from_unit: str | None, to_unit: str | None) -> "ParsedNumber":
+    def to_unit(self, from_unit: str | None, to_unit: str | None) -> ParsedNumber:
         """Convert every bound. Raises units.UnitError if the units are incompatible."""
         if from_unit == to_unit or to_unit is None or from_unit is None:
             return self
@@ -65,7 +65,7 @@ class ParsedNumber:
             raw=self.raw,
         )
 
-    def overlaps(self, other: "ParsedNumber") -> bool:
+    def overlaps(self, other: ParsedNumber) -> bool:
         return self.low <= other.high and other.low <= self.high
 
 
@@ -77,7 +77,7 @@ def parse_number(text: str | float | int | None) -> ParsedNumber | None:
     """Parse one numeric expression. Returns None when there is no number in it."""
     if text is None:
         return None
-    if isinstance(text, (int, float)):
+    if isinstance(text, int | float):
         v = float(text)
         return ParsedNumber(value=v, low=v, high=v, raw=str(text))
 
@@ -133,7 +133,7 @@ def find_number(text: str) -> ParsedNumber | None:
         _NUM,
     ]
     for pat in patterns:
-        if m := re.search(pat, text, re.IGNORECASE):
-            if parsed := parse_number(m.group(0)):
-                return parsed
+        m = re.search(pat, text, re.IGNORECASE)
+        if m and (parsed := parse_number(m.group(0))):
+            return parsed
     return None

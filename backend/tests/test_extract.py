@@ -108,6 +108,37 @@ class TestMpnPrecision:
         assert extract(norm("BALL BEARING SKF 6205-2Z")).mpn == "6205-2Z"
 
 
+class TestGtinAnchor:
+    """§0.4 names GTIN as a Tier-0 anchor key alongside MPN."""
+
+    def _gtin(self) -> str:
+        from app.normalize import gtin_check_digit
+
+        body = "890123456789"
+        return body + str(gtin_check_digit(body))
+
+    def test_a_labelled_gtin_is_extracted(self):
+        gtin = self._gtin()
+        assert extract(norm(f"BALL BEARING SKF 6205-2Z EAN {gtin}")).gtin == gtin
+
+    def test_a_bare_thirteen_digit_run_is_extracted(self):
+        gtin = self._gtin()
+        assert extract(norm(f"BALL BEARING SKF 6205-2Z {gtin}")).gtin == gtin
+
+    def test_a_bad_check_digit_is_not_accepted_as_an_anchor(self):
+        from app.normalize import gtin_check_digit
+
+        body = "890123456789"
+        bad = body + str((gtin_check_digit(body) + 1) % 10)
+        assert extract(norm(f"BALL BEARING SKF 6205-2Z EAN {bad}")).gtin is None
+
+    def test_ordinary_descriptions_carry_no_gtin(self):
+        assert extract(norm("BALL BEARING SKF 6205-2Z")).gtin is None
+
+    def test_a_part_number_is_not_mistaken_for_a_gtin(self):
+        assert extract(norm("VALVE GATE 50NB PART NO KTZ-GV50-300")).gtin is None
+
+
 class TestAttributeRecovery:
     def test_identity_critical_fields_are_recovered_for_each_class(self):
         for text, class_code in CLASS_EXAMPLES:

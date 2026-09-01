@@ -138,15 +138,27 @@ async def ingest(
         description = (row.get(column_mapping["description"]) or "").strip()
 
         if not legacy:
-            rejected.append(RejectedRow(row_number=row_number, reason="Missing material code.", raw=dict(row)))
+            rejected.append(
+                RejectedRow(
+                    row_number=row_number, reason="Missing material code.", raw=dict(row)
+                )
+            )
             continue
         if not description:
-            rejected.append(RejectedRow(row_number=row_number, reason="Missing description.", raw=dict(row)))
+            rejected.append(
+                RejectedRow(
+                    row_number=row_number, reason="Missing description.", raw=dict(row)
+                )
+            )
             continue
         if legacy in seen_in_file:
             duplicates_in_file += 1
             rejected.append(
-                RejectedRow(row_number=row_number, reason=f"Duplicate code {legacy!r} in this file.", raw=dict(row))
+                RejectedRow(
+                    row_number=row_number,
+                    reason=f"Duplicate code {legacy!r} in this file.",
+                    raw=dict(row),
+                )
             )
             continue
         if legacy in existing:

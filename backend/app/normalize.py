@@ -242,12 +242,27 @@ def normalize_mpn(mpn: str | None) -> str | None:
     return cleaned if len(cleaned) >= 4 else None
 
 
+def gtin_check_digit(digits: str) -> int:
+    """GS1 mod-10: weights alternate 3 and 1 from the right of the payload."""
+    total = 0
+    for position, ch in enumerate(reversed(digits)):
+        total += int(ch) * (3 if position % 2 == 0 else 1)
+    return (10 - total % 10) % 10
+
+
 def normalize_gtin(gtin: str | None) -> str | None:
-    """GTIN-8/12/13/14 digits only; anything else is not a usable anchor."""
+    """GTIN-8/12/13/14, check digit verified.
+
+    Validated rather than merely length-checked, for the same reason MPN
+    extraction is precision-first: a wrong GTIN becomes a Tier-0 anchor key and
+    merges unrelated items outright.
+    """
     if not gtin:
         return None
     digits = re.sub(r"\D", "", str(gtin))
-    return digits if len(digits) in (8, 12, 13, 14) else None
+    if len(digits) not in (8, 12, 13, 14):
+        return None
+    return digits if gtin_check_digit(digits[:-1]) == int(digits[-1]) else None
 
 
 def text_hash(norm_text: str) -> str:

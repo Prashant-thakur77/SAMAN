@@ -30,7 +30,6 @@ from .models import (
     Item,
     MatchRun,
     Pair,
-    RawItem,
     TruthEquivalence,
     TruthGroup,
     TruthTrap,
@@ -240,7 +239,8 @@ def _veto_metrics(db: Session, snap: Snapshot) -> dict:
         b = snap.raw_to_item.get(raw_b)
         if a is None or b is None:
             continue
-        merged = snap.predicted.get(a) is not None and snap.predicted.get(a) == snap.predicted.get(b)
+        cluster_a = snap.predicted.get(a)
+        merged = cluster_a is not None and cluster_a == snap.predicted.get(b)
         correct = merged if expect else not merged
 
         by_kind[kind]["total"] += 1
@@ -378,7 +378,11 @@ def compute_metrics(db: Session) -> dict:
             "items_holdout": len(snap.holdout),
             "clusters": db.execute(select(Cluster.id)).scalars().all().__len__(),
             "truth_groups_holdout": len(
-                {snap.item_to_group[i] for i in snap.holdout if i in snap.item_to_group}
+                {
+                    snap.item_to_group[i]
+                    for i in snap.holdout
+                    if i in snap.item_to_group
+                }
             ),
         },
         "duplicate": {

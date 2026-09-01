@@ -14,3 +14,18 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    # `Depends()` in a parameter default is the FastAPI idiom, not a mutable
+    # default argument. Flagging it here would mean ignoring it everywhere.
+    "B008",
+    # The catalogues are deliberately multilingual; Devanagari is data.
+    "RUF001",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test names are long on purpose: they read as the specification they check.
+"tests/*" = ["E501"]

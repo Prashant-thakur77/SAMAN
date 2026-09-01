@@ -12,7 +12,7 @@ Naming follows the spec table list exactly. Two conventions throughout:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -33,7 +33,7 @@ from .db import Base
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # --------------------------------------------------------------------------
@@ -48,7 +48,7 @@ class Cpse(Base):
     code: Mapped[str] = mapped_column(String(16), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(128))
 
-    raw_items: Mapped[list["RawItem"]] = relationship(back_populates="cpse")
+    raw_items: Mapped[list[RawItem]] = relationship(back_populates="cpse")
 
 
 class User(Base):
@@ -85,7 +85,7 @@ class RawItem(Base):
     qty_on_hand: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     cpse: Mapped[Cpse] = relationship(back_populates="raw_items")
-    item: Mapped["Item | None"] = relationship(back_populates="raw_item", uselist=False)
+    item: Mapped[Item | None] = relationship(back_populates="raw_item", uselist=False)
 
     __table_args__ = (
         # Spec §8A: the lookup the ingest de-duplicator and ERP mapping both use.
@@ -185,8 +185,8 @@ class Cluster(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     status: Mapped[str] = mapped_column(String(16), default="draft")  # draft|approved|conflict
 
-    members: Mapped[list["ClusterMember"]] = relationship(back_populates="cluster")
-    golden: Mapped["GoldenRecord | None"] = relationship(back_populates="cluster", uselist=False)
+    members: Mapped[list[ClusterMember]] = relationship(back_populates="cluster")
+    golden: Mapped[GoldenRecord | None] = relationship(back_populates="cluster", uselist=False)
 
 
 class ClusterMember(Base):
@@ -251,7 +251,9 @@ class ReviewTask(Base):
     __tablename__ = "review_task"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    cluster_id: Mapped[int | None] = mapped_column(ForeignKey("cluster.id"), nullable=True, index=True)
+    cluster_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cluster.id"), nullable=True, index=True
+    )
     pair_id: Mapped[int | None] = mapped_column(ForeignKey("pair.id"), nullable=True, index=True)
     band: Mapped[str] = mapped_column(String(8), index=True)  # high|grey|low
     state: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending|done

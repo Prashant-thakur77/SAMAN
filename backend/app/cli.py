@@ -102,13 +102,14 @@ def print_metrics(report: dict) -> None:
           f"{base['recall']:>8.4f} {base['f1']:>8.4f}")
 
     veto = report["veto"]
-    print(f"\n  VETO LAYER (planted §2A traps, held-out)")
+    print("\n  VETO LAYER (planted §2A traps, held-out)")
     print("  " + "-" * 62)
-    print(f"  {'traps correctly refused':34} {veto['traps_refused']:>9,} of {veto['traps_total']:,}")
+    refused = f"{veto['traps_refused']:,} of {veto['traps_total']:,}"
+    print(f"  {'traps correctly refused':34} {refused:>16}")
     for kind, counts in veto["by_kind"].items():
         print(f"    {kind:32} {counts['accuracy']:>9.4f}  ({counts['correct']}/{counts['total']})")
 
-    print(f"\n  PER CLASS (worst first)")
+    print("\n  PER CLASS (worst first)")
     print("  " + "-" * 62)
     for row in report["per_class"]:
         print(f"  {row['class_code']:34} {row['precision']:>9.4f} {row['recall']:>8.4f} "
@@ -118,8 +119,8 @@ def print_metrics(report: dict) -> None:
     auto = report["automation"]
     print(f"\n  {'automation rate':34} {auto['automation_rate']:>9.4f}")
     print(f"  {'pairs needing human review':34} {auto['needs_review']:>9,}")
-    print(f"  {'candidate pairs generated':34} "
-          f"{report['blocking']['stats'].get('candidate_pairs', 0):>9,}")
+    candidates = report["blocking"]["stats"].get("candidate_pairs", 0)
+    print(f"  {'candidate pairs generated':34} {candidates:>9,}")
     print("=" * 66)
 
 

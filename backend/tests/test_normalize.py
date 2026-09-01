@@ -7,6 +7,7 @@ from app.normalize import (
     canonical_uom,
     expand_abbreviations,
     extract_pack_qty,
+    gtin_check_digit,
     normalize_gtin,
     normalize_mpn,
     normalize_row,
@@ -100,12 +101,27 @@ class TestAnchorKeys:
         """A 2-character 'part number' would anchor thousands of unrelated rows."""
         assert normalize_mpn("AB") is None
 
-    @pytest.mark.parametrize("gtin", ["12345678", "123456789012", "1234567890123"])
-    def test_valid_gtin_lengths_are_kept(self, gtin):
+    @pytest.mark.parametrize("length", [8, 12, 13, 14])
+    def test_every_valid_gtin_length_is_accepted(self, length):
+        body = "8901234567890123"[: length - 1]
+        gtin = body + str(gtin_check_digit(body))
         assert normalize_gtin(gtin) == gtin
 
     def test_invalid_gtin_length_is_rejected(self):
         assert normalize_gtin("12345") is None
+
+    def test_a_failed_check_digit_is_rejected(self):
+        """A wrong GTIN would become a Tier-0 anchor and merge unrelated items."""
+        body = "890123456789"
+        good = body + str(gtin_check_digit(body))
+        bad = body + str((gtin_check_digit(body) + 1) % 10)
+        assert normalize_gtin(good) == good
+        assert normalize_gtin(bad) is None
+
+    def test_separators_are_stripped_before_validation(self):
+        body = "890123456789"
+        gtin = body + str(gtin_check_digit(body))
+        assert normalize_gtin(f"{gtin[:3]}-{gtin[3:]}") == gtin
 
 
 def test_normalization_is_idempotent():

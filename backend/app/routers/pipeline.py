@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends
@@ -18,13 +19,10 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
 def _run() -> None:
     """Background entry point — owns its own session, never the request's."""
-    with session_scope() as db:
-        try:
-            pipeline_mod.run_pipeline(db)
-        except Exception:
-            # run_pipeline has already recorded the failure on the status
-            # object; swallowing here keeps a bad run from killing the worker.
-            pass
+    # run_pipeline records the failure on the status object before it raises;
+    # suppressing here keeps a bad run from killing the worker.
+    with session_scope() as db, contextlib.suppress(Exception):
+        pipeline_mod.run_pipeline(db)
 
 
 @router.post("/run", response_model=PipelineStatusOut)

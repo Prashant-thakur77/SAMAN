@@ -87,17 +87,34 @@ def parse_metric_thread(text: str) -> Designation | None:
 # --------------------------------------------------------------------------
 
 _P = {
-    "size_nb": re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*(?:NB|DN|NOMINAL BORE)\b|\bDN\s*(\d{1,4})\b"),
-    "pressure_class": re.compile(r"\b(?:CLASS|CL)\s*(150|300|600|900)\b|\b(150|300|600|900)\s*(?:#|LB)\b|\bCL(150|300|600|900)\b"),
-    "schedule": re.compile(r"\bSCH(?:EDULE)?\s*[-]?\s*(20|40|80|160)\b|\bSCH(20|40|80|160)\b|\b(XS|XXS)\b"),
-    "thickness": re.compile(r"\b(\d+(?:\.\d+)?)\s*MM\s*(?:THK|THICK|THICKNESS)\b|\b(?:THK|THICKNESS)\s*(\d+(?:\.\d+)?)\s*MM\b"),
+    "size_nb": re.compile(
+        r"\b(\d{1,4}(?:\.\d+)?)\s*(?:NB|DN|NOMINAL BORE)\b|\bDN\s*(\d{1,4})\b"
+    ),
+    "pressure_class": re.compile(
+        r"\b(?:CLASS|CL)\s*(150|300|600|900)\b"
+        r"|\b(150|300|600|900)\s*(?:#|LB)\b"
+        r"|\bCL(150|300|600|900)\b"
+    ),
+    "schedule": re.compile(
+        r"\bSCH(?:EDULE)?\s*[-]?\s*(20|40|80|160)\b|\bSCH(20|40|80|160)\b|\b(XS|XXS)\b"
+    ),
+    "thickness": re.compile(
+        r"\b(\d+(?:\.\d+)?)\s*MM\s*(?:THK|THICK|THICKNESS)\b"
+        r"|\b(?:THK|THICKNESS)\s*(\d+(?:\.\d+)?)\s*MM\b"
+    ),
     # Both orders occur: "GRADE 8.8" and "8.8 GRADE", "AR GRADE" and "GRADE AR".
     "grade": re.compile(
         r"\bGRADE\s*(4\.6|8\.8|10\.9|12\.9)\b|\b(4\.6|8\.8|10\.9|12\.9)\s*GRADE\b"
         r"|\bGRADE\s*(LR|AR|GR|TECH)\b|\b(LR|AR|GR|TECH)\s*GRADE\b"
     ),
-    "length_mm": re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:LG|LONG|LENGTH)\b|\b(?:LG|LENGTH)\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"),
-    "cores_csa": re.compile(r"\b(\d{1,2})\s*(?:C|CORE|CORES)?\s*[Xx*]\s*(\d+(?:\.\d+)?)\s*(?:SQMM|SQUARE MILLIMETRE|MM2)\b"),
+    "length_mm": re.compile(
+        r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:LG|LONG|LENGTH)\b"
+        r"|\b(?:LG|LENGTH)\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"
+    ),
+    "cores_csa": re.compile(
+        r"\b(\d{1,2})\s*(?:C|CORE|CORES)?\s*[Xx*]\s*(\d+(?:\.\d+)?)"
+        r"\s*(?:SQMM|SQUARE MILLIMETRE|MM2)\b"
+    ),
     "csa": re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:SQMM|SQUARE MILLIMETRE|MM2)\b"),
     "voltage": re.compile(r"\b(\d+(?:\.\d+)?)\s*(KV|KILOVOLT|V|VOLT)\b"),
     # Two digits minimum: a single digit before C is a cable core count
@@ -106,9 +123,18 @@ _P = {
     "pressure_bar": re.compile(r"\b(\d+(?:\.\d+)?)\s*BAR\b"),
     "load_kg": re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:KG|KILOGRAM)\b"),
     "concentration": re.compile(r"\b(\d{1,3}(?:\.\d+)?)\s*(?:PCT|%|PERCENT)\b"),
-    "bore_mm": re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:BORE|ID|INNER DIAMETER)\b|\bBORE\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"),
-    "od_mm": re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:OD|OUTER DIAMETER)\b|\bOUTER DIAMETER\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"),
-    "width_mm": re.compile(r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:W|WIDTH|WD)\b|\bWIDTH\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"),
+    "bore_mm": re.compile(
+        r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:BORE|ID|INNER DIAMETER)\b"
+        r"|\bBORE\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"
+    ),
+    "od_mm": re.compile(
+        r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:OD|OUTER DIAMETER)\b"
+        r"|\bOUTER DIAMETER\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"
+    ),
+    "width_mm": re.compile(
+        r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:W|WIDTH|WD)\b"
+        r"|\bWIDTH\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"
+    ),
     "length_m": re.compile(r"\b(\d{1,3}(?:\.\d+)?)\s*(?:M|METRE)\s*(?:LG|LENGTH)?\b"),
 }
 
@@ -269,10 +295,27 @@ def _spec_vocabulary(attrs: dict[str, object], class_code: str) -> set[str]:
     for value in attrs.values():
         if isinstance(value, str):
             stop.add(value.upper())
-        elif isinstance(value, (int, float)):
+        elif isinstance(value, int | float):
             stop.add(str(value))
             stop.add(str(int(value)) if float(value).is_integer() else str(value))
     return stop
+
+
+#: A GTIN is either labelled, or a bare 13/14-digit run — nothing else in a
+#: catalogue description is that long.
+_GTIN_LABELLED = re.compile(r"\b(?:GTIN|EAN|UPC|BARCODE)\s*[:\-]?\s*(\d{8,14})\b")
+_GTIN_BARE = re.compile(r"(?<!\d)(\d{13,14})(?!\d)")
+
+
+def extract_gtin(text: str) -> str | None:
+    """Pull a GTIN out of the description and verify its check digit (§0.4)."""
+    from .normalize import normalize_gtin
+
+    for pattern in (_GTIN_LABELLED, _GTIN_BARE):
+        for match in pattern.finditer(text):
+            if gtin := normalize_gtin(match.group(1)):
+                return gtin
+    return None
 
 
 def extract_brand(text: str, class_code: str | None = None) -> str | None:
@@ -342,6 +385,7 @@ class Extraction:
     class_confidence: float
     attrs: dict[str, object]
     mpn: str | None
+    gtin: str | None
     designation: str | None
     conflicts: list[dict[str, object]]
 
@@ -443,7 +487,7 @@ def extract(norm_text: str) -> Extraction:
             existing = attrs.get(key)
             if existing is None:
                 attrs[key] = value
-            elif isinstance(value, (int, float)) and isinstance(existing, (int, float)):
+            elif isinstance(value, int | float) and isinstance(existing, int | float):
                 if abs(float(existing) - float(value)) > 1e-6:
                     conflicts.append(
                         {
@@ -468,6 +512,7 @@ def extract(norm_text: str) -> Extraction:
         class_confidence=round(guess.confidence, 4),
         attrs=attrs,
         mpn=extract_mpn(text, designation, attrs, guess.class_code),
+        gtin=extract_gtin(text),
         designation=designation.raw if designation else None,
         conflicts=conflicts,
     )

@@ -4,7 +4,7 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M3
+## Status: end of M3 (audited)
 
 M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
 engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
@@ -16,7 +16,7 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 |---|---|---|
 | Golden descriptions are a representative member, not a rendered template | §2D standardization engine, with attribute fusion and per-field provenance | M3.4 |
 | The directed equivalence engine is not built | §2B; the truth is seeded and `GET /api/metrics` reports `equivalence.status = not_built` rather than a fabricated number | M3.5 |
-| `splink` is not exercised | Not installed by default, so Tier 1 runs on rapidfuzz and `/api/health` says so. The degraded path is the default-tested path | see below |
+| `splink` is not exercised | Not installed by default, so Tier 1 runs on rapidfuzz and `/api/health` says so. The degraded path is the default-tested path. **Its code path is therefore unrun — a liability on stage.** | before the demo |
 | Tier 3 adjudication of the grey band is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
 | All 12 in-shell routes still render empty states | Nothing may be faked (§10); screens fill as their engines land | M4–M7.5 |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
@@ -56,6 +56,29 @@ Recorded rather than silently substituted, per the "how to use this spec" note.
   every extraction gap into a false negative. The residual trap failures are
   rows whose value was destroyed by the seed's typo model — the intended
   behaviour, not a defect.
+
+### Audit, after M3
+
+A full pass over M1–M3 against the spec. Verified working: `docker compose up`
+serves both services (§0.1) including the API proxy; the design tokens, motion
+durations and easing curve match §1.1/§1.5 exactly; fonts are self-hosted with
+no `fonts.googleapis` reference anywhere; no non-localhost network call exists
+in either app (§9); a fresh empty database answers `/api/metrics` and runs the
+pipeline without crashing (§8A); every table and column in §4 exists; the repo
+carries no secrets and no build artefacts.
+
+Four defects found and fixed:
+
+| Defect | Why it mattered | Fix |
+|---|---|---|
+| **Fit classes all compared equal.** `parse_number("H7")` returns magnitude 0, so `H7`, `H6` and `JS9` were mutually identical — and identical to the number 0 | §2A names "tolerance-string parsing (±0.05, H7)" as a comparator. On an identity_critical attribute this is a silent failure to veto, the exact failure the layer exists to prevent | Fit classes now compare as symbols; a grade against a magnitude is `unknown`, not a match |
+| **The Tier-0 GTIN anchor was dead code.** 0 of 11,802 items carried a GTIN, so the branch could never fire | §0.4 names GTIN alongside MPN as a Tier-0 anchor. An unexercised branch in the highest-precision tier is untested code in the most load-bearing place | GTINs are extracted from the description (§4 puts `gtin` on `item`, not `raw_item`) with the GS1 check digit verified, and the generator prints them on ~19% of rows. Duplicate recall rose 0.929 → 0.938 |
+| **`review_task.cluster_id` was never populated** | §4 declares the column and §6.5's merge-into-cluster view needs it | Populated from the pair's anchor item; 3,606 of 3,606 tasks now carry it |
+| **`ruff` was configured in `pyproject.toml` since M1 but never installed** | The lint config was decorative | Installed and run; 55 findings fixed, `B008` suppressed with a reason (`Depends()` in a default is the FastAPI idiom, not a mutable-default bug). Zero findings now |
+
+One earlier claim corrected: the M3 report said in-band trap accuracy was 0.82
+on 17 samples. After the GTIN change it is 0.89 on 19. Both are honest small
+samples; the figure moves with the seed.
 
 ### Measurement honesty
 

@@ -169,6 +169,8 @@ class Product:
     brand: str
     mpn: str | None
     base_price: float
+    #: Not every catalogue item carries a barcode; roughly a third here do.
+    gtin: str | None = None
     #: how many CPSEs carry it; 1 = singleton
     spread: int = 1
     tags: list[str] = field(default_factory=list)
@@ -320,9 +322,21 @@ def bearing_mpn(designation: str, seal: str, brand: str, load_class: str, temp: 
     conflicting specifications, which the matcher would rightly raise as a
     data-quality conflict.
     """
-    suffix = "-2RS" if seal == "2RS" else "" if seal == "OPEN" else _BEARING_BRAND_SUFFIX.get(brand, "-2Z")
+    suffix = (
+        "-2RS" if seal == "2RS"
+        else "" if seal == "OPEN"
+        else _BEARING_BRAND_SUFFIX.get(brand, "-2Z")
+    )
     variant = "" if (load_class == "STD" and temp == 120) else f"/{load_class[0]}{temp}"
     return f"{designation}{suffix}{variant}"
+
+
+def make_gtin(rng: random.Random) -> str:
+    """A GTIN-13 with a correct GS1 check digit (890 = the Indian prefix)."""
+    from .normalize import gtin_check_digit
+
+    body = "890" + "".join(str(rng.randrange(10)) for _ in range(9))
+    return body + str(gtin_check_digit(body))
 
 
 def _finalize(
@@ -333,6 +347,7 @@ def _finalize(
     # Opaque catalogue number keyed to the exact combination, so no two
     # distinct products can ever share an anchor key.
     catalogue = f"{brand[:3]}-{_MPN_FAMILY.get(class_code, 'XX')}{index:05d}"
+    gtin = make_gtin(rng) if rng.random() < 0.35 else None
 
     if class_code == "bearing.ball.deep_groove":
         designation = str(combo["designation"])
@@ -349,7 +364,7 @@ def _finalize(
             gid, class_code, attrs, brand,
             bearing_mpn(designation, str(combo["seal_type"]), brand,
                         str(combo["load_class"]), int(combo["temp_max_c"])),
-            round(bore * rng.uniform(18, 45), 2),
+            round(bore * rng.uniform(18, 45), 2), gtin=gtin,
         )
 
     if class_code == "valve.gate":
@@ -363,7 +378,7 @@ def _finalize(
             "temp_max_c": combo["temp_max_c"],
         }
         return Product(gid, class_code, attrs, brand, catalogue,
-                       round(size * float(pclass) * rng.uniform(0.9, 1.6), 2))
+                       round(size * float(pclass) * rng.uniform(0.9, 1.6), 2), gtin=gtin)
 
     if class_code == "gasket.spiral_wound":
         size = int(combo["size_nb_mm"])
@@ -374,7 +389,7 @@ def _finalize(
         }
         return Product(gid, class_code, attrs, brand,
                        catalogue,
-                       round(size * rng.uniform(3, 9), 2))
+                       round(size * rng.uniform(3, 9), 2), gtin=gtin)
 
     if class_code == "pipe.seamless":
         size = int(combo["nps_mm"])
@@ -384,7 +399,7 @@ def _finalize(
             "length_m": 6.0,
         }
         return Product(gid, class_code, attrs, brand, catalogue,
-                       round(size * rng.uniform(9, 22), 2))
+                       round(size * rng.uniform(9, 22), 2), gtin=gtin)
 
     if class_code == "fastener.bolt.hex":
         nominal = int(combo["nominal_mm"])
@@ -395,7 +410,7 @@ def _finalize(
             "material": combo["material"], "finish": rng.choice(FINISHES),
         }
         return Product(gid, class_code, attrs, brand, catalogue,
-                       round(nominal * length * rng.uniform(0.02, 0.08), 2))
+                       round(nominal * length * rng.uniform(0.02, 0.08), 2), gtin=gtin)
 
     if class_code == "cable.power":
         cores = int(combo["cores"])
@@ -406,7 +421,7 @@ def _finalize(
             "insulation": combo["insulation"], "temp_max_c": combo["temp_max_c"],
         }
         return Product(gid, class_code, attrs, brand, catalogue,
-                       round(cores * csa * rng.uniform(9, 20), 2))
+                       round(cores * csa * rng.uniform(9, 20), 2), gtin=gtin)
 
     if class_code == "chemical.reagent":
         attrs = {
@@ -414,7 +429,7 @@ def _finalize(
             "concentration_pct": combo["concentration_pct"],
         }
         return Product(gid, class_code, attrs, brand, catalogue,
-                       round(rng.uniform(400, 4500), 2))
+                       round(rng.uniform(400, 4500), 2), gtin=gtin)
 
     if class_code == "ppe.helmet":
         attrs = {
@@ -426,7 +441,7 @@ def _finalize(
         }
         return Product(gid, class_code, attrs, brand,
                        catalogue,
-                       round(rng.uniform(180, 900), 2))
+                       round(rng.uniform(180, 900), 2), gtin=gtin)
 
     raise ValueError(f"no finalizer for class {class_code!r}")
 
@@ -593,6 +608,14 @@ def render(product: Product, style: StyleProfile, rng: random.Random) -> str:
         parts = [noun, *phrases, product.brand]
     if mpn_text:
         parts.append(mpn_text)
+    # A barcode is printed on some catalogue rows but not all, and the label
+    # varies between CPSEs — which is what makes it a realistic Tier-0 anchor.
+    if product.gtin and rng.random() < 0.55:
+        parts.append(
+            f"{rng.choice(('EAN', 'GTIN', 'BARCODE'))} {product.gtin}"
+            if rng.random() < 0.7
+            else product.gtin
+        )
 
     text = style.sep.join(p for p in parts if p)
     text = _contract(text, style.contract)
@@ -756,10 +779,9 @@ def _plant_traps(
                 break
             lo = _vary_to(cls, candidate, "load_class", "STD")
             hi = _vary_to(cls, candidate, "load_class", "XHIGH")
-            if lo not in used[cls] or lo == candidate:
-                if hi not in used[cls]:
-                    index_a, index_b = lo, hi
-                    break
+            if (lo not in used[cls] or lo == candidate) and hi not in used[cls]:
+                index_a, index_b = lo, hi
+                break
         if index_a is None or index_b is None:
             continue
         used["bearing.ball.deep_groove"].update({index_a, index_b})

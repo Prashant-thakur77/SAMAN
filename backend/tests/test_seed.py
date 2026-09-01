@@ -6,6 +6,7 @@ numbers would be meaningless.
 """
 
 import collections
+import itertools
 import json
 
 from sqlalchemy import func, select
@@ -16,7 +17,6 @@ from app.models import (
     Item,
     PurchaseHistory,
     RawItem,
-    Stock,
     SubstitutionRule,
     TruthEquivalence,
     TruthGroup,
@@ -184,7 +184,7 @@ class TestLearnability:
                 if spec is None or spec.role != "performance" or not spec.tolerance_pct:
                     continue
                 numbers = sorted(float(v) for v in values)
-                for lo, hi in zip(numbers, numbers[1:]):
+                for lo, hi in itertools.pairwise(numbers):
                     gap = abs(hi - lo) / max(abs(hi), 1e-9) * 100
                     assert gap > spec.tolerance_pct, (
                         f"{class_code}.{attr}: {lo} and {hi} are {gap:.1f}% apart, "

@@ -13,15 +13,15 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
 from .extract import extract
 from .models import Item, RawItem
-from .normalize import normalize_gtin, normalize_mpn, normalize_row
+from .normalize import normalize_mpn, normalize_row
 
 BATCH = 1000
 
@@ -125,7 +125,7 @@ def build_items(
                 "class_code": ex.class_code,
                 "class_confidence": ex.class_confidence,
                 "mpn_norm": normalize_mpn(ex.mpn),
-                "gtin": normalize_gtin(None),
+                "gtin": ex.gtin,
                 "uom_base": norm.uom_base,
                 "pack_qty": norm.pack_qty,
                 "attrs_json": json.dumps(attrs, sort_keys=True, default=str),
@@ -388,9 +388,11 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
         ClusterMember,
         Cnmc,
         GoldenRecord,
-        Item as ItemModel,
         Pair,
         ReviewTask,
+    )
+    from .models import (
+        Item as ItemModel,
     )
 
     rows = db.execute(
@@ -514,10 +516,16 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     db.commit()
     status.rows_done = len(refined)
 
-    # Review queue: one task per pair a human still has to decide.
+    # Review queue: one task per pair a human still has to decide. The cluster
+    # is carried alongside the pair so the workbench's merge-into-cluster view
+    # has somewhere to go (§6.5).
+    cluster_of = dict(
+        db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all()
+    )
     tasks = [
         {
             "pair_id": pair_id,
+            "cluster_id": cluster_of.get(item_a),
             "band": band,
             "state": "pending",
             "assignee_role": "steward" if verdict != "conflict" else "approver",
@@ -525,8 +533,8 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
             if verdict == "conflict"
             else "confidence in the grey band",
         }
-        for pair_id, band, verdict in db.execute(
-            select(Pair.id, Pair.band, Pair.verdict).where(
+        for pair_id, item_a, band, verdict in db.execute(
+            select(Pair.id, Pair.item_a, Pair.band, Pair.verdict).where(
                 Pair.verdict.in_(("review", "conflict"))
             )
         ).all()

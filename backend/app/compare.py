@@ -23,7 +23,7 @@ from typing import Any
 
 from .numeric import ParsedNumber, parse_number
 from .taxonomy import AttrSpec, ClassSchema
-from .units import UnitError, convert
+from .units import UnitError
 
 #: Two floats within this are the same measurement, not a difference.
 EPSILON = 1e-6
@@ -138,6 +138,24 @@ def compare_numeric(spec: AttrSpec, raw_a: Any, raw_b: Any) -> AttrComparison:
     b = _as_number(raw_b, spec.unit, spec.unit)
     if a is None or b is None:
         return AttrComparison(spec.name, spec.role, raw_a, raw_b, UNKNOWN, "not comparable")
+
+    # A tolerance grade ("H7", "JS9") carries no magnitude, so it must be
+    # compared as a symbol. Falling through to the numeric path would make
+    # every fit class equal to every other one — and equal to the number 0 —
+    # which on an identity_critical attribute is a silent failure to veto.
+    if a.fit_class or b.fit_class:
+        if not (a.fit_class and b.fit_class):
+            return AttrComparison(
+                spec.name, spec.role, raw_a, raw_b, UNKNOWN,
+                "a tolerance grade cannot be compared with a magnitude",
+            )
+        if a.fit_class == b.fit_class:
+            return AttrComparison(spec.name, spec.role, raw_a, raw_b, MATCH, "same fit class")
+        result = MISMATCH if spec.vetoes else OUT_OF_BAND
+        return AttrComparison(
+            spec.name, spec.role, raw_a, raw_b, result,
+            f"fit class {a.fit_class} vs {b.fit_class}",
+        )
 
     # A stated range is satisfied by any overlap rather than by equal midpoints.
     if a.is_range or b.is_range:

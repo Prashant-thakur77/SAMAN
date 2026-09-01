@@ -97,9 +97,10 @@ metrics do.
 |---|---|---|
 | CPSEs | 4 — CPCL, IOCL, GAIL, ONGC | 6 — adds HPCL, SAIL |
 | Raw catalogue rows | ~11,800 | ~156,400 |
+| Items carrying a validated GTIN | ~2,300 | — |
 | Ground-truth products | 7,000 | 14,161 |
 | Planted near-miss traps | 400 products / 1,020 pairs | same |
-| Purchase-history rows | ~21,400 | ~279,500 |
+| Purchase-history rows | ~21,300 | ~279,500 |
 | Seed + normalize + extract | **2.4 s** | **29.5 s** (~5,300 rows/s) |
 | Full pipeline (`make demo`) | **84 s** | not run — benchmark profile is for load testing only |
 
@@ -127,8 +128,8 @@ against these numbers.
 
 | M3 gate (spec §8) | Result | Target |
 |---|---|---|
-| Duplicate precision | **0.983** | ≥ 0.92 |
-| Duplicate recall | **0.929** | ≥ 0.80 |
+| Duplicate precision | **0.975** | ≥ 0.92 |
+| Duplicate recall | **0.938** | ≥ 0.80 |
 | Blocking recall | **0.984** | ≥ 0.97 |
 | Veto precision on planted traps | **1.000** | ≥ 0.98 |
 
@@ -137,16 +138,16 @@ A single averaged number would hide more than it shows, so the full report at
 
 | | Precision | Recall | F1 |
 |---|---|---|---|
-| Pairwise | 0.983 | 0.929 | 0.955 |
-| **B-cubed (cluster level)** | 0.994 | 0.971 | 0.982 |
-| Naive baseline: exact text match | 1.000 | 0.038 | 0.074 |
+| Pairwise | 0.975 | 0.938 | 0.957 |
+| **B-cubed (cluster level)** | 0.992 | 0.974 | 0.983 |
+| Naive baseline: exact text match | 1.000 | 0.032 | 0.061 |
 
 Pairwise scores can look excellent while clusters are catastrophically
 over-merged, so B-cubed is reported beside them. The baseline is what a plain
 exact-match de-duplication achieves on the same data: it is perfectly precise
-and finds 4% of the duplicates.
+and finds 3% of the duplicates.
 
-**Veto layer**, on the planted near-miss traps: 416 of 416 correctly refused.
+**Veto layer**, on the planted near-miss traps: 380 of 380 correctly refused.
 
 | Trap | Accuracy |
 |---|---|
@@ -154,10 +155,11 @@ and finds 4% of the duplicates.
 | Performance outside the band (200 kg vs 500 kg) | 1.00 |
 | Cross-brand equivalent (SKF / FAG / NSK) | 1.00 |
 | Directed substitute (class 300 vs 600) | 1.00 |
-| Performance inside the band — must still merge | 0.82 |
+| Performance inside the band — must still merge | 0.89 |
 
-Per class, the weakest is named rather than averaged away: `chemical.reagent`
-at F1 0.905. Automation rate is 0.994, leaving 3,607 pairs for human review.
+Per class, the weakest is named rather than averaged away:
+`bearing.ball.deep_groove` at F1 0.937, with every class above 0.93. Automation
+rate is 0.995, leaving 3,606 pairs for human review.
 
 ---
 

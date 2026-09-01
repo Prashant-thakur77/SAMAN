@@ -5,8 +5,16 @@ These are the tests that protect the claim "similarity never overrides a veto".
 
 import pytest
 
-from app.compare import IN_BAND, MATCH, MISMATCH, OUT_OF_BAND, UNKNOWN, compare_attrs, compare_attr
-from app.taxonomy import get_schema
+from app.compare import (
+    IN_BAND,
+    MATCH,
+    MISMATCH,
+    OUT_OF_BAND,
+    UNKNOWN,
+    compare_attr,
+    compare_attrs,
+)
+from app.taxonomy import AttrSpec, get_schema
 
 BEARING = get_schema("bearing.ball.deep_groove")
 VALVE = get_schema("valve.gate")
@@ -133,6 +141,35 @@ class TestComparators:
     def test_enum_comparison_ignores_case_and_padding(self):
         spec = BEARING.attributes["seal_type"]
         assert compare_attr(spec, " zz ", "ZZ").result == MATCH
+
+
+class TestFitClasses:
+    """§2A names "tolerance-string parsing (±0.05, H7)" as a comparator.
+
+    A fit class carries a tolerance grade but no magnitude. Comparing it
+    numerically made every grade equal to every other one — and equal to zero —
+    which on an identity_critical attribute is a silent failure to veto.
+    """
+
+    FIT = AttrSpec(name="fit", type="numeric", role="identity_critical", unit="mm", tolerance=0)
+
+    def test_the_same_grade_matches(self):
+        assert compare_attr(self.FIT, "H7", "H7").result == MATCH
+
+    @pytest.mark.parametrize(("a", "b"), [("H7", "H6"), ("H7", "JS9"), ("h6", "H7")])
+    def test_different_grades_are_refused(self, a, b):
+        comparison = compare_attr(self.FIT, a, b)
+        assert comparison.result == MISMATCH
+        assert comparison.is_veto
+
+    def test_a_grade_is_not_comparable_with_a_magnitude(self):
+        """'H7' must not read as the number zero."""
+        assert compare_attr(self.FIT, "H7", 0).result == UNKNOWN
+        assert compare_attr(self.FIT, "H7", 25).result == UNKNOWN
+
+    def test_a_performance_grade_reports_out_of_band(self):
+        spec = AttrSpec(name="fit", type="numeric", role="performance", tolerance_pct=5)
+        assert compare_attr(spec, "H7", "H6").result == OUT_OF_BAND
 
 
 class TestEvidence:
