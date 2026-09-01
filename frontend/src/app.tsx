@@ -1,6 +1,7 @@
 import { AnimatePresence } from 'framer-motion'
 import { Route, Routes, useLocation } from 'react-router-dom'
 
+import { RequireRole } from './components/RequireRole'
 import { RouteTransition } from './components/RouteTransition'
 import { Shell } from './components/Shell'
 import Admin from './routes/Admin'
@@ -30,8 +31,22 @@ const SHELL_ROUTES = [
   { path: '/copilot', element: <Copilot /> },
   { path: '/audit', element: <Audit /> },
   { path: '/onboard', element: <Onboard /> },
-  { path: '/migration', element: <Migration /> },
-  { path: '/admin', element: <Admin /> },
+  {
+    path: '/migration',
+    element: (
+      <RequireRole roles={['registrar', 'admin']}>
+        <Migration />
+      </RequireRole>
+    ),
+  },
+  {
+    path: '/admin',
+    element: (
+      <RequireRole roles={['registrar', 'admin']}>
+        <Admin />
+      </RequireRole>
+    ),
+  },
   { path: '*', element: <NotFound /> },
 ]
 

@@ -161,3 +161,40 @@ class TestAuditApi:
     def test_every_event_exposes_its_links(self, client, pipeline_run):
         for event in client.get("/api/audit?limit=3").json()["events"]:
             assert len(event["hash"]) == 64 and len(event["prev_hash"]) == 64
+
+
+class TestConcurrentAppends:
+    """The pipeline runs in a background task while a reviewer is deciding."""
+
+    def test_two_writers_do_not_fork_or_fail_the_chain(self, db):
+        import threading
+
+        from sqlalchemy import text
+
+        from app.db import SessionLocal
+
+        db.execute(text("DELETE FROM audit_event"))
+        db.commit()
+        audit.ensure_genesis(db)
+
+        failures: list[str] = []
+
+        def append(worker: int) -> None:
+            try:
+                with SessionLocal() as session:
+                    for n in range(10):
+                        audit.record(session, "decision", f"p:{worker}-{n}", {"w": worker, "n": n})
+            except Exception as exc:
+                failures.append(f"{type(exc).__name__}: {exc}")
+
+        threads = [threading.Thread(target=append, args=(w,)) for w in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert failures == []
+        db.expire_all()
+        result = audit.verify(db)
+        assert result["valid"], result["first_break"]
+        assert result["events"] == 41  # genesis + 4 workers x 10

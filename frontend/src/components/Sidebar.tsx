@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 
 import { cn } from '../lib/cn'
 import { NAV, NAV_GROUPS } from '../lib/nav'
+import { useSession } from '../lib/session'
 import { IconChevronLeft, IconChevronRight } from './Icons'
 
 /**
@@ -16,6 +17,11 @@ export function Sidebar({
   collapsed: boolean
   onToggle: () => void
 }) {
+  const { can, loading } = useSession()
+  // Entries a role cannot open are hidden rather than shown and refused. The
+  // route guard still stands behind this for anyone who types the address.
+  const visible = NAV.filter((item) => !item.roles || loading || can(...item.roles))
+
   return (
     <aside
       className={cn(
@@ -38,7 +44,7 @@ export function Sidebar({
 
       <nav className="flex-1 overflow-y-auto py-4" aria-label="Main">
         {NAV_GROUPS.map((group) => {
-          const items = NAV.filter((i) => i.group === group)
+          const items = visible.filter((i) => i.group === group)
           if (items.length === 0) return null
           return (
             <div key={group} className="mb-5">

@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import AuditEvent
@@ -79,6 +80,10 @@ def ensure_genesis(db: Session) -> AuditEvent:
     return event
 
 
+#: Attempts to claim the next sequence number when writers collide.
+APPEND_ATTEMPTS = 8
+
+
 def record(
     db: Session,
     action: str,
@@ -91,28 +96,41 @@ def record(
 
     `commit=False` lets a caller append inside a larger transaction so the
     mutation and its audit record land together or not at all.
-    """
-    head = _head(db)
-    if head is None:
-        head = ensure_genesis(db)
 
-    seq = head.seq + 1
+    Two writers can read the same head and claim the same sequence number —
+    the pipeline runs in a background task while a reviewer is deciding. The
+    unique index on `seq` makes that fail rather than fork the chain, and the
+    append is retried inside a SAVEPOINT so a collision rolls back only this
+    insert, never the caller's own work.
+    """
     payload_json = canonical_json(payload)
-    event = AuditEvent(
-        seq=seq,
-        user=user,
-        action=action,
-        entity=entity,
-        payload_json=payload_json,
-        prev_hash=head.hash,
-        hash=compute_hash(seq, head.hash, payload_json),
-    )
-    db.add(event)
-    if commit:
-        db.commit()
-    else:
-        db.flush()
-    return event
+
+    for attempt in range(APPEND_ATTEMPTS):
+        head = _head(db) or ensure_genesis(db)
+        seq = head.seq + 1
+        event = AuditEvent(
+            seq=seq,
+            user=user,
+            action=action,
+            entity=entity,
+            payload_json=payload_json,
+            prev_hash=head.hash,
+            hash=compute_hash(seq, head.hash, payload_json),
+        )
+        try:
+            with db.begin_nested():
+                db.add(event)
+                db.flush()
+        except IntegrityError:
+            db.expire_all()
+            if attempt == APPEND_ATTEMPTS - 1:
+                raise
+            continue
+        if commit:
+            db.commit()
+        return event
+
+    raise RuntimeError("could not append to the audit chain")  # unreachable
 
 
 def void(db: Session, seq: int, reason: str, user: str = "system") -> AuditEvent:

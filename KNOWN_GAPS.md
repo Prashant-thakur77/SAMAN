@@ -19,7 +19,8 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 | An LLM may not yet propose equivalences | §2B source 4, the lowest-trust one. It can only ever add review-queue suggestions, never auto-approve | M6 |
 | Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
 | Home, Search, dashboards, Copilot, Onboard, Migration and Admin still render empty states | Nothing may be faked (§10); screens fill as their engines land | M5–M7.5 |
-| No frontend test runner | The API is covered by 472 pytest cases and the UI is type-checked and built in CI, but component behaviour is unverified | polish pass |
+| No frontend test runner | The API is covered by 473 pytest cases and the UI is type-checked and built, but component behaviour is unverified | polish pass |
+| Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale; worth batching if the queue view is ever paged deeply | M8B |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
 | Tables are not virtualized; search is not paginated | Needed only once the UI renders large result sets | M8B |
 | No screenshots or README demo script | Requires working screens | M9 |
@@ -164,6 +165,19 @@ precision to 0.90.
   the items into the surviving cluster.
 - **`rebuild_golden` flushed a golden record before setting its NOT NULL
   description.** Every column is now set before the insert.
+
+Found in the post-M4 audit:
+
+- **The audit chain failed under concurrent writers.** Three of four threads hit
+  `UNIQUE constraint failed: audit_event.seq` — the unique index made it fail
+  closed rather than fork the chain, which is the right failure, but a reviewer
+  deciding while the pipeline runs would have met a 500. Appends now retry
+  inside a SAVEPOINT, so a collision rolls back only that insert and never the
+  caller's own transaction. Six threads x 15 events now append cleanly.
+- **UI route guards were missing.** §0.9 asks for enforcement on the API *and*
+  in the UI. `/admin` and `/migration` are now guarded, the sidebar hides what a
+  role cannot open, and the guard explains why rather than showing a wall of
+  403s.
 
 ### Measurement honesty
 
