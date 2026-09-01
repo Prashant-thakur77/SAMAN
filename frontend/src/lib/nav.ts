@@ -14,6 +14,7 @@ import {
   IconChart,
   IconCopilot,
   IconHome,
+  IconMigration,
   IconOpportunity,
   IconSearch,
   IconUpload,
@@ -57,9 +58,11 @@ export const NAV: NavItem[] = [
   {
     label: 'Migration',
     path: '/migration',
-    icon: IconUpload,
+    icon: IconMigration,
     group: 'Tools',
-    roles: ['registrar', 'admin'],
+    // Visible to all: a steward may inspect the plan, but the apply and
+    // rollback controls and other CPSEs' valuations are withheld.
+    roles: null,
   },
 
   { label: 'Audit', path: '/audit', icon: IconAudit, group: 'Governance', roles: null },

@@ -19,6 +19,7 @@ from .routers import (
     health,
     ingest,
     metrics,
+    migration,
     pipeline,
     relations,
     search,
@@ -59,6 +60,7 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(copilot.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(migration.router, prefix="/api")
 
 
 @app.on_event("startup")

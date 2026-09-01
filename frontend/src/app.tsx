@@ -35,14 +35,9 @@ const SHELL_ROUTES = [
   { path: '/copilot', element: <Copilot /> },
   { path: '/audit', element: <Audit /> },
   { path: '/onboard', element: <Onboard /> },
-  {
-    path: '/migration',
-    element: (
-      <RequireRole roles={['registrar', 'admin']}>
-        <Migration />
-      </RequireRole>
-    ),
-  },
+  // Read-only for a steward: the apply and rollback controls are role-gated
+  // inside the screen, and other CPSEs' valuations are withheld server-side.
+  { path: '/migration', element: <Migration /> },
   {
     path: '/admin',
     element: (

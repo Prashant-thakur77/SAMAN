@@ -587,3 +587,85 @@ export type HealthPanel = {
 export const getHealthPanel = () => api.get<HealthPanel>('/settings/health')
 export const setSovereign = (enabled: boolean) =>
   api.post<{ sovereign_mode: boolean; note: string }>('/settings/sovereign', { enabled })
+
+// ---- ERP migration (§2C, §6.12) ----
+
+export type MigrationChange = {
+  matnr: string
+  cpse: string
+  legacy_code: string
+  cluster_id: number
+  cnmc: string
+  action: 'crossref' | 'block'
+  surviving_matnr: string | null
+  impact: 'safe' | 'open_transactions' | 'valuation_conflict'
+  open_po_lines: number
+  open_qty: number
+  stock_qty: number
+  total_value: number | null
+  price_withheld?: boolean
+  before: Record<string, string>
+  after?: Record<string, string>
+  diff?: Record<string, { before: string | null; after: string | null }>
+  will_apply?: boolean
+}
+
+export type MigrationPlan = {
+  clusters: number
+  changes: MigrationChange[]
+  summary: {
+    total: number
+    crossref: number
+    block: number
+    safe: number
+    held_open_transactions: number
+    valuation_conflict: number
+  }
+  thresholds?: { valuation_conflict_value: number; note: string }
+  visibility?: { role: string; cpse: string | null; sees_attributed_prices: boolean }
+  would_apply?: number
+  would_hold?: number
+  erp_fingerprint?: string
+  note: string
+}
+
+export type ErpState = {
+  system: string
+  database: string
+  counts: Record<string, number>
+  materials_blocked: number
+  materials_cross_referenced: number
+  fingerprint: string
+  sample: { matnr: string; lvorm: string; zz_cnmc: string; zz_supersedes: string }[]
+  note: string
+}
+
+export type MigrationBatch = { id: number; status: string; ts: string; changes: number }
+
+export type BatchDetail = {
+  id: number
+  status: string
+  ts: string
+  changes: {
+    erp_table: string
+    erp_key: string
+    state: string
+    before: Record<string, string>
+    after: Record<string, string> | null
+  }[]
+  verification: { checked: number; in_sync: boolean; drifted: unknown[] }
+}
+
+export const getErpState = () => api.get<ErpState>('/migration/erp')
+export const migrationDryRun = (clusterIds?: number[]) =>
+  api.post<MigrationPlan>('/migration/dryrun', { cluster_ids: clusterIds ?? null })
+export const migrationApply = (clusterIds?: number[], includeHeld = false) =>
+  api.post<{ batch_id: number; applied: number; held: number }>('/migration/apply', {
+    cluster_ids: clusterIds ?? null,
+    include_held: includeHeld,
+  })
+export const migrationRollback = (batchId: number) =>
+  api.post<{ batch_id: number; restored: number }>(`/migration/rollback/${batchId}`)
+export const getMigrationBatches = () =>
+  api.get<{ batches: MigrationBatch[] }>('/migration/batches')
+export const getBatchDetail = (id: number) => api.get<BatchDetail>(`/migration/batches/${id}`)

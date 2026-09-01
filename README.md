@@ -88,7 +88,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M5 | Executive + Opportunity dashboards | **Done** |
 | M6 | Copilot | **Done** |
 | M7 | Onboarding wizard, admin, audit explorer | **Done** |
-| M7.5 | Two-way ERP migration | Not started |
+| M7.5 | Two-way ERP migration | **Done** |
 | M8 | Smart-Create, licensing artefacts | Not started |
 | M8B | Demo survivability + performance | Not started |
 | M9 | Motion polish, a11y pass, screenshots | Not started |
@@ -330,6 +330,40 @@ rate is 0.995, leaving 3,606 pairs for human review.
 
 ---
 
+### Migrating the ERP, reversibly
+
+The consolidation is worth nothing until it reaches the system the buyer
+actually uses, and the reason consolidations fail is that they change a material
+underneath a live purchase order. So the write-back is staged: **plan →
+dry-run → impact → apply → verify → rollback**, against a mock SAP holding the
+five tables a consolidation touches (MARA, MAKT, EKPO, MARD, MBEW) seeded from
+the catalogue — 11,778 materials with 1,406 open PO lines.
+
+Each planned change carries a traffic light:
+
+| Impact | What it means | What happens |
+|---|---|---|
+| Safe | No open transactions, no stranded value | Applied |
+| Open transactions | An open PO line references the material | **Held** — never changed under a live order |
+| Valuation conflict | More than ₹50 lakh of stock would be superseded | Held for review |
+
+One master per cluster survives and takes the CNMC; the rest are **blocked, not
+deleted** — the row, its texts and its history all stay, which is how a real
+consolidation is done and what an auditor will ask for. Every applied row is
+journaled with its before-image, so a batch reverses exactly.
+
+That reversal is asserted rather than assumed: `erp.fingerprint()` hashes every
+row of every table in a stable order, and the test suite checks the hash after a
+rollback equals the hash before the apply — **byte-identical**, not merely
+"looks right". `verify` re-reads the ERP against the journal and reports drift
+if someone edited a migrated row behind the platform's back.
+
+A plan names every duplicate nationally, which would otherwise hand a steward a
+competitor's stock valuation, so it goes through the same §0.9b visibility gate
+as the dashboards and the Copilot: the rows stay, the money is withheld.
+
+---
+
 ## Problem-statement traceability
 
 Every capability named in SIH26099, and where it lives in this build. Statuses
@@ -343,11 +377,11 @@ are kept honest — partial is marked partial.
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |
 | Mapping of existing CPSE codes to the common national code | mapping block on the item page | **Done** — `/items/:id` lists every CPSE's code under one CNMC |
-| Legacy code rationalization and migration support | plan → dry-run → apply → rollback | Not started (M7.5) |
+| Legacy code rationalization and migration support | plan → dry-run → apply → rollback → verify | `backend/app/migration.py`, `/migration` |
 | User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | **Done** — keyboard-first workbench over all three bands, role-gated, self-approval refused |
 | Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | **Done** — KPIs reconcile with `/api/metrics`; class x CPSE heatmap in grayscale |
 | Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | **Done** — tamper- and reorder-evident, verified from the UI |
-| Integration capability with SAP/ERP | `ErpAdapter` + mock ERP write-back | Not started (M7.5) |
+| Integration capability with SAP/ERP | `ErpAdapter` + mock ERP write-back | `backend/app/erp.py` (MARA/MAKT/EKPO/MARD/MBEW) |
 | Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | **Done** — 12-month demand windows, price-per-base-unit variance, vendor overlap, last-price trend |
 | Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done** — pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |
 | Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done** — one position across CPSEs, 37 transfer suggestions worth ₹5.9 Cr |

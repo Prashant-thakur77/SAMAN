@@ -228,6 +228,24 @@ that could not be true:
   to a token start, so it still matches `6205-2Z` and `6205ZZ` and no longer
   matches mid-barcode.
 
+### M7.5 findings
+
+- **The traffic light was on red for everything.** With the valuation-conflict
+  threshold at ₹1 lakh, 12 of 14 blocks tripped it, which makes the light
+  useless — a reviewer learns nothing from a column that always says the same
+  thing. Checking the actual distribution of superseded stock value (p50 ₹554k,
+  p75 ₹3.9M, p90 ₹27.5M) put the threshold at ₹50 lakh, which now separates 14
+  safe from 3 genuinely large write-offs.
+- **The dry run leaked other CPSEs' stock valuations to a steward.** A plan
+  necessarily names every duplicate nationally, and the impact column carries
+  the money, so the endpoint was handing a steward exactly what §0.9b exists to
+  withhold — the same failure the Copilot had in M6. Both now call
+  `visibility.redact_prices`, which is the point of enforcing it in one place.
+- **Rollback fidelity was asserted, not assumed.** "The ERP looks right again"
+  is not a test. `erp.fingerprint()` hashes every row of every table in a stable
+  order and the suite compares the hash before the apply with the hash after the
+  rollback.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

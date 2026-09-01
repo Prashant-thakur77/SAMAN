@@ -99,14 +99,18 @@ export function TD({
   align = 'left',
   mono,
   className,
+  title,
 }: {
   children: ReactNode
   align?: 'left' | 'right'
   mono?: boolean
   className?: string
+  /** Native tooltip — used to explain a withheld or truncated value. */
+  title?: string
 }) {
   return (
     <td
+      title={title}
       className={cn(
         'h-row px-3',
         align === 'right' ? 'text-right' : 'text-left',

@@ -75,6 +75,14 @@ export const IconUpload = (p: IconProps) => (
   </Svg>
 )
 
+export const IconMigration = (p: IconProps) => (
+  <Svg {...p}>
+    {/* two systems, an arrow each way: the migration is reversible */}
+    <path d="M2.5 5.5h7M7 3l2.5 2.5L7 8" />
+    <path d="M17.5 14.5h-7M13 12l-2.5 2.5L13 17" />
+  </Svg>
+)
+
 export const IconAudit = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 3h9l3 3v11H4V3Z" />
