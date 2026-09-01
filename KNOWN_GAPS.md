@@ -4,7 +4,7 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M5
+## Status: end of M6
 
 M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
 engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
@@ -14,11 +14,12 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 
 | Gap | Reason | Closes in |
 |---|---|---|
-| The LLM may not yet polish an unfilled template slot | §2D allows it, validated back against the template. Rendering drops unfilled segments cleanly instead, which is deterministic; the polish step needs the Ollama client | M6 |
+| The LLM may not yet polish an unfilled template slot | §2D allows it, validated back against the template. Rendering drops unfilled segments cleanly instead, which is deterministic | not planned — the deterministic renderer is better here |
+| No Ollama model is installed on this machine | The Tier-3 path is implemented and unit-tested against a stubbed model, including its rejection guard, but has not been run against a real one | before the demo, if a model is wanted |
 | Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | future tuning |
 | An LLM may not yet propose equivalences | §2B source 4, the lowest-trust one. It can only ever add review-queue suggestions, never auto-approve | M6 |
 | Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
-| Search, Copilot, Onboard, Migration and Admin still render empty states | Nothing may be faked (§10); screens fill as their engines land | M6–M7.5 |
+| Search, Onboard, Migration and Admin still render empty states | Nothing may be faked (§10); screens fill as their engines land | M7–M7.5 |
 | No frontend test runner | The API is covered by 473 pytest cases and the UI is type-checked and built, but component behaviour is unverified | polish pass |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale; worth batching if the queue view is ever paged deeply | M8B |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
@@ -201,6 +202,19 @@ that could not be true:
   restricted.
 - **Recharts put the main bundle at 721 kB.** The two dashboard routes are now
   lazily loaded, taking the initial bundle to 332 kB (106 kB gzipped).
+
+### M6 findings
+
+- **Redacting the rows was not enough.** A CPCL steward's answer to "which CPSE
+  overpays for gaskets" had its table redacted correctly while the *sentence*
+  still read "against IOCL at ₹621.54". Price-sensitive answers now compose
+  different prose for a restricted viewer, and a test asserts no other CPSE is
+  named in the text.
+- **An anonymous viewer was told about "your catalogue"**, which they do not
+  have. That branch now reports the range alone.
+- **The README credited duckdb for "analytics views backing the Copilot"**,
+  which was never true — the Copilot's queries run on SQLite. Corrected to what
+  duckdb actually does here: splink's execution backend.
 
 ### Measurement honesty
 

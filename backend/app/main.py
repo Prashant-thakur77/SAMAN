@@ -13,6 +13,7 @@ from .routers import (
     auth,
     clusters,
     cnmc,
+    copilot,
     dashboard,
     health,
     ingest,
@@ -53,6 +54,7 @@ app.include_router(clusters.router, prefix="/api")
 app.include_router(relations.router, prefix="/api")
 app.include_router(workbench.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(copilot.router, prefix="/api")
 
 
 @app.on_event("startup")

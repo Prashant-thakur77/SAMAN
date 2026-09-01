@@ -410,3 +410,32 @@ export type OpportunityDashboard = {
 export const getExecutive = () => api.get<ExecutiveDashboard>('/dashboard/executive')
 export const getOpportunity = (capture: number) =>
   api.get<OpportunityDashboard>(`/dashboard/opportunity?capture=${capture}`)
+
+// ---- copilot (§6.9) ----
+
+export type CopilotAnswer = {
+  answer: string
+  citations: { cluster_id: number | null; label: string; cnmc: string | null }[]
+  sql: string | null
+  params: Record<string, unknown>
+  rows: Record<string, unknown>[]
+  template: string | null
+  mode: string
+  refused: boolean
+  note: string | null
+  llm_rejected?: string
+  scope: { note: string }
+  engine: string
+}
+
+export type CopilotSuggestions = {
+  prompts: string[]
+  templates: { key: string; description: string; example: string }[]
+  mode: string
+  sovereign_mode: boolean
+  note: string
+}
+
+export const getCopilotSuggestions = () => api.get<CopilotSuggestions>('/copilot/suggestions')
+export const askCopilot = (question: string) =>
+  api.post<CopilotAnswer>('/copilot/query', { question })
