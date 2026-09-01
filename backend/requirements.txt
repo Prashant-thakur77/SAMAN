@@ -14,7 +14,8 @@ httpx==0.28.1               # BSD-3-Clause  (localhost-only Ollama client)
 rapidfuzz==3.11.0           # MIT
 scikit-learn==1.6.0         # BSD-3-Clause
 numpy==2.2.1                # BSD-3-Clause
-duckdb==1.1.3               # MIT
+duckdb>=1.3,<2              # MIT           (>=1.3 required: pandas 3 ships a native
+                            #                str dtype that duckdb 1.1 cannot register)
 pint==0.24.4                # BSD-3-Clause  (unit-aware numeric comparators, spec 2A)
 pyyaml==6.0.2               # MIT           (class schemas, description templates, rule DSL)
 

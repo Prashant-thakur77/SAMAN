@@ -1,7 +1,8 @@
 """Tiered matching engine — spec §0.4, §2A.
 
 Tier 0  exact anchor keys: normalized MPN, GTIN, normalized-text hash
-Tier 1  fuzzy string similarity (rapidfuzz token_set_ratio; splink when present)
+Tier 1  probabilistic linkage: splink Fellegi-Sunter match weight when it is
+        available, otherwise rapidfuzz token_set_ratio (spec §0.4)
 Tier 2  semantic similarity over the embedding vectors
 VETO    §2A hard constraints, applied to candidates from EVERY tier
 Tier 3  adjudication of the grey band (deterministic, or Ollama when configured)
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 from rapidfuzz import fuzz
@@ -31,6 +33,9 @@ from rapidfuzz import fuzz
 from .compare import CompareResult, compare_attrs
 from .embed import cosine
 from .taxonomy import UNCLASSIFIED, get_schema
+
+if TYPE_CHECKING:  # avoids importing splink's stack unless it is actually used
+    from .linkage import LinkageResult
 
 # --------------------------------------------------------------------------
 # Thresholds. Tuned on the 60% tuning split only (§0.6), then frozen.
@@ -116,8 +121,28 @@ def tier0_anchor(a: MatchCandidate, b: MatchCandidate) -> tuple[float, str | Non
 
 
 def tier1_fuzzy(a: MatchCandidate, b: MatchCandidate) -> float:
-    """token_set_ratio absorbs word order and the abbreviation noise."""
+    """token_set_ratio absorbs word order and the abbreviation noise.
+
+    The Tier-1 fallback when splink is not installed, and the value the
+    evidence card falls back to showing.
+    """
     return fuzz.token_set_ratio(a.norm_text, b.norm_text) / 100.0
+
+
+def tier1_linkage(
+    a: MatchCandidate, b: MatchCandidate, linkage: LinkageResult | None
+) -> tuple[float, str, dict | None]:
+    """Tier-1 score, preferring learned match weights over a raw string ratio.
+
+    Returns (score, engine, waterfall). splink only emits pairs its own
+    blocking produced, so a pair it never saw falls back to rapidfuzz rather
+    than being scored as though it had failed.
+    """
+    if linkage is not None:
+        probability = linkage.score(a.id, b.id)
+        if probability is not None:
+            return probability, "splink", linkage.waterfall(a.id, b.id)
+    return tier1_fuzzy(a, b), "rapidfuzz", None
 
 
 def tier2_semantic(a: MatchCandidate, b: MatchCandidate) -> float:
@@ -169,18 +194,25 @@ def _band(confidence: float) -> str:
 # --------------------------------------------------------------------------
 
 
-def match_pair(a: MatchCandidate, b: MatchCandidate) -> MatchResult:
+def match_pair(
+    a: MatchCandidate,
+    b: MatchCandidate,
+    linkage: LinkageResult | None = None,
+) -> MatchResult:
     """Score and adjudicate one candidate pair, with its evidence."""
     anchor, anchor_kind = tier0_anchor(a, b)
-    fuzzy = tier1_fuzzy(a, b)
+    fuzzy, tier1_engine, waterfall = tier1_linkage(a, b, linkage)
     semantic = tier2_semantic(a, b)
 
     tier_scores = {
         "tier0_anchor": round(anchor, 4),
         "tier0_key": anchor_kind,
         "tier1_fuzzy": round(fuzzy, 4),
+        "tier1_engine": tier1_engine,
         "tier2_semantic": round(semantic, 4),
     }
+    if waterfall:
+        tier_scores["tier1_waterfall"] = waterfall
 
     # --- the schema-less pool (§2A.1) -----------------------------------
     # Without a class we have no identity_critical fields, so the veto layer

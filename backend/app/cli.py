@@ -116,6 +116,13 @@ def print_metrics(report: dict) -> None:
               f"{row['f1']:>8.4f}")
     print(f"\n  Worst-performing class: {report['worst_class']}")
 
+    engines = report.get("engines", {})
+    if engines:
+        print("\n  ACTIVE ENGINES")
+        print("  " + "-" * 62)
+        for tier, name in engines.items():
+            print(f"  {tier:34} {name}")
+
     auto = report["automation"]
     print(f"\n  {'automation rate':34} {auto['automation_rate']:>9.4f}")
     print(f"  {'pairs needing human review':34} {auto['needs_review']:>9,}")

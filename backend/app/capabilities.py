@@ -15,6 +15,7 @@ startup, so a dead localhost daemon cannot slow or break boot.
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -23,12 +24,20 @@ from .config import get_settings
 
 
 def _importable(module: str) -> bool:
-    """True if ``module`` can be imported without actually importing it."""
+    """True only if ``module`` genuinely imports.
+
+    `find_spec` is cheaper, but it merely proves the package directory exists.
+    A dependency installed without its own dependencies passes that check and
+    then fails on use — so /api/health would advertise an engine that cannot
+    run, which is worse than reporting the fallback. Since `detect()` is
+    cached, the real import is paid once.
+    """
     try:
-        return importlib.util.find_spec(module) is not None
-    except (ImportError, ValueError):
-        # A broken/partial install raises here. Treat as absent and degrade.
+        importlib.import_module(module)
+    except Exception:
+        # ImportError, but also anything a broken install raises at import time.
         return False
+    return True
 
 
 @dataclass(frozen=True)
@@ -74,17 +83,27 @@ def detect() -> Capabilities:
     settings = get_settings()
     degraded: list[str] = []
 
-    if _importable("splink"):
+    forced = settings.saman_disable_optional
+
+    if _importable("splink") and not forced:
         linkage = "splink"
     else:
         linkage = "rapidfuzz"
-        degraded.append("splink unavailable — Tier 1 using rapidfuzz-only scoring")
+        degraded.append(
+            "optional engines disabled — Tier 1 using rapidfuzz-only scoring"
+            if forced
+            else "splink unavailable — Tier 1 using rapidfuzz-only scoring"
+        )
 
-    if _importable("sentence_transformers"):
+    if _importable("sentence_transformers") and not forced:
         embedding = "sentence-transformers"
     else:
         embedding = "tfidf"
-        degraded.append("sentence-transformers unavailable — Tier 2 using TF-IDF char 3-5grams")
+        degraded.append(
+            "optional engines disabled — Tier 2 using TF-IDF char 3-5grams"
+            if forced
+            else "sentence-transformers unavailable — Tier 2 using TF-IDF char 3-5grams"
+        )
 
     if settings.llm_enabled:
         llm = "ollama"

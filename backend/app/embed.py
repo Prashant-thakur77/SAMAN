@@ -49,6 +49,8 @@ class Embedder:
     """Fits on a corpus and returns dense, L2-normalized vectors."""
 
     def __init__(self, mode: str | None = None):
+        # detect() already honours SAMAN_DISABLE_OPTIONAL, so forcing the
+        # fallback needs no special case here.
         self.mode = mode or detect().embedding_mode
         self._model = None
         self._vectorizer = None

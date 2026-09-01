@@ -1,10 +1,27 @@
 # SAMAN backend — OPTIONAL accelerators. The app runs fully without these and
-# reports the degraded mode at GET /api/health (spec 0.4).
+# reports the degraded mode at GET /api/health (spec §0.4).
 #
-#   splink absent               -> Tier 1 degrades to rapidfuzz-only scoring
-#   sentence-transformers absent -> Tier 2 degrades to scikit-learn TF-IDF char 3-5grams
+#   splink absent                -> Tier 1 degrades to rapidfuzz-only scoring
+#   sentence-transformers absent -> Tier 2 degrades to scikit-learn TF-IDF
 #
 # Install with:  make deps-optional
+# Force the fallbacks even when these are installed:  SAMAN_DISABLE_OPTIONAL=true
+#
+# Both paths are gated: `make demo` meets the §8 M3 targets either way. On this
+# dataset the fallback actually scores slightly higher and costs a third of the
+# memory, so it is what the demo runs by default — see README "Tier-1 engine".
 
-splink==4.0.7                    # MIT       (Tier 1 probabilistic linkage, DuckDB backend)
-sentence-transformers==3.3.1     # Apache-2.0 (Tier 2 semantic embeddings, all-MiniLM-L6-v2)
+splink==4.0.7                    # MIT       (Fellegi-Sunter linkage, DuckDB backend)
+
+# splink declares `sqlglot>=13` with no upper bound, and sqlglot 26+ changed the
+# expression AST in a way splink 4.0.7 cannot parse — it fails inside EM
+# training with "Expected sql condition to refer to one column but got []".
+# Pinned here because splink's own metadata does not constrain it.
+sqlglot>=25,<26                  # MIT
+
+# NOTE: also requires duckdb>=1.3 (already pinned in requirements.txt). pandas 3
+# ships a native `str` dtype that duckdb 1.1 cannot register.
+
+sentence-transformers==3.3.1     # Apache-2.0 (Tier 2 embeddings, all-MiniLM-L6-v2)
+# Weights are loaded from the local cache only; SAMAN never downloads a model at
+# runtime (spec §9). Without a warm cache, Tier 2 stays on TF-IDF.

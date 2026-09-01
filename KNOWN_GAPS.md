@@ -16,8 +16,7 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 |---|---|---|
 | Golden descriptions are a representative member, not a rendered template | §2D standardization engine, with attribute fusion and per-field provenance | M3.4 |
 | The directed equivalence engine is not built | §2B; the truth is seeded and `GET /api/metrics` reports `equivalence.status = not_built` rather than a fabricated number | M3.5 |
-| `splink` is not exercised | Not installed by default, so Tier 1 runs on rapidfuzz and `/api/health` says so. The degraded path is the default-tested path. **Its code path is therefore unrun — a liability on stage.** | before the demo |
-| Tier 3 adjudication of the grey band is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
+| Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
 | All 12 in-shell routes still render empty states | Nothing may be faked (§10); screens fill as their engines land | M4–M7.5 |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
 | Tables are not virtualized; search is not paginated | Needed only once the UI renders large result sets | M8B |
@@ -79,6 +78,45 @@ Four defects found and fixed:
 One earlier claim corrected: the M3 report said in-band trap accuracy was 0.82
 on 17 samples. After the GTIN change it is 0.89 on 19. Both are honest small
 samples; the figure moves with the seed.
+
+### Tier-1 engine: measured, then chosen
+
+The M3 report flagged splink as "unexercised code — a liability on stage".
+It is now implemented, wired and gated. Measured on the demo profile:
+
+| Tier-1 engine | F1 | Wall clock | Peak memory |
+|---|---|---|---|
+| splink (Fellegi–Sunter) | 0.952 | 68 s | 5.0 GB |
+| rapidfuzz (default) | **0.957** | **45 s** | **1.6 GB** |
+
+Both pass all four gates on the same frozen threshold. The fallback is the
+default because it is better here on every axis; splink remains a real path,
+one flag away, with its match weights and per-comparison waterfall persisted
+into the evidence object.
+
+Three things were found by actually running it, none of which would have
+surfaced from a dependency list:
+
+- **splink declares `sqlglot>=13` with no upper bound.** Resolution pulls
+  sqlglot 30, whose AST splink 4.0.7 cannot parse; EM training dies with
+  "Expected sql condition to refer to one column but got []". Pinned to
+  `>=25,<26` in `requirements-optional.txt`, because splink's own metadata
+  does not constrain it. Anyone following the README would have hit this.
+- **pandas 3 ships a native `str` dtype that duckdb 1.1 cannot register.**
+  The core `duckdb` pin moved to `>=1.3`.
+- **A token-intersection comparison — closer in spirit to `token_set_ratio`
+  and the obvious way to close the gap — destroyed the model.** splink
+  estimated that 1 in 4.67 of 69M comparisons would match, and the run peaked
+  at 11 GB before the OOM killer took it. Reverted, with the reason recorded in
+  the code. `run_linkage` now refuses to materialise more than 6M predicted
+  pairs and degrades instead, and streams results out of DuckDB in batches
+  rather than building one large frame (7.7 GB -> 5.0 GB).
+
+A related defect this exposed: capability detection used `find_spec`, which
+succeeds for a package installed without its own dependencies. `/api/health`
+was therefore willing to advertise `sentence-transformers` when importing it
+raised `ModuleNotFoundError: huggingface_hub`. Detection now performs a real
+import, so the health endpoint cannot claim an engine that will not run.
 
 ### Measurement honesty
 

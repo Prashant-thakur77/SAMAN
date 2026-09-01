@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     saman_secret_key: str = "saman-dev-secret-change-me"
     saman_sovereign_mode: bool = False
 
+    #: Force the §0.4 fallback engines even when the optional accelerators are
+    #: installed. Two uses: exercising the degraded path in CI without
+    #: uninstalling anything, and demonstrating graceful degradation live.
+    saman_disable_optional: bool = False
+
     # Optional Tier-3 LLM. Unset => deterministic adjudicator + templated Copilot.
     ollama_url: str | None = None
     ollama_model: str = "qwen2.5:7b"

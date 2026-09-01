@@ -262,6 +262,7 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
     import numpy as np
 
     from .blocking import ItemKey, generate_candidates
+    from .linkage import run_linkage
     from .match import candidate_from_row, match_pair
     from .metrics import measure_blocking_recall
     from .models import Item as ItemModel
@@ -306,6 +307,14 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
     )
 
     pairs, blocking_stats = generate_candidates(keys, vectors, index_by_id)
+
+    # Tier 1: train the probabilistic model once for the whole run. Returns
+    # None when splink is unavailable or fails, in which case every pair falls
+    # back to rapidfuzz (spec §0.4).
+    status.stage = "match (tier-1 linkage)"
+    linkage = run_linkage(db, pairs)
+    status.stage = "match"
+
     status.rows_total = len(pairs)
     status.rows_done = 0
 
@@ -316,7 +325,7 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
     equivalence_candidates = 0
 
     for n, (a, b) in enumerate(pairs, start=1):
-        result = match_pair(candidates[a], candidates[b])
+        result = match_pair(candidates[a], candidates[b], linkage)
         bands[result.band] = bands.get(result.band, 0) + 1
         verdicts[result.verdict] = verdicts.get(result.verdict, 0) + 1
         if result.equivalence:
@@ -363,6 +372,7 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
 
     stats = {
         "blocking": {**blocking_stats.as_dict(), **measure_blocking_recall(db, pairs)},
+        "linkage": linkage.as_stats() if linkage else {"engine": "rapidfuzz"},
         "bands": bands,
         "verdicts": verdicts,
         "accepted_pairs": len(accepted),

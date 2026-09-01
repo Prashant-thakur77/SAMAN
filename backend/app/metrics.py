@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from .capabilities import detect
 from .match import T_HIGH, T_LOW
 from .models import (
     Cluster,
@@ -403,6 +404,13 @@ def compute_metrics(db: Session) -> dict:
         "per_class": per_class,
         "worst_class": worst_class,
         "automation": _automation(run_stats, db),
+        # Which engine actually decided, not which is installed. A report that
+        # does not say what produced it is hard to trust.
+        "engines": {
+            "tier1_linkage": run_stats.get("linkage", {}).get("engine", "rapidfuzz"),
+            "tier2_embedding": detect().embedding_mode,
+            "tier3_adjudication": detect().llm_mode,
+        },
         "thresholds": {"high": T_HIGH, "low": T_LOW},
         "gate": {
             name: {
