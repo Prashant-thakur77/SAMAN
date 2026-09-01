@@ -84,7 +84,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M3 | Embeddings, blocking, tiered match, veto layer, clustering, CNMC, metrics | **Done** |
 | M3.4 | Golden-record standardization + provenance | **Done** |
 | M3.5 | Functional-equivalence engine | **Done** |
-| M4 | Workbench, decisions, role gates, audit chain | Not started |
+| M4 | Workbench, decisions, role gates, audit chain | **Done** |
 | M5 | Executive + Opportunity dashboards | Not started |
 | M6 | Copilot | Not started |
 | M7 | Onboarding wizard, admin, audit explorer | Not started |
@@ -243,6 +243,22 @@ Rules are data, not code. A steward reads and edits them through `GET/POST
   never_if: [material !=]
 ```
 
+### Review and governance
+
+The workbench covers all three confidence bands, not only the uncertain one: an
+automation rate means little unless a reviewer can sample what was automated.
+Grey tasks must be decided; the Auto-high tab offers automatic merges for
+confirmation, and Auto-low surfaces the closest matches the veto layer refused —
+the most informative refusals to spot-check. Overturning an automatic decision
+actually changes the world: rejecting a merge splits the cluster back apart.
+
+Every mutation appends to a hash-chained ledger whose hash covers the event's
+own sequence number, so the chain detects **reordering as well as tampering**,
+and `GET /api/audit/verify` reports the sequence number of the first break.
+Deletions are never physical — a retraction is a `void` event referencing the
+original. Tests mutate, delete and transpose rows directly in the database and
+assert the break is found at the right sequence.
+
 **Veto layer**, on the planted near-miss traps: 380 of 380 correctly refused.
 
 | Trap | Accuracy |
@@ -271,11 +287,11 @@ are kept honest — partial is marked partial.
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |
-| Mapping of existing CPSE codes to the common national code | mapping block on the item page | Partial — every CPSE's legacy code is returned by `GET /api/clusters/{id}`; the item page lands in M4 |
+| Mapping of existing CPSE codes to the common national code | mapping block on the item page | **Done** — `/items/:id` lists every CPSE's code under one CNMC |
 | Legacy code rationalization and migration support | plan → dry-run → apply → rollback | Not started (M7.5) |
-| User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | Partial — separation of duties enforced (§0.9); workbench lands in M4 |
+| User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | **Done** — keyboard-first workbench over all three bands, role-gated, self-approval refused |
 | Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | Not started (M5) |
-| Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | Not started (M4) |
+| Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | **Done** — tamper- and reorder-evident, verified from the UI |
 | Integration capability with SAP/ERP | `ErpAdapter` + mock ERP write-back | Not started (M7.5) |
 | Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | Partial — data seeded and authoritative; analytics land in M5 |
 | Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done** — pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |

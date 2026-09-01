@@ -6,8 +6,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
+from .audit import ensure_genesis
 from .config import get_settings
-from .db import init_db
+from .db import SessionLocal, init_db
 from .routers import (
     auth,
     clusters,
@@ -17,6 +18,7 @@ from .routers import (
     metrics,
     pipeline,
     relations,
+    workbench,
 )
 
 settings = get_settings()
@@ -48,13 +50,17 @@ app.include_router(metrics.router, prefix="/api")
 app.include_router(cnmc.router, prefix="/api")
 app.include_router(clusters.router, prefix="/api")
 app.include_router(relations.router, prefix="/api")
+app.include_router(workbench.router, prefix="/api")
 
 
 @app.on_event("startup")
 def _startup() -> None:
     """Create tables if the database file is new, so a fresh clone can boot
-    straight into empty states rather than a 500 (spec §8A)."""
+    straight into empty states rather than a 500 (spec §8A), and open the audit
+    ledger so its first real event has a genesis to chain from (§0.9a)."""
     init_db()
+    with SessionLocal() as db:
+        ensure_genesis(db)
 
 
 @app.get("/", include_in_schema=False)

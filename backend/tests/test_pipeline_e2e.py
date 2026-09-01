@@ -46,12 +46,21 @@ class TestPipelineProducesTheDerivedLayer:
         ).scalar()
         assert multi > 20
 
-    def test_grey_pairs_become_review_tasks(self, pipeline_run, db):
-        grey = db.execute(
+    def test_every_grey_pair_becomes_a_review_task(self, pipeline_run, db):
+        """Grey pairs must all be decided; high and low are sampled for audit."""
+        grey_pairs = db.execute(
             select(func.count(Pair.id)).where(Pair.verdict.in_(("review", "conflict")))
         ).scalar()
-        tasks = db.execute(select(func.count(ReviewTask.id))).scalar()
-        assert tasks == grey
+        grey_tasks = db.execute(
+            select(func.count(ReviewTask.id)).where(ReviewTask.band == "grey")
+        ).scalar()
+        assert grey_tasks == grey_pairs
+
+    def test_the_automatic_bands_are_sampled_for_confirmation(self, pipeline_run, db):
+        for band in ("high", "low"):
+            assert db.execute(
+                select(func.count(ReviewTask.id)).where(ReviewTask.band == band)
+            ).scalar() > 0
 
     def test_review_tasks_explain_themselves(self, pipeline_run, db):
         reasons = db.execute(select(ReviewTask.reason).limit(20)).scalars().all()

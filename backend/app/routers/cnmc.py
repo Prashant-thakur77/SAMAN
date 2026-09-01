@@ -13,7 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import require_roles
+from .. import audit
+from ..auth import enforce_separation_of_duties, require_roles
 from ..cnmc import family_for, is_valid, next_code, serial_of
 from ..db import get_db
 from ..models import Cluster, ClusterMember, Cnmc, GoldenRecord, Item, User
@@ -38,6 +39,9 @@ def issue(
         # Issuance is idempotent rather than an error: a retried request must
         # never mint a second code for the same record.
         return {"code": existing.code, "golden_id": golden_id, "already_issued": True}
+
+    # §0.9: whoever proposed or edited this record may not also approve it.
+    enforce_separation_of_duties(golden, user)
 
     if golden.status == "conflict":
         raise HTTPException(
@@ -66,6 +70,20 @@ def issue(
     if golden.status == "draft":
         golden.status = "approved"
         golden.approved_by = user.id
+    audit.record(
+        db,
+        action="cnmc.issue",
+        entity=f"cnmc:{code}",
+        payload={
+            "code": code,
+            "golden_id": golden_id,
+            "cluster_id": golden.cluster_id,
+            "class_code": class_code,
+            "std_description": golden.std_description,
+        },
+        user=user.email,
+        commit=False,
+    )
     db.commit()
 
     return {

@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy import insert, or_, select
 from sqlalchemy.orm import Session
 
+from .. import audit
 from ..auth import require_roles
 from ..db import get_db
 from ..equivalence import BASIS_CONFIDENCE, parse_rules
@@ -151,6 +152,21 @@ def propose_relation(
         status="proposed",
     )
     db.add(relation)
+    db.flush()
+    audit.record(
+        db,
+        action="relation.propose",
+        entity=f"relation:{relation.id}",
+        payload={
+            "item_a": body.item_a,
+            "item_b": body.item_b,
+            "rel_type": body.rel_type,
+            "direction": body.direction,
+            "note": body.note,
+        },
+        user=user.email,
+        commit=False,
+    )
     db.commit()
     return {"id": relation.id, "status": relation.status}
 
@@ -217,6 +233,14 @@ def upsert_rule(
         db.add(rule)
         db.flush()
         rule_id = rule.id
+    audit.record(
+        db,
+        action="rule.upsert",
+        entity=f"substitution_rule:{body.class_code}",
+        payload={"class_code": body.class_code, "rule_yaml": body.rule_yaml, "active": body.active},
+        user=user.email,
+        commit=False,
+    )
     db.commit()
     return {"id": rule_id, "class_code": body.class_code, "conditions": len(parsed)}
 
@@ -263,6 +287,14 @@ async def import_crossref(
         )
     if rows:
         db.execute(insert(Crossref), rows)
+        audit.record(
+            db,
+            action="crossref.import",
+            entity="crossref",
+            payload={"file": file.filename, "imported": len(rows), "rejected": rejected},
+            user=user.email,
+            commit=False,
+        )
         db.commit()
     return {
         "imported": len(rows),

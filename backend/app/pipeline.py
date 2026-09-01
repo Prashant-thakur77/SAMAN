@@ -26,6 +26,10 @@ from .normalize import normalize_mpn, normalize_row
 
 BATCH = 1000
 
+#: How many auto-refused pairs to surface for spot-checking. Every refusal is
+#: recorded, but a queue of hundreds of thousands is not a queue.
+LOW_BAND_SAMPLE = 500
+
 
 @dataclass
 class PipelineStatus:
@@ -598,27 +602,60 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     db.commit()
     status.rows_done = len(refined)
 
-    # Review queue: one task per pair a human still has to decide. The cluster
-    # is carried alongside the pair so the workbench's merge-into-cluster view
-    # has somewhere to go (§6.5).
+    # Review queue. All three §6.5 bands are populated, not just the grey one:
+    # an automation rate only means something if a human can sample what was
+    # automated. Grey tasks must be decided; high and low tasks are there to be
+    # confirmed or overturned.
     cluster_of = dict(
         db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all()
     )
-    tasks = [
-        {
+
+    def _task(pair_id, item_a, band, verdict, role, reason):
+        return {
             "pair_id": pair_id,
             "cluster_id": cluster_of.get(item_a),
             "band": band,
             "state": "pending",
-            "assignee_role": "steward" if verdict != "conflict" else "approver",
-            "reason": "specification conflict on an anchor-key match"
+            "assignee_role": role,
+            "reason": reason,
+        }
+
+    tasks = [
+        _task(
+            pair_id,
+            item_a,
+            band,
+            verdict,
+            "approver" if verdict == "conflict" else "steward",
+            "specification conflict on an anchor-key match"
             if verdict == "conflict"
             else "confidence in the grey band",
-        }
+        )
         for pair_id, item_a, band, verdict in db.execute(
             select(Pair.id, Pair.item_a, Pair.band, Pair.verdict).where(
                 Pair.verdict.in_(("review", "conflict"))
             )
+        ).all()
+    ]
+
+    tasks += [
+        _task(pair_id, item_a, "high", "duplicate", "approver",
+              "confirm an automatic merge")
+        for pair_id, item_a in db.execute(
+            select(Pair.id, Pair.item_a).where(Pair.band == "high")
+        ).all()
+    ]
+
+    # The most valuable low-band sample is the pairs that looked most alike and
+    # were refused anyway — that is where the veto layer did the work.
+    tasks += [
+        _task(pair_id, item_a, "low", "distinct", "steward",
+              "confirm an automatic refusal — a close match the veto layer declined")
+        for pair_id, item_a in db.execute(
+            select(Pair.id, Pair.item_a)
+            .where(Pair.band == "low", Pair.veto_json.is_not(None))
+            .order_by(Pair.confidence.desc(), Pair.id)
+            .limit(LOW_BAND_SAMPLE)
         ).all()
     ]
     for i in range(0, len(tasks), BATCH):

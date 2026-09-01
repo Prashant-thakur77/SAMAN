@@ -8,6 +8,7 @@ import { Field, Input } from '../components/primitives/Field'
 import { ApiError, getDemoUsers, login, type DemoUser } from '../lib/api'
 import { cn } from '../lib/cn'
 import { shakeAnimation } from '../lib/motion'
+import { useSession } from '../lib/session'
 
 /**
  * /login — spec §6.1. The wordmark is expanded exactly once, here, with the
@@ -26,6 +27,7 @@ export default function Login() {
   const controls = useAnimationControls()
   const reduce = useReducedMotion() ?? false
   const navigate = useNavigate()
+  const { refresh } = useSession()
 
   useEffect(() => {
     let alive = true
@@ -48,6 +50,7 @@ export default function Login() {
     setBusy(true)
     try {
       await login(email, password)
+      await refresh()
       navigate('/')
     } catch (err) {
       setError(

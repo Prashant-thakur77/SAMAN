@@ -4,7 +4,7 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M3.5
+## Status: end of M4
 
 M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
 engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
@@ -18,7 +18,8 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 | Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | future tuning |
 | An LLM may not yet propose equivalences | §2B source 4, the lowest-trust one. It can only ever add review-queue suggestions, never auto-approve | M6 |
 | Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
-| All 12 in-shell routes still render empty states | Nothing may be faked (§10); screens fill as their engines land | M4–M7.5 |
+| Home, Search, dashboards, Copilot, Onboard, Migration and Admin still render empty states | Nothing may be faked (§10); screens fill as their engines land | M5–M7.5 |
+| No frontend test runner | The API is covered by 472 pytest cases and the UI is type-checked and built in CI, but component behaviour is unverified | polish pass |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
 | Tables are not virtualized; search is not paginated | Needed only once the UI renders large result sets | M8B |
 | No screenshots or README demo script | Requires working screens | M9 |
@@ -147,6 +148,22 @@ Measured against that incomplete truth, precision read 0.07 for an engine that
 was largely right. Truth is now computed exhaustively over the product
 population and expanded across renderings at measurement time, which moved
 precision to 0.90.
+
+### M4 findings
+
+- **Two of the three workbench tabs were permanently empty.** Review tasks were
+  created only for grey pairs, so Auto-high and Auto-low showed nothing. An
+  automation rate is only meaningful if a human can sample what was automated,
+  so tasks are now created for every auto-accepted pair and for the 500 closest
+  auto-refused ones — the refusals most worth spot-checking.
+- **Rejecting an automatic merge changed nothing but a flag.** Overturning a
+  decision now splits the cluster back apart, which is what the reviewer's "no"
+  is asking for.
+- **Merging a cluster orphaned its review tasks** (`review_task.cluster_id`
+  referenced the deleted source, raising a foreign-key error). Tasks now follow
+  the items into the surviving cluster.
+- **`rebuild_golden` flushed a golden record before setting its NOT NULL
+  description.** Every column is now set before the insert.
 
 ### Measurement honesty
 

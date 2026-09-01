@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
+from .. import audit
 from ..auth import require_roles
 from ..db import get_db
 from ..extract import extract
@@ -205,6 +206,21 @@ async def ingest(
     if accepted and not dry_run:
         for i in range(0, len(accepted), 1000):
             db.execute(insert(RawItem), accepted[i : i + 1000])
+        audit.record(
+            db,
+            action="ingest",
+            entity=f"cpse:{cpse.code}",
+            payload={
+                "cpse": cpse.code,
+                "file": file.filename,
+                "rows_read": rows_read,
+                "rows_accepted": len(accepted),
+                "rows_rejected": len(rejected),
+                "column_mapping": column_mapping,
+            },
+            user=_user.email,
+            commit=False,
+        )
         db.commit()
 
     return IngestReport(

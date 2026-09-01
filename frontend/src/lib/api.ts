@@ -87,3 +87,195 @@ export const login = (email: string, password: string) =>
   api.post<User>('/auth/login', { email, password })
 export const logout = () => api.post<{ ok: boolean }>('/auth/logout')
 export const getSession = () => api.get<User | null>('/auth/session')
+
+// ---- review workbench (§6.5) ----
+
+export type TierScores = {
+  tier0_anchor: number
+  tier0_key: string | null
+  tier1_fuzzy: number
+  tier1_engine?: string
+  tier2_semantic: number
+  attribute_agreement?: number
+  tier1_waterfall?: {
+    engine: string
+    match_probability: number
+    match_weight: number
+    comparison_levels: Record<string, number>
+  }
+}
+
+export type AttrDiff = {
+  attr: string
+  role: 'identity_critical' | 'performance' | 'cosmetic'
+  a: unknown
+  b: unknown
+  result: string
+  detail: string
+  agrees: boolean
+}
+
+export type ItemCard = {
+  item_id: number
+  normalized: string
+  description: string
+  legacy_code: string
+  cpse: string
+  plant: string | null
+  class_code: string
+  class_confidence: number
+  class_uncertain: boolean
+  mpn_norm: string | null
+  gtin: string | null
+  pack_qty: number
+  uom_base: string | null
+  cluster_id: number | null
+  attrs: Record<string, unknown>
+}
+
+export type TaskCard = {
+  task_id: number
+  band: 'high' | 'grey' | 'low'
+  state: string
+  reason: string | null
+  cluster_id: number | null
+  pair_id?: number
+  verdict?: string
+  confidence?: number
+  tier_scores?: TierScores
+  veto?: { vetoed_by: { attr: string; a: unknown; b: unknown; reason: string }[] } | null
+  refused_because?: string[]
+  equivalence?: { basis: string; direction: string | null } | null
+  route?: string
+  conflict?: string
+  attribute_diff?: AttrDiff[]
+  agreement?: number
+  items?: [ItemCard, ItemCard]
+}
+
+export type QueueResponse = {
+  band: string | null
+  counts: { high: number; grey: number; low: number }
+  total: number
+  offset: number
+  tasks: TaskCard[]
+}
+
+export const getQueue = (band?: string, offset = 0, limit = 25) =>
+  api.get<QueueResponse>(
+    `/queues?limit=${limit}&offset=${offset}${band ? `&band=${band}` : ''}`,
+  )
+
+export const postDecision = (body: {
+  task_id: number
+  action: 'approve' | 'reject' | 'merge' | 'split'
+  note?: string
+  cluster_id?: number
+  item_id?: number
+}) => api.post<Record<string, unknown>>('/decisions', body)
+
+// ---- clusters (§6.6) ----
+
+export type Provenance = {
+  field: string
+  source_member_id: number | null
+  rule: string
+  candidates: { value: string; member_id: number; source: string }[]
+}
+
+export type ClusterDetail = {
+  cluster_id: number
+  status: string
+  member_count: number
+  class_code: string
+  golden: {
+    id: number
+    std_description: string
+    attrs: Record<string, unknown>
+    status: string
+    template: string
+    proposed_by: number | null
+    approved_by: number | null
+  } | null
+  cnmc: { code: string; status: string } | null
+  provenance: Provenance[]
+  conflicts: { attr: string; values: string[]; blocking: boolean; note: string }[]
+  members: (ItemCard & { normalized: string })[]
+  standardization_delta: {
+    member_id: number
+    legacy: string
+    golden: string
+    unchanged: boolean
+    tokens_added: string[]
+    tokens_dropped: string[]
+  }[]
+}
+
+export const getCluster = (id: number) => api.get<ClusterDetail>(`/clusters/${id}`)
+export const editGolden = (id: number, std_description: string) =>
+  api.post<{ std_description: string }>(`/clusters/${id}/golden`, { std_description })
+export const splitMember = (id: number, item_id: number, note?: string) =>
+  api.post<{ new_cluster_id: number }>(`/clusters/${id}/split`, { item_id, note })
+export const mergeCluster = (id: number, source_cluster_id: number, note?: string) =>
+  api.post<{ cluster_id: number }>(`/clusters/${id}/merge`, { source_cluster_id, note })
+export const issueCnmc = (goldenId: number) =>
+  api.post<{ code: string; already_issued: boolean }>(`/cnmc/issue/${goldenId}`)
+
+// ---- items (§6.4) ----
+
+export type ItemDetail = ItemCard & {
+  golden: { id: number; std_description: string; status: string; attrs: Record<string, unknown> } | null
+  cnmc: { code: string; status: string } | null
+  cluster: { id: number; status: string } | null
+  duplicates: ItemCard[]
+  equivalents: {
+    counterpart: ItemCard
+    rel_type: string
+    direction: string
+    basis: string
+    confidence: number
+    substitutes_this: boolean
+  }[]
+}
+
+export const getItem = (id: number) => api.get<ItemDetail>(`/items/${id}`)
+
+// ---- audit (§6.10) ----
+
+export type AuditEventRow = {
+  seq: number
+  ts: string
+  user: string
+  action: string
+  entity: string
+  payload: Record<string, unknown>
+  prev_hash: string
+  hash: string
+}
+
+export type AuditResponse = {
+  total: number
+  offset: number
+  actions: Record<string, number>
+  events: AuditEventRow[]
+}
+
+export type VerifyResponse = {
+  valid: boolean
+  events: number
+  head_seq?: number
+  head_hash?: string
+  voided_events?: number[]
+  first_break: { seq: number; reason: string } | null
+  note: string
+}
+
+export const getAudit = (params: { entity?: string; user?: string; action?: string; limit?: number } = {}) => {
+  const query = new URLSearchParams()
+  if (params.entity) query.set('entity', params.entity)
+  if (params.user) query.set('user', params.user)
+  if (params.action) query.set('action', params.action)
+  query.set('limit', String(params.limit ?? 100))
+  return api.get<AuditResponse>(`/audit?${query}`)
+}
+export const verifyChain = () => api.get<VerifyResponse>('/audit/verify')
