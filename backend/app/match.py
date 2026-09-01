@@ -62,6 +62,17 @@ ANCHOR_BASE = 0.74
 #: compared before attribute agreement is treated as real support.
 MIN_IDENTITY_ATTRS = 1
 
+#: ...and this share of the class's identity_critical attributes must have been
+#: comparable before the pair may be auto-accepted.
+#:
+#: Counting attributes is not enough. A typo that turns "120.0 SQMM" into
+#: "120.0 QMM" destroys `cores` and `csa_mm2` together; the three remaining
+#: identity attributes then agreed and a 5-core 120mm² cable was merged with a
+#: 3-core 4mm² one. Nothing had gone wrong pairwise — a missing value must
+#: never veto — but too little of what defines the item had been checked to
+#: merge on. Below this coverage the pair goes to review instead.
+MIN_IDENTITY_COVERAGE = 0.6
+
 
 @dataclass
 class MatchCandidate:
@@ -302,20 +313,38 @@ def match_pair(
         )
 
     score = _evidence_score(fuzzy, semantic, comparison)
+    identity_total = len(schema.identity_critical)
     identity_compared = sum(
         1
         for c in comparison.per_attr
         if c.role == "identity_critical" and c.result != "unknown"
     )
+    identity_coverage = identity_compared / identity_total if identity_total else 1.0
 
-    if anchor_kind:
-        confidence = min(1.0, ANCHOR_BASE + (1.0 - ANCHOR_BASE) * score)
-    else:
-        confidence = score
-        # Attribute agreement with nothing identifying behind it is weak
-        # evidence; hold the pair back for review rather than auto-merging.
-        if identity_compared < MIN_IDENTITY_ATTRS:
-            confidence = min(confidence, T_HIGH - 0.01)
+    confidence = (
+        min(1.0, ANCHOR_BASE + (1.0 - ANCHOR_BASE) * score) if anchor_kind else score
+    )
+
+    # The class's blocking attribute is its most discriminating field by
+    # construction — bore for a bearing, cross-section for a cable. If it could
+    # not be compared, the pair has not been checked on the thing that most
+    # decides identity, whatever else agreed.
+    defining_attr = schema.block_on
+    defining_compared = defining_attr is None or any(
+        c.attr == defining_attr and c.result != "unknown" for c in comparison.per_attr
+    )
+
+    # Attribute agreement with too little of the item's identity behind it is
+    # weak evidence, however high the text similarity. Hold the pair back for
+    # review rather than auto-merging it. An exact anchor key is exempt: a
+    # shared part number is itself an identity claim.
+    thin_evidence = (
+        identity_compared < MIN_IDENTITY_ATTRS
+        or identity_coverage < MIN_IDENTITY_COVERAGE
+        or not defining_compared
+    )
+    if thin_evidence and anchor_kind not in ("mpn", "gtin"):
+        confidence = min(confidence, T_HIGH - 0.01)
 
     band = _band(confidence)
     verdict = "duplicate" if band == "high" else "distinct" if band == "low" else "duplicate"
@@ -325,7 +354,27 @@ def match_pair(
     return MatchResult(
         a.id, b.id, verdict, band, round(confidence, 4), tier_scores,
         equivalence=equivalence,
-        evidence={**evidence, "identity_attributes_compared": identity_compared},
+        evidence={
+            **evidence,
+            "identity_attributes_compared": identity_compared,
+            "identity_attributes_total": identity_total,
+            "identity_coverage": round(identity_coverage, 3),
+            "defining_attribute": defining_attr,
+            "defining_attribute_compared": defining_compared,
+            **(
+                {
+                    "held_for_review": (
+                        f"{defining_attr} could not be compared"
+                        if not defining_compared
+                        else f"only {identity_compared} of {identity_total} "
+                        "identity-critical attributes could be compared"
+                    )
+                    + " — too little of what defines this item to merge on"
+                }
+                if thin_evidence and anchor_kind not in ("mpn", "gtin")
+                else {}
+            ),
+        },
     )
 
 

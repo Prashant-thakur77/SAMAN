@@ -4,7 +4,7 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M4
+## Status: end of M5
 
 M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
 engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
@@ -18,7 +18,7 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 | Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | future tuning |
 | An LLM may not yet propose equivalences | §2B source 4, the lowest-trust one. It can only ever add review-queue suggestions, never auto-approve | M6 |
 | Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
-| Home, Search, dashboards, Copilot, Onboard, Migration and Admin still render empty states | Nothing may be faked (§10); screens fill as their engines land | M5–M7.5 |
+| Search, Copilot, Onboard, Migration and Admin still render empty states | Nothing may be faked (§10); screens fill as their engines land | M6–M7.5 |
 | No frontend test runner | The API is covered by 473 pytest cases and the UI is type-checked and built, but component behaviour is unverified | polish pass |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale; worth batching if the queue view is ever paged deeply | M8B |
 | `make demo-restore` / `make licenses` exit non-zero | Placeholders fail loudly rather than pretending to succeed | M8, M8B |
@@ -178,6 +178,29 @@ Found in the post-M4 audit:
   in the UI. `/admin` and `/migration` are now guarded, the sidebar hides what a
   role cannot open, and the guard explains why rather than showing a wall of
   403s.
+
+### M5 findings
+
+The dashboards earned their keep before they were finished, by showing a number
+that could not be true:
+
+- **A 98.9% price spread for one material.** `purchase_history.unit_price` was
+  being stored per *base* unit by the seed and divided by `pack_qty` again by
+  the analytics. It now holds the PO line price per *catalogued* unit, as an
+  ERP does, and the §9A normalization is performed by the analytics — so that
+  normalization is exercised rather than pre-baked.
+- **Then a 98.3% spread that was not a pricing bug at all.** A typo turning
+  `120.0 SQMM` into `120.0 QMM` destroyed `cores` and `csa_mm2` together; the
+  three surviving identity attributes agreed, and a 5-core 120mm² cable had been
+  merged with a 3-core 4mm² one. The matcher now refuses to auto-merge a pair
+  whose class-defining attribute could not be compared. **Duplicate precision
+  rose 0.978 to 0.994** and the worst price variance fell to a realistic 49%.
+- **Redaction was nulling values before the programme total was summed**, so a
+  steward's dashboard raised a TypeError. Totals are computed first: the
+  consolidated figure is the point of the feature and only its attribution is
+  restricted.
+- **Recharts put the main bundle at 721 kB.** The two dashboard routes are now
+  lazily loaded, taking the initial bundle to 332 kB (106 kB gzipped).
 
 ### Measurement honesty
 

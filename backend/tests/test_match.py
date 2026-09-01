@@ -1,5 +1,7 @@
 """The tiered matcher — spec §0.4, §2A, §2B."""
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 
@@ -141,6 +143,59 @@ class TestSchemaLessPool:
         a = item(1, "X", cls="unclassified", conf=0.1)
         b = item(2, "Y", cls="unclassified", conf=0.1)
         assert "class uncertain" in match_pair(a, b).evidence["reason"]
+
+
+class TestThinEvidenceIsHeldBack:
+    """A pair may not be merged on attributes that were never checked.
+
+    Found by following an implausible dashboard number back to its cause: a
+    typo turning "120.0 SQMM" into "120.0 QMM" destroyed `cores` and `csa_mm2`
+    together, the three remaining identity attributes agreed, and a 5-core
+    120mm² cable was merged with a 3-core 4mm² one.
+    """
+
+    CABLE = "cable.power"
+    FULL_CABLE: ClassVar[dict] = {
+        "cores": 3.0, "csa_mm2": 4.0, "voltage_v": 11000.0,
+        "conductor": "AL", "insulation": "XLPE", "temp_max_c": 70.0,
+    }
+
+    def _cable(self, item_id, attrs, text="CABLE POWER 3C X 4.0 SQMM ALUMINIUM XLPE 11000V"):
+        return item(item_id, text, attrs=attrs, cls=self.CABLE)
+
+    def test_a_pair_missing_its_defining_attribute_is_not_auto_merged(self):
+        damaged = {k: v for k, v in self.FULL_CABLE.items() if k not in ("cores", "csa_mm2")}
+        result = match_pair(
+            self._cable(1, dict(self.FULL_CABLE)),
+            self._cable(2, damaged, "CABLE POWER 5C X 120.0 QMM ALUMINIUM XLPE 11000V"),
+        )
+        assert result.band != "high"
+        assert result.verdict != "duplicate"
+        assert "too little of what defines this item" in result.evidence["held_for_review"]
+
+    def test_a_complete_pair_is_still_auto_merged(self):
+        result = match_pair(
+            self._cable(1, dict(self.FULL_CABLE)), self._cable(2, dict(self.FULL_CABLE))
+        )
+        assert result.band == "high"
+
+    def test_the_evidence_records_what_could_not_be_compared(self):
+        damaged = {k: v for k, v in self.FULL_CABLE.items() if k != "csa_mm2"}
+        evidence = match_pair(
+            self._cable(1, dict(self.FULL_CABLE)), self._cable(2, damaged)
+        ).evidence
+        assert evidence["defining_attribute"] == "csa_mm2"
+        assert evidence["defining_attribute_compared"] is False
+
+    def test_a_shared_part_number_is_itself_an_identity_claim(self):
+        """An exact anchor is exempt: the manufacturer has already asserted it."""
+        damaged = {k: v for k, v in self.FULL_CABLE.items() if k not in ("cores", "csa_mm2")}
+        result = match_pair(
+            item(1, "CABLE POWER 3C X 4.0 SQMM", attrs=dict(self.FULL_CABLE),
+                 mpn="KEIPW00987", cls=self.CABLE),
+            item(2, "CABLE POWER QMM", attrs=damaged, mpn="KEIPW00987", cls=self.CABLE),
+        )
+        assert result.band == "high"
 
 
 class TestBandsAndConfidence:

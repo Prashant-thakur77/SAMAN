@@ -223,6 +223,33 @@ export const issueCnmc = (goldenId: number) =>
 
 // ---- items (§6.4) ----
 
+export type ConsolidatedStock = {
+  cluster_id: number
+  cpse_count: number
+  plant_count: number
+  total_qty: number
+  total_value: number
+  positions: {
+    cpse: string
+    plant: string
+    qty_on_hand: number
+    reserved_qty: number
+    available: number
+    unit_value: number | null
+    value: number | null
+    value_withheld: boolean
+    last_movement: string | null
+  }[]
+}
+
+export type PurchaseTrend = {
+  orders: number
+  history: { po_date: string; unit_price: number; qty: number; vendor: string; cpse: string }[]
+  last: { po_date: string; unit_price: number; vendor: string; cpse: string } | null
+  trend: { from: number; to: number; change_pct: number; direction: string } | null
+  price_band: { label: string } | null
+}
+
 export type ItemDetail = ItemCard & {
   golden: { id: number; std_description: string; status: string; attrs: Record<string, unknown> } | null
   cnmc: { code: string; status: string } | null
@@ -236,6 +263,9 @@ export type ItemDetail = ItemCard & {
     confidence: number
     substitutes_this: boolean
   }[]
+  consolidated_stock: ConsolidatedStock | null
+  purchase_history: PurchaseTrend
+  visibility: { note: string; sees_attributed_prices: boolean }
 }
 
 export const getItem = (id: number) => api.get<ItemDetail>(`/items/${id}`)
@@ -279,3 +309,104 @@ export const getAudit = (params: { entity?: string; user?: string; action?: stri
   return api.get<AuditResponse>(`/audit?${query}`)
 }
 export const verifyChain = () => api.get<VerifyResponse>('/audit/verify')
+
+// ---- dashboards (§6.7, §6.8) ----
+
+export type Kpi = {
+  key: string
+  label: string
+  value: number
+  format?: 'percent' | 'currency'
+  note?: string
+}
+
+export type ExecutiveDashboard = {
+  kpis: Kpi[]
+  per_cpse: { cpse: string; name: string; items: number; coded: number; progress: number }[]
+  heatmap: {
+    classes: string[]
+    cpses: string[]
+    peak: number
+    cells: { class_code: string; cpse: string; count: number; intensity: number }[]
+  }
+  review: { pending: Record<string, number>; decisions_made: number }
+  trend: { date: string; cnmcs_issued: number; cnmcs_total: number; decisions: number }[]
+  inventory: {
+    positions: number
+    total_value: number
+    dead_stock_value: number
+    dead_stock_materials: number
+  }
+  visibility: { role: string; cpse: string | null; sees_attributed_prices: boolean; note: string }
+}
+
+export type JointTender = {
+  cluster_id: number
+  description?: string
+  cnmc?: string | null
+  cpses: string[]
+  cpse_count: number
+  combined_qty: number
+  price_low: number
+  price_high: number
+  price_spread: number
+  spread_pct: number
+  estimated_saving: number
+  per_cpse: { cpse: string; orders: number; qty: number; unit_price: number | null }[]
+  market_band?: { label: string } | null
+}
+
+export type OpportunityDashboard = {
+  joint_tenders: {
+    window_months: number
+    capture_assumption: number
+    assumption_note: string
+    candidates_found: number
+    total_estimated_saving: number
+    candidates: JointTender[]
+  }
+  price_variance: {
+    note: string
+    items_with_variance: number
+    rows: {
+      cluster_id: number
+      description?: string
+      variance_pct: number
+      lowest: { cpse: string; unit_price: number | null }
+      highest: { cpse: string; unit_price: number | null }
+      market_band?: { label: string } | null
+    }[]
+  }
+  vendor_overlap: {
+    items_found: number
+    rows: { cluster_id: number; description?: string; vendor_count: number; cpse_count: number }[]
+  }
+  inventory: {
+    transfers: {
+      note: string
+      suggestions_found: number
+      total_avoided_purchase_value: number
+      suggestions: {
+        cluster_id: number
+        description?: string
+        qty: number
+        avoided_purchase_value: number | null
+        idle_since: string | null
+        from: { cpse: string; plant: string; available: number }
+        to: { cpse: string; plant: string; available: number }
+      }[]
+    }
+    dead_stock: {
+      months_without_movement: number
+      materials_found: number
+      total_value: number
+      rows: { cluster_id: number; description?: string; qty: number; value: number }[]
+    }
+    totals: { positions: number; total_qty: number; total_value: number }
+  }
+  visibility: { note: string; sees_attributed_prices: boolean }
+}
+
+export const getExecutive = () => api.get<ExecutiveDashboard>('/dashboard/executive')
+export const getOpportunity = (capture: number) =>
+  api.get<OpportunityDashboard>(`/dashboard/opportunity?capture=${capture}`)

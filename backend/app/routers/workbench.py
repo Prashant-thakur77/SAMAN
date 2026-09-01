@@ -10,8 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import audit, review
-from ..auth import require_roles, require_user
+from .. import audit, inventory, opportunity, review
+from ..auth import current_user_optional, require_roles, require_user
 from ..db import get_db
 from ..models import (
     AuditEvent,
@@ -28,6 +28,7 @@ from ..models import (
     ReviewTask,
     User,
 )
+from ..visibility import scope_for
 
 router = APIRouter(tags=["review"])
 
@@ -358,11 +359,16 @@ def audit_verify(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/items/{item_id}")
-def get_item(item_id: int, db: Session = Depends(get_db)) -> dict:
+def get_item(
+    item_id: int,
+    user: Annotated[User | None, Depends(current_user_optional)] = None,
+    db: Session = Depends(get_db),
+) -> dict:
     card = _item_card(db, item_id)
     if "normalized" not in card:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No item {item_id}.")
 
+    scope = scope_for(user)
     cluster_id = card["cluster_id"]
     golden = (
         db.execute(
@@ -427,4 +433,12 @@ def get_item(item_id: int, db: Session = Depends(get_db)) -> dict:
         "cluster": {"id": cluster_id, "status": db.get(Cluster, cluster_id).status}
         if cluster_id
         else None,
+        # §2E: once items share a CNMC, stock held across CPSEs becomes one
+        # visible position for the first time.
+        "consolidated_stock": (
+            inventory.consolidated_stock(db, cluster_id, scope) if cluster_id else None
+        ),
+        # §9A(c): last purchase price and its direction.
+        "purchase_history": opportunity.last_purchase_and_trend(db, item_id, scope),
+        "visibility": scope.as_dict(),
     }

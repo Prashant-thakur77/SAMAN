@@ -3,9 +3,12 @@ import { Link, useParams } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
 import { ItemPanel } from '../components/workbench/ItemPanel'
+import { formatRupees } from '../components/charts/CountUp'
 import { CodeChip, StatusChip } from '../components/primitives/Chip'
 import { EmptyState } from '../components/primitives/EmptyState'
+import { TBody, TD, TH, THead, TR, Table } from '../components/primitives/Table'
 import { ApiError, getItem, type ItemDetail } from '../lib/api'
+import { cn } from '../lib/cn'
 
 /**
  * /items/:id — the golden record, every CPSE's legacy code, and §2B's two
@@ -76,6 +79,106 @@ export default function Item() {
           )}
         </div>
       </section>
+
+      {/* §2E: stock across every CPSE, visible as one position */}
+      {detail.consolidated_stock && detail.consolidated_stock.positions.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="micro-label">Consolidated stock across CPSEs</h2>
+          <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-3">
+            <div className="space-y-1 bg-bg p-4">
+              <p className="micro-label">Total on hand</p>
+              <p className="font-mono text-lg">
+                {detail.consolidated_stock.total_qty.toLocaleString('en-IN')}
+              </p>
+            </div>
+            <div className="space-y-1 bg-bg p-4">
+              <p className="micro-label">Held across</p>
+              <p className="font-mono text-lg">
+                {detail.consolidated_stock.cpse_count} CPSEs ·{' '}
+                {detail.consolidated_stock.plant_count} plants
+              </p>
+            </div>
+            <div className="space-y-1 bg-bg p-4">
+              <p className="micro-label">Tied-up value</p>
+              <p className="font-mono text-lg">
+                {formatRupees(detail.consolidated_stock.total_value)}
+              </p>
+            </div>
+          </div>
+          <Table>
+            <THead>
+              <TH>CPSE</TH>
+              <TH>Plant</TH>
+              <TH align="right">On hand</TH>
+              <TH align="right">Available</TH>
+              <TH align="right">Value</TH>
+              <TH>Last movement</TH>
+            </THead>
+            <TBody>
+              {detail.consolidated_stock.positions.map((position) => (
+                <TR key={`${position.cpse}-${position.plant}`}>
+                  <TD mono>{position.cpse}</TD>
+                  <TD mono>{position.plant}</TD>
+                  <TD mono align="right">{position.qty_on_hand.toLocaleString('en-IN')}</TD>
+                  <TD mono align="right">{position.available.toLocaleString('en-IN')}</TD>
+                  <TD mono align="right">
+                    {position.value === null ? (
+                      <span className="text-muted" title="Another CPSE's valuation is registrar and auditor scope (§0.9b)">
+                        withheld
+                      </span>
+                    ) : (
+                      formatRupees(position.value)
+                    )}
+                  </TD>
+                  <TD mono>{position.last_movement ?? '—'}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </section>
+      )}
+
+      {/* §9A(c): last purchase price and its direction */}
+      {detail.purchase_history.orders > 0 && (
+        <section className="space-y-3">
+          <h2 className="micro-label">Purchase history</h2>
+          {detail.purchase_history.last ? (
+            <div className="flex flex-wrap items-baseline gap-6 border border-hairline p-4">
+              <div>
+                <p className="micro-label">Last purchase</p>
+                <p className="font-mono text-lg">
+                  {formatRupees(detail.purchase_history.last.unit_price)}
+                </p>
+                <p className="micro-label mt-1">
+                  {detail.purchase_history.last.po_date} · {detail.purchase_history.last.vendor}
+                </p>
+              </div>
+              {detail.purchase_history.trend && (
+                <div>
+                  <p className="micro-label">Trend</p>
+                  <p
+                    className={cn(
+                      'font-mono text-lg',
+                      detail.purchase_history.trend.direction === 'up' ? 'text-danger' : 'text-ok',
+                    )}
+                  >
+                    {detail.purchase_history.trend.change_pct > 0 ? '+' : ''}
+                    {detail.purchase_history.trend.change_pct}%
+                  </p>
+                  <p className="micro-label mt-1">
+                    over {detail.purchase_history.orders} orders
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="border border-hairline px-4 py-3 text-sm text-muted">
+              {detail.purchase_history.price_band?.label ??
+                'Prices for this CPSE are outside your visibility scope.'}
+            </p>
+          )}
+        </section>
+      )}
 
       {/* §2B: two separate blocks, deliberately */}
       <section className="space-y-4">

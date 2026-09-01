@@ -1366,7 +1366,11 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
     stock_rows: list[dict] = []
     for item_id, raw_id, pack_qty in id_pairs:
         cpse_id, price, plant = price_by_raw[raw_id]
-        unit_price = (price or 0.0) / max(pack_qty or 1.0, 1.0)
+        # The PO line price, per catalogued unit — a boxed item is priced per
+        # box. Normalizing to a base unit is the analytics' job, so that the
+        # §9A pack-size normalization is exercised rather than pre-baked.
+        catalogued_price = price or 0.0
+        base_unit_price = catalogued_price / max(pack_qty or 1.0, 1.0)
         vendors = VENDORS.get("bearing.ball.deep_groove")
 
         for _ in range(rng.choices((0, 1, 2, 3, 4), weights=(15, 30, 25, 20, 10))[0]):
@@ -1376,7 +1380,7 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
                     "cpse_id": cpse_id,
                     "po_date": today - timedelta(days=rng.randint(1, 540)),
                     "qty": float(rng.randint(1, 250)),
-                    "unit_price": round(unit_price * rng.uniform(0.92, 1.08), 2),
+                    "unit_price": round(catalogued_price * rng.uniform(0.92, 1.08), 2),
                     "vendor": rng.choice(
                         vendors if vendors else ("GENERAL SUPPLIES",)
                     ),
@@ -1394,7 +1398,8 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
                 "qty_on_hand": qty,
                 "reserved_qty": round(qty * rng.uniform(0, 0.2), 1),
                 "last_movement_date": today - timedelta(days=days_since_movement),
-                "unit_value": round(unit_price, 2),
+                # Inventory is valued per base unit, which is how stock is held.
+                "unit_value": round(base_unit_price, 2),
             }
         )
 

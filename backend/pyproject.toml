@@ -21,8 +21,10 @@ ignore = [
     # `Depends()` in a parameter default is the FastAPI idiom, not a mutable
     # default argument. Flagging it here would mean ignoring it everywhere.
     "B008",
-    # The catalogues are deliberately multilingual; Devanagari is data.
+    # The catalogues are deliberately multilingual; Devanagari is data, and the
+    # prose uses real typography (en dashes, rupee signs).
     "RUF001",
+    "RUF002",
     "RUF003",
 ]
 

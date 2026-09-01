@@ -85,7 +85,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M3.4 | Golden-record standardization + provenance | **Done** |
 | M3.5 | Functional-equivalence engine | **Done** |
 | M4 | Workbench, decisions, role gates, audit chain | **Done** |
-| M5 | Executive + Opportunity dashboards | Not started |
+| M5 | Executive + Opportunity dashboards | **Done** |
 | M6 | Copilot | Not started |
 | M7 | Onboarding wizard, admin, audit explorer | Not started |
 | M7.5 | Two-way ERP migration | Not started |
@@ -243,6 +243,24 @@ Rules are data, not code. A steward reads and edits them through `GET/POST
   never_if: [material !=]
 ```
 
+### Commercial and inventory analytics
+
+Purchase history is *used*, not merely stored. Prices are normalized to price
+per base unit, so a box of 100 is never compared with a single piece, and every
+modelled figure travels with the assumption that produced it — the what-if
+slider changes an assumption, so the number it yields says so.
+
+Duplicate codes hide stock. Once items share a CNMC the same material held in
+several CPSEs becomes one visible position, which is what turns idle surplus in
+one CPSE and a shortage in another into a transfer suggestion with a rupee value
+that traces back to real stock rows.
+
+**Visibility (§0.9b)** is enforced in one place so the dashboards and the
+Copilot cannot diverge. A steward sees their own CPSE's prices in full and an
+anonymised band for everyone else — "market range ₹1,088–₹96,183, n=3 CPSEs" —
+while consolidated programme totals stay visible to all, because the aggregate
+is the point and only its attribution is restricted.
+
 ### Review and governance
 
 The workbench covers all three confidence bands, not only the uncertain one: an
@@ -290,15 +308,15 @@ are kept honest — partial is marked partial.
 | Mapping of existing CPSE codes to the common national code | mapping block on the item page | **Done** — `/items/:id` lists every CPSE's code under one CNMC |
 | Legacy code rationalization and migration support | plan → dry-run → apply → rollback | Not started (M7.5) |
 | User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | **Done** — keyboard-first workbench over all three bands, role-gated, self-approval refused |
-| Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | Not started (M5) |
+| Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | **Done** — KPIs reconcile with `/api/metrics`; class x CPSE heatmap in grayscale |
 | Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | **Done** — tamper- and reorder-evident, verified from the UI |
 | Integration capability with SAP/ERP | `ErpAdapter` + mock ERP write-back | Not started (M7.5) |
-| Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | Partial — data seeded and authoritative; analytics land in M5 |
+| Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | **Done** — 12-month demand windows, price-per-base-unit variance, vendor overlap, last-price trend |
 | Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done** — pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |
-| Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | Not started (M5) |
-| Inter-CPSE collaboration | sharing engine + joint tenders | Not started (M5) |
+| Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done** — one position across CPSEs, 37 transfer suggestions worth ₹5.9 Cr |
+| Inter-CPSE collaboration | sharing engine + joint tenders | **Done** — 1,801 joint-tender candidates across two or more CPSEs |
 | Faster procurement/specification finalization | Smart-Create + standardized specs | Not started (M8) |
-| Foundation for strategic sourcing | vendor overlap + combined-volume analysis | Not started (M5) |
+| Foundation for strategic sourcing | vendor overlap + combined-volume analysis | **Done** — combined volume and vendor overlap on the Opportunity dashboard |
 
 ---
 

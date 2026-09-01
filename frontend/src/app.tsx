@@ -1,4 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
+import { Suspense, lazy } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 
 import { RequireRole } from './components/RequireRole'
@@ -8,9 +9,12 @@ import Admin from './routes/Admin'
 import Audit from './routes/Audit'
 import Cluster from './routes/Cluster'
 import Copilot from './routes/Copilot'
-import DashExecutive from './routes/DashExecutive'
-import DashOpportunity from './routes/DashOpportunity'
-import Home from './routes/Home'
+// Recharts is ~200 kB and only two screens need it, so the dashboards are
+// split out of the initial bundle (spec §9: keep the bundle lean).
+const DashExecutive = lazy(() => import('./routes/DashExecutive'))
+const DashOpportunity = lazy(() => import('./routes/DashOpportunity'))
+
+import Home from './routes/Home' 
 import Item from './routes/Item'
 import Login from './routes/Login'
 import Migration from './routes/Migration'
@@ -71,7 +75,17 @@ export default function App() {
       <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
           {SHELL_ROUTES.map(({ path, element }) => (
-            <Route key={path} path={path} element={<RouteTransition>{element}</RouteTransition>} />
+            <Route
+              key={path}
+              path={path}
+              element={
+                <RouteTransition>
+                  <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
+                    {element}
+                  </Suspense>
+                </RouteTransition>
+              }
+            />
           ))}
         </Routes>
       </AnimatePresence>

@@ -278,6 +278,14 @@ class Decision(Base):
 
 
 class PurchaseHistory(Base):
+    """Authoritative source for all price analytics (see the §4 data-authority note).
+
+    `unit_price` is the price paid **per catalogued unit** — the PO line price
+    for the UoM that was ordered, which is what an ERP holds. Comparing a box
+    of 100 with a single piece therefore requires dividing by `item.pack_qty`,
+    and that normalization is the analytics layer's job (§2A.1, §9A).
+    """
+
     __tablename__ = "purchase_history"
 
     id: Mapped[int] = mapped_column(primary_key=True)
