@@ -166,9 +166,28 @@ class TestInventorySharing:
 
 
 class TestExecutiveEndpoint:
-    def test_the_six_kpis_are_present(self, client, pipeline_run):
+    def test_the_kpis_spec_6_7_names_are_present(self, client, pipeline_run):
         keys = {k["key"] for k in client.get("/api/dashboard/executive").json()["kpis"]}
-        assert keys == {"items", "clusters", "duplicates", "cnmcs", "automation", "savings"}
+        assert {
+            "items",
+            "clusters",
+            "duplicates",
+            "cnmcs",
+            "automation",
+            "savings",
+        } <= keys
+
+    def test_prevented_duplicates_are_counted_beside_the_cleanup(
+        self, client, pipeline_run
+    ):
+        """The rest of this dashboard measures cleaning up; this one measures
+        the mess not being made."""
+        kpis = {
+            k["key"]: k for k in client.get("/api/dashboard/executive").json()["kpis"]
+        }
+        assert "prevented" in kpis
+        assert kpis["prevented"]["value"] >= 0
+        assert kpis["prevented"]["note"]
 
     def test_kpis_reconcile_with_the_database(self, client, db, pipeline_run):
         """§6.7 AC: the numbers must reconcile, not merely look plausible."""

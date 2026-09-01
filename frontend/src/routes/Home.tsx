@@ -39,7 +39,9 @@ export default function Home() {
   const headline = summary?.kpis.filter((k) =>
     isReviewer
       ? ['items', 'clusters', 'duplicates'].includes(k.key)
-      : ['clusters', 'duplicates', 'cnmcs', 'automation', 'savings'].includes(k.key),
+      : ['clusters', 'duplicates', 'cnmcs', 'automation', 'savings', 'prevented'].includes(
+          k.key,
+        ),
   )
 
   return (

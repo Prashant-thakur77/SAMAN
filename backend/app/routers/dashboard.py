@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
-from .. import inventory, opportunity
+from .. import inventory, opportunity, smart_create
 from ..auth import current_user_optional
 from ..db import get_db
 from ..models import (
@@ -153,6 +153,8 @@ def executive(
             }
         )
 
+    prevention = smart_create.stats(db)
+
     return {
         "kpis": [
             {"key": "items", "label": "Catalogue rows", "value": items_total},
@@ -176,6 +178,15 @@ def executive(
                 "value": savings["total_estimated_saving"],
                 "format": "currency",
                 "note": savings["assumption_note"],
+            },
+            {
+                # The only KPI that counts duplicates that never happened. The
+                # rest of this dashboard measures cleaning up; this one measures
+                # the mess not being made.
+                "key": "prevented",
+                "label": "Duplicates prevented at source",
+                "value": prevention["prevented"],
+                "note": "Checks where the requester reused an existing material.",
             },
         ],
         "per_cpse": per_cpse,
