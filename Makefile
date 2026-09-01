@@ -14,7 +14,7 @@ PYTEST      := $(VENV)/bin/pytest
 
 .PHONY: help setup venv deps deps-optional web-deps dev backend frontend test \
         lint build clean licenses licenses-check seed seed-large pipeline demo demo-splink \
-        demo-snapshot demo-restore tune test-web preview screenshots
+        demo-snapshot demo-restore tune test-web preview screenshots check
 
 help:  ## Show available targets
 	@echo "SAMAN — make targets"
@@ -88,6 +88,12 @@ preview:  ## Serve the production build on :4173 against the API on :8000
 
 screenshots:  ## Regenerate docs/screenshots from the running app (needs make preview)
 	cd backend && ../$(PY) scripts/screenshots.py
+
+check:  ## Everything CI runs: lint, both test suites, type-check, licenses
+	cd backend && ../$(PY) -m ruff check .
+	cd backend && ../$(PYTEST) -q
+	cd frontend && npx tsc --noEmit && npm run test
+	cd backend && ../$(PY) scripts/licenses.py --check
 
 test-web:  ## Run the frontend test suite
 	cd frontend && npm run test

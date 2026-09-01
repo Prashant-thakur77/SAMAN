@@ -37,7 +37,10 @@ make dev       # API on :8000, UI on :5173
 ```
 
 `make demo` exits non-zero if the §8 M3 gate is not met, so it doubles as the
-quality check.
+quality check. `make check` runs everything CI does — ruff, 693 backend tests,
+14 frontend tests, the type-check and the licence gate. `make demo-snapshot`
+and `make demo-restore` take and reinstate a restore point in under a second,
+for when a demo goes somewhere unplanned.
 
 Sign in with any seeded account — `steward@cpcl.in`, `registrar@min.gov.in`,
 `approver@min.gov.in` and others are listed on the login screen. Every one uses
@@ -166,8 +169,8 @@ against these numbers.
 
 | M3 gate (spec §8) | Result | Target |
 |---|---|---|
-| Duplicate precision | **0.975** | ≥ 0.92 |
-| Duplicate recall | **0.938** | ≥ 0.80 |
+| Duplicate precision | **0.994** | ≥ 0.92 |
+| Duplicate recall | **0.933** | ≥ 0.80 |
 | Blocking recall | **0.984** | ≥ 0.97 |
 | Veto precision on planted traps | **1.000** | ≥ 0.98 |
 
@@ -176,8 +179,8 @@ A single averaged number would hide more than it shows, so the full report at
 
 | | Precision | Recall | F1 |
 |---|---|---|---|
-| Pairwise | 0.975 | 0.938 | 0.957 |
-| **B-cubed (cluster level)** | 0.992 | 0.974 | 0.983 |
+| Pairwise | 0.994 | 0.933 | 0.963 |
+| **B-cubed (cluster level)** | 0.998 | 0.971 | 0.984 |
 | Naive baseline: exact text match | 1.000 | 0.032 | 0.061 |
 
 Pairwise scores can look excellent while clusters are catastrophically
@@ -360,8 +363,10 @@ assert the break is found at the right sequence.
 | Performance inside the band — must still merge | 0.89 |
 
 Per class, the weakest is named rather than averaged away:
-`bearing.ball.deep_groove` at F1 0.937, with every class above 0.93. Automation
-rate is 0.995, leaving 3,606 pairs for human review.
+`chemical.reagent` at F1 0.917 — perfectly precise but recalling only 0.847,
+because reagent descriptions carry fewer distinguishing attributes than a
+bearing does. Every class is above 0.91. Automation rate is 0.994, leaving
+3,868 pairs for human review.
 
 ---
 

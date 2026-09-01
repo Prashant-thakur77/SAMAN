@@ -322,8 +322,12 @@ def _equivalence_metrics(db: Session, snap: Snapshot) -> dict:
 
     if not predicted_rows:
         return {
-            "status": "not_built",
-            "note": "The equivalence engine lands in M3.5; truth is seeded and ready.",
+            "status": "no_predictions",
+            "note": (
+                "No equivalence relations have been produced yet — run the "
+                "pipeline's `relations` stage. The truth table is seeded and "
+                "ready, so this measures as soon as there is something to score."
+            ),
             "truth_pairs_holdout": len(truth),
         }
 

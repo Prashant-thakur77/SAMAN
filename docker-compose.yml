@@ -14,6 +14,9 @@ services:
       - ./backend:/srv/backend
     environment:
       SAMAN_DB_PATH: /srv/data/app.db
+      # Pinned to match what `make demo` scored the data with, so /api/health
+      # and the evidence cards agree about which engine ran (§0.4).
+      SAMAN_TIER1_ENGINE: rapidfuzz
       # Ollama stays unset: the demo must run without it (spec §0.4 Tier 3).
     healthcheck:
       test:
