@@ -71,18 +71,11 @@ export function TR({
     <motion.tr
       variants={listItemVariants(reduce)}
       onClick={onClick}
-      tabIndex={onClick ? 0 : undefined}
-      role={onClick ? 'button' : undefined}
-      onKeyDown={
-        onClick
-          ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                onClick()
-              }
-            }
-          : undefined
-      }
+      // Deliberately no `role="button"`: that would take the element out of the
+      // table's row structure and leave a screen reader unable to navigate the
+      // grid at all. A clickable row is a mouse convenience; every one of them
+      // also carries a real link in its first cell, which is what the keyboard
+      // and the reader use.
       className={cn(
         'border-b border-hairline',
         onClick && 'cursor-pointer hover:bg-surface',

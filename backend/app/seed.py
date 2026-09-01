@@ -1491,3 +1491,89 @@ def seed_registry_activity(db: Session, fraction: float = DEMO_APPROVED_FRACTION
         "left_for_review": len(candidates) - issued,
         "skipped_conflicts": skipped,
     }
+
+
+#: How many catalogue rows the demo re-checks through Smart-Create. Enough for
+#: the prevention rate to mean something, small enough not to lengthen `make
+#: demo` noticeably.
+DEMO_SMART_CREATE_CHECKS = 60
+
+
+def seed_smart_create_activity(db: Session, samples: int = DEMO_SMART_CREATE_CHECKS) -> dict:
+    """Exercise Smart-Create so its counter starts with a real history.
+
+    Nothing is fabricated: each check is a genuine run of the matcher against a
+    real description rewritten in another CPSE's house style, and a prevented
+    duplicate is one the engine actually found. A buyer who reuses the match is
+    a prevention; one who overrides it is recorded with a reason. Both happen in
+    a real registry, so both happen here.
+    """
+    from . import smart_create
+    from .models import RawItem, SmartCreateCheck, User
+
+    steward = db.execute(
+        select(User).where(User.email == "steward@cpcl.in")
+    ).scalar_one_or_none()
+    if steward is None:
+        return {"checks": 0, "note": "no steward seeded"}
+
+    rng = random.Random(SEED + 17)
+    pool = db.execute(
+        select(RawItem.description, RawItem.uom)
+        .where(RawItem.cpse_id != steward.cpse_id)
+        .order_by(RawItem.id)
+    ).all()
+    if not pool:
+        return {"checks": 0, "note": "empty catalogue"}
+
+    chosen = rng.sample(pool, min(samples, len(pool)))
+    prevented = overridden = cleared = 0
+
+    for index, (description, uom) in enumerate(chosen):
+        probe = _restyle(description, rng)
+        result = smart_create.check(db, probe, uom=uom, user=steward)
+        matches = result["suggestions"]
+        if not matches:
+            cleared += 1
+            continue
+        # Most people take the match they are shown; a minority have a real
+        # reason not to, and that reason is what the audit trail is for.
+        if index % 7 == 0:
+            try:
+                smart_create.create_anyway(
+                    db,
+                    result["create_token"],
+                    f"SC-{steward.cpse_id}-{index:05d}",
+                    probe,
+                    uom,
+                    "Different plant, separate valuation class.",
+                    steward,
+                )
+                overridden += 1
+            except ValueError:
+                cleared += 1
+        else:
+            smart_create.reuse(db, result["check_id"], matches[0]["item_id"], steward)
+            prevented += 1
+
+    open_checks = db.execute(
+        select(func.count(SmartCreateCheck.id)).where(SmartCreateCheck.outcome == "open")
+    ).scalar()
+    return {
+        "checks_run": len(chosen),
+        "duplicates_prevented": prevented,
+        "created_anyway": overridden,
+        "no_match_found": cleared,
+        "left_open": int(open_checks or 0),
+    }
+
+
+def _restyle(description: str, rng: random.Random) -> str:
+    """Rewrite a description the way another CPSE's catalogue would carry it.
+
+    The point of the check is that it survives a house-style change, so feeding
+    it the original string back would prove nothing.
+    """
+    tokens = [t for t in description.replace(",", " ").split() if t]
+    rng.shuffle(tokens)
+    return " ".join(tokens)

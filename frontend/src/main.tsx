@@ -12,7 +12,9 @@ if (!root) throw new Error('#root not found in index.html')
 
 createRoot(root).render(
   <StrictMode>
-    <BrowserRouter>
+    {/* Opt in early to the v7 behaviours so the upgrade is not a surprise, and
+        so the console stays clean enough that a real warning is noticed. */}
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ThemeProvider>
         <SessionProvider>
           <App />

@@ -25,3 +25,8 @@ sqlglot>=25,<26                  # MIT
 sentence-transformers==3.3.1     # Apache-2.0 (Tier 2 embeddings, all-MiniLM-L6-v2)
 # Weights are loaded from the local cache only; SAMAN never downloads a model at
 # runtime (spec §9). Without a warm cache, Tier 2 stays on TF-IDF.
+
+# --- documentation tooling (not needed to run or demo SAMAN) ---
+# `make screenshots` drives the built UI in headless Chromium to regenerate the
+# README images, so they can never drift from what the app actually renders.
+playwright==1.62.0               # Apache-2.0

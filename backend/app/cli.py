@@ -79,6 +79,10 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
         _print_table("Registry activity", seed_registry_activity(db))
 
+        from .seed import seed_smart_create_activity
+
+        _print_table("Smart-Create activity", seed_smart_create_activity(db))
+
         report = compute_metrics(db)
 
     print_metrics(report)

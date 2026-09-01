@@ -99,6 +99,21 @@ class TestTierOnePin:
         assert detected.linkage_mode == "rapidfuzz"
         assert any("pinned to rapidfuzz" in note for note in detected.degraded)
 
+    def test_a_deliberate_pin_is_not_reported_as_degradation(self, monkeypatch):
+        """An indicator that cries wolf about a chosen configuration is one
+        people learn to ignore."""
+        monkeypatch.setenv("SAMAN_TIER1_ENGINE", "rapidfuzz")
+        linkage = capabilities.refresh().as_dict()["linkage"]
+        assert linkage["degraded"] is False
+        assert linkage["selected_by"] == "operator"
+
+    def test_a_missing_splink_is_reported_as_degradation(self, monkeypatch):
+        monkeypatch.setenv("SAMAN_TIER1_ENGINE", "auto")
+        monkeypatch.setattr(capabilities, "_importable", lambda module: False)
+        linkage = capabilities.refresh().as_dict()["linkage"]
+        assert linkage["degraded"] is True
+        assert linkage["selected_by"] == "availability"
+
     def test_pinning_a_missing_splink_degrades_and_says_why(self, monkeypatch):
         monkeypatch.setenv("SAMAN_TIER1_ENGINE", "splink")
         monkeypatch.setattr(capabilities, "_importable", lambda module: False)

@@ -14,7 +14,7 @@ PYTEST      := $(VENV)/bin/pytest
 
 .PHONY: help setup venv deps deps-optional web-deps dev backend frontend test \
         lint build clean licenses licenses-check seed seed-large pipeline demo demo-splink \
-        demo-snapshot demo-restore tune
+        demo-snapshot demo-restore tune test-web preview screenshots
 
 help:  ## Show available targets
 	@echo "SAMAN — make targets"
@@ -61,15 +61,19 @@ web-deps:  ## Install frontend dependencies
 
 # --- run -----------------------------------------------------------------
 
+# TIER1 matches what `make demo` scored the data with, so /api/health and the
+# evidence cards agree about which engine ran. Override on the command line.
+TIER1 ?= rapidfuzz
+
 dev:  ## Run backend :8000 and frontend :5173 together
 	@echo "==> SAMAN dev: API http://localhost:8000/api/docs  ·  UI http://localhost:5173"
 	@trap 'kill 0' EXIT INT TERM; \
-	  ( cd backend && ../$(UVICORN) app.main:app --reload --port 8000 ) & \
+	  ( cd backend && SAMAN_TIER1_ENGINE=$(TIER1) ../$(UVICORN) app.main:app --reload --port 8000 ) & \
 	  ( cd frontend && npm run dev ) & \
 	  wait
 
 backend:  ## Run the API only, on :8000
-	cd backend && ../$(UVICORN) app.main:app --reload --port 8000
+	cd backend && SAMAN_TIER1_ENGINE=$(TIER1) ../$(UVICORN) app.main:app --reload --port 8000
 
 frontend:  ## Run the UI only, on :5173
 	cd frontend && npm run dev
@@ -78,6 +82,15 @@ frontend:  ## Run the UI only, on :5173
 
 test:  ## Run the backend test suite
 	cd backend && ../$(PYTEST) -q
+
+preview:  ## Serve the production build on :4173 against the API on :8000
+	cd frontend && npm run build && npx vite preview
+
+screenshots:  ## Regenerate docs/screenshots from the running app (needs make preview)
+	cd backend && ../$(PY) scripts/screenshots.py
+
+test-web:  ## Run the frontend test suite
+	cd frontend && npm run test
 
 lint:  ## Type-check the frontend
 	cd frontend && npm run typecheck

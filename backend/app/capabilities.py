@@ -47,6 +47,10 @@ class Capabilities:
     llm_mode: str  # "ollama" | "deterministic"
     sovereign_mode: bool
     degraded: list[str] = field(default_factory=list)
+    #: True when Tier 1 is on the fallback because an operator chose it, not
+    #: because splink is missing. A deliberate choice is not a degradation, and
+    #: reporting it as one trains people to ignore the indicator.
+    linkage_pinned: bool = False
 
     @property
     def all_optional_present(self) -> bool:
@@ -59,7 +63,8 @@ class Capabilities:
                 "engine": "splink (Fellegi-Sunter, DuckDB)"
                 if self.linkage_mode == "splink"
                 else "rapidfuzz token_set_ratio",
-                "degraded": self.linkage_mode != "splink",
+                "degraded": self.linkage_mode != "splink" and not self.linkage_pinned,
+                "selected_by": "operator" if self.linkage_pinned else "availability",
             },
             "embedding": {
                 "mode": self.embedding_mode,
@@ -85,11 +90,15 @@ def detect() -> Capabilities:
 
     forced = settings.saman_disable_optional
     sovereign = sovereign_mode()
+    #: Deliberate operator choices, reported but never counted as degradation.
+    notes: list[str] = []
 
     pinned = (settings.saman_tier1_engine or "auto").strip().lower()
+    linkage_pinned = False
     if pinned == "rapidfuzz":
         linkage = "rapidfuzz"
-        degraded.append("Tier 1 pinned to rapidfuzz by SAMAN_TIER1_ENGINE")
+        linkage_pinned = True
+        notes.append("Tier 1 pinned to rapidfuzz by SAMAN_TIER1_ENGINE")
     elif _importable("splink") and not forced:
         linkage = "splink"
     else:
@@ -126,7 +135,10 @@ def detect() -> Capabilities:
         embedding_mode=embedding,
         llm_mode=llm,
         sovereign_mode=sovereign,
-        degraded=degraded,
+        # Notes about deliberate choices are worth showing on the health panel,
+        # but they are not degradations and must not be counted as such.
+        degraded=degraded + notes,
+        linkage_pinned=linkage_pinned,
     )
 
 

@@ -1,0 +1,178 @@
+"""Regenerate the README screenshots from the running application (spec §8).
+
+Run via ``make screenshots``. The point of scripting this rather than cropping
+by hand is that the images cannot drift: every one is the built bundle, served
+by `vite preview`, talking to a real API over the demo database, driven through
+a real sign-in. If a screen breaks, the screenshot breaks with it.
+
+Requires the optional documentation tooling::
+
+    uv pip install --python backend/.venv/bin/python playwright
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+REPO = Path(__file__).resolve().parents[2]
+OUTPUT = REPO / "docs" / "screenshots"
+
+@dataclass
+class Shot:
+    """One screenshot, and whatever it takes to make the screen worth looking at.
+
+    An empty form photographs badly and says nothing about the feature, so the
+    screens that need input get driven first — a real query typed into
+    Smart-Create, a real dry run on the migration screen.
+    """
+
+    name: str
+    path: str
+    marker: str
+    theme: str = "light"
+    #: Steps run after the page settles and before the shutter.
+    setup: Callable[[Any], None] | None = None
+    settle_ms: int = 1_200
+
+
+#: A gate valve in a house style that appears nowhere in the catalogue --
+#: abbreviated, reordered, with a Hindi token -- which still resolves to the
+#: right material. It shows the three answers at once: the existing record, a
+#: different manufacturer's equivalent, and the near-misses the veto refused.
+SMART_CREATE_PROBE = "वाल्व GATE 32NB CL 300 CS FLGD 51.1 BAR KITZ"
+
+
+def _smart_create(page) -> None:
+    page.fill("#sc-description", SMART_CREATE_PROBE)
+    page.fill("#sc-uom", "NOS")
+    page.click("button:has-text('Check before creating')")
+    page.wait_for_selector("text=Already in the catalogue", timeout=20_000)
+
+
+def _migration_dry_run(page) -> None:
+    page.click("button:has-text('Run a dry run')")
+    page.wait_for_selector("text=Safe to apply", timeout=30_000)
+
+
+def _copilot(page) -> None:
+    page.fill("input[placeholder*='overpays']", "Which CPSE overpays for gaskets?")
+    page.keyboard.press("Enter")
+    # The answer types itself in; wait for the citations rather than a guess.
+    page.wait_for_selector("text=/cite|source|evidence|query/i", timeout=25_000)
+
+
+#: Ordered as the README tells the story, not as the router lists them.
+SHOTS: list[Shot] = [
+    Shot("home", "/", "text=Overview"),
+    Shot("search", "/search?q=6205", "text=Search"),
+    Shot("workbench", "/workbench", "text=Review", theme="dark"),
+    Shot("executive", "/dashboard/executive", "text=Analytics"),
+    Shot("opportunity", "/dashboard/opportunity", "text=Analytics", theme="dark"),
+    Shot("smart-create", "/smart-create", "text=Smart-Create", setup=_smart_create),
+    Shot("migration", "/migration", "text=ERP migration", setup=_migration_dry_run),
+    Shot("copilot", "/copilot", "text=Copilot", theme="dark", setup=_copilot),
+    Shot("audit", "/audit", "text=Governance"),
+    Shot("admin", "/admin", "text=Engine health"),
+]
+
+VIEWPORT = {"width": 1440, "height": 960}
+
+
+def capture(base_url: str, role: str, password: str) -> int:
+    try:
+        from playwright.sync_api import TimeoutError as PlaywrightTimeout
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print(__doc__.strip().splitlines()[-1])
+        print("playwright is not installed — see the module docstring.")
+        return 1
+
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    written, failed = [], []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        context = browser.new_context(viewport=VIEWPORT, device_scale_factor=2)
+        page = context.new_page()
+
+        # /login is a picker over the seeded accounts, not an email field:
+        # choose the role, then sign in.
+        page.goto(f"{base_url}/login", wait_until="networkidle")
+        page.click(f"li:has-text('{role}') button")
+        page.fill("input[type=password]", password)
+        page.click("button[type=submit]")
+        page.wait_for_url(f"{base_url}/", timeout=15_000)
+
+        for shot in SHOTS:
+            try:
+                _set_theme(page, shot.theme)
+                page.goto(f"{base_url}{shot.path}", wait_until="networkidle")
+                page.wait_for_selector(shot.marker, timeout=15_000)
+                if shot.setup:
+                    shot.setup(page)
+                # Charts draw in and KPIs count up; catching them mid-animation
+                # makes the platform look broken in a still image.
+                page.wait_for_timeout(shot.settle_ms)
+                destination = OUTPUT / f"{shot.name}.png"
+                page.screenshot(path=str(destination), full_page=False)
+                written.append(destination.name)
+                print(f"  {destination.relative_to(REPO)}  ({shot.theme})")
+            except PlaywrightTimeout as exc:
+                failed.append(f"{shot.name} ({shot.path})")
+                print(f"  !! {shot.name}: {str(exc).splitlines()[0]}")
+
+        browser.close()
+
+    print(f"\n{len(written)} screenshots in {OUTPUT.relative_to(REPO)}")
+    if failed:
+        print("failed: " + ", ".join(failed))
+        return 1
+    return 0
+
+
+def _set_theme(page, theme: str) -> None:
+    """Set the stored theme before navigation, so no frame renders the other one."""
+    page.add_init_script(
+        f"try {{ localStorage.setItem('saman.theme', '{theme}') }} catch (e) {{}}"
+    )
+    page.evaluate(
+        f"try {{ localStorage.setItem('saman.theme', '{theme}') }} catch (e) {{}}"
+    )
+
+
+def wait_for(base_url: str, seconds: int = 60) -> bool:
+    import urllib.error
+    import urllib.request
+
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(f"{base_url}/api/health", timeout=2) as response:
+                if response.status == 200:
+                    return True
+        except (urllib.error.URLError, OSError):
+            time.sleep(1)
+    return False
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-url", default="http://127.0.0.1:4173")
+    parser.add_argument("--role", default="registrar")
+    parser.add_argument("--password", default="demo")
+    args = parser.parse_args()
+
+    if not wait_for(args.base_url):
+        print(f"nothing serving {args.base_url} — start `make dev` or `make preview` first")
+        return 1
+    return capture(args.base_url, args.role, args.password)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

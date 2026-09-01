@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/primitives/Button'
@@ -183,7 +183,13 @@ export default function Search() {
               {(results?.items ?? []).map((hit) => (
                 <TR key={hit.item_id} onClick={() => navigate(`/items/${hit.item_id}`)}>
                   <TD>
-                    <span className="block max-w-xl truncate">{hit.description}</span>
+                    <Link
+                      to={`/items/${hit.item_id}`}
+                      className="block max-w-xl truncate hover:underline hover:underline-offset-4"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {hit.description}
+                    </Link>
                     {hit.cluster_size > 1 && (
                       <span className="micro-label">
                         shared with {hit.cluster_size - 1} other row

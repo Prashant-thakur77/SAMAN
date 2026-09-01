@@ -314,6 +314,33 @@ that could not be true:
   from 13.5s to 0.2s, still byte-identical; the plan is now windowed server-side
   with whole-plan totals, and rendered through a fixed-height virtualiser.
 
+### M9 findings
+
+- **A modal the keyboard could walk out of.** Tab from the ⌘K palette landed on
+  the page behind it, and closing it dropped focus at the top of the document.
+  Both are fixed and both are tested — forty tabs must all stay inside the
+  dialog, and the opener must get focus back.
+- **A single-page app announces nothing.** Activating a nav link swapped the
+  whole content column without moving focus or changing the document, so a
+  screen reader user got silence. Route changes now speak into a polite live
+  region and move focus to the main landmark, and there is a skip link past the
+  twelve sidebar entries.
+- **`role="button"` on a `<tr>`** took the row out of the table's structure,
+  leaving a reader unable to navigate the grid at all. Removed; the search rows
+  carry a real link instead, which is what the keyboard was missing anyway.
+- **A deliberate configuration was reported as a fault.** Pinning Tier 1 to
+  rapidfuzz made the health chip read "3 of 3 degraded". An indicator that cries
+  wolf about a chosen setting is one people learn to ignore, so a pin is now
+  reported as `selected_by: operator` and is not counted.
+- **The frontend had no tests at all.** Type-checking is not a test. Vitest now
+  covers the accessibility behaviours above and the row virtualiser, and runs in
+  CI alongside the backend suite.
+- **`certifi` is MPL-2.0 and sits in the required set.** File-scoped copyleft on
+  a CA bundle nobody modifies, so it is reported rather than fatal. The
+  `--hairline` token is 1.26:1 against the background, below the 3:1 that WCAG
+  1.4.11 wants for a control boundary; the palette is fixed by §1.1, so controls
+  are identified by their labels and a 19.8:1 focus ring instead.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

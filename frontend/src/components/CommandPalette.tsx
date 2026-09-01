@@ -20,6 +20,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const [hits, setHits] = useState<SearchHit[]>([])
   const [searching, setSearching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const reduce = useReducedMotion() ?? false
 
@@ -31,13 +32,45 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     )
   }, [query])
 
-  // Reset and focus each time the palette opens.
+  // Reset and focus each time the palette opens, and give focus back to
+  // whatever opened it on close. Without the second half, dismissing the
+  // palette drops a keyboard user at the top of the document.
   useEffect(() => {
     if (!open) return
+    const opener = document.activeElement as HTMLElement | null
     setQuery('')
     setCursor(0)
     const id = requestAnimationFrame(() => inputRef.current?.focus())
-    return () => cancelAnimationFrame(id)
+    return () => {
+      cancelAnimationFrame(id)
+      opener?.focus?.()
+    }
+  }, [open])
+
+  // Keep Tab inside the dialog. A modal the keyboard can walk out of is not
+  // modal — the reader ends up narrating the page behind it.
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusable = dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
   }, [open])
 
   useEffect(() => {
@@ -103,6 +136,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             aria-hidden
           />
           <motion.div
+            ref={dialogRef}
             variants={paletteVariants(reduce)}
             initial="initial"
             animate="animate"
@@ -130,12 +164,23 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               }}
               placeholder="Search SAMAN — pages, items, CNMC codes"
               aria-label="Search SAMAN"
+              role="combobox"
+              aria-expanded
+              aria-controls="palette-results"
+              aria-activedescendant={options[cursor] ? `palette-option-${cursor}` : undefined}
+              aria-autocomplete="list"
               className="h-12 w-full border-b border-hairline bg-transparent px-4 font-mono text-sm text-ink placeholder:text-muted focus-visible:ring-0"
             />
-            <ul className="max-h-80 overflow-y-auto py-1" role="listbox">
+            <ul
+              id="palette-results"
+              className="max-h-80 overflow-y-auto py-1"
+              role="listbox"
+              aria-label="Results"
+            >
               {options.map((option, i) => (
                 <li key={option.key}>
                   <button
+                    id={`palette-option-${i}`}
                     type="button"
                     role="option"
                     aria-selected={i === cursor}
@@ -160,6 +205,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 </li>
               )}
             </ul>
+            <p aria-live="polite" className="sr-only">
+              {searching
+                ? 'Searching'
+                : `${options.length} result${options.length === 1 ? '' : 's'}`}
+            </p>
             {hits.length > 0 && (
               <button
                 type="button"
