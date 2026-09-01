@@ -107,7 +107,10 @@ demo-restore:  ## Reset to the pre-baked demo snapshot in under 5s
 	@echo "!! Not built yet — the snapshot lands in M8B (spec §8A)."; exit 1
 
 licenses:  ## Regenerate THIRD_PARTY_LICENSES.md and fail on any GPL/AGPL dep
-	@echo "!! Not built yet — license tooling lands in M8 (spec §9)."; exit 1
+	cd backend && ../$(PY) scripts/licenses.py
+
+licenses-check:  ## Verify licenses without rewriting the file (CI gate)
+	cd backend && ../$(PY) scripts/licenses.py --check
 
 clean:  ## Remove build artefacts and caches (leaves data/ alone)
 	rm -rf frontend/dist frontend/node_modules/.vite

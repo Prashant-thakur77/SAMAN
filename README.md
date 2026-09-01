@@ -89,7 +89,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M6 | Copilot | **Done** |
 | M7 | Onboarding wizard, admin, audit explorer | **Done** |
 | M7.5 | Two-way ERP migration | **Done** |
-| M8 | Smart-Create, licensing | Smart-Create done |
+| M8 | Smart-Create, licensing | **Done** |
 | M8 | Smart-Create, licensing artefacts | Not started |
 | M8B | Demo survivability + performance | Not started |
 | M9 | Motion polish, a11y pass, screenshots | Not started |
@@ -421,13 +421,24 @@ are kept honest — partial is marked partial.
 
 ## Built with
 
-Third-party dependencies and their licenses. All permissive — no GPL or AGPL.
-`make licenses` regenerates [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)
-from `pip-licenses` and `license-checker` (wired in M8).
+Every dependency SAMAN requires is permissively licensed. `make licenses`
+regenerates [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) from
+`pip-licenses` and `license-checker` — 290 packages across both ecosystems — and
+**exits non-zero if any required dependency is GPL or AGPL**. CI runs it on
+every push.
+
+One finding worth stating plainly: **splink requires `igraph`, which is
+GPL-2.0.** It is not an extra of splink; it is a hard dependency. splink is
+itself optional in SAMAN — `make deps` does not install it, the demo does not
+run it, and the fallback engine measures slightly better here — so the required
+set stays clean and the licence check passes. Anyone who runs
+`make deps-optional` takes on that obligation, and the generated file says so at
+the top rather than burying it in a table. `certifi` is MPL-2.0, which is
+file-scoped copyleft on a CA bundle we do not modify.
 
 | Library | License | Used for |
 |---|---|---|
-| [splink](https://github.com/moj-analytical-services/splink) | MIT | Tier-1 probabilistic record linkage (Fellegi–Sunter) and match-weight waterfall — **optional**, see "Tier-1 engine" above |
+| [splink](https://github.com/moj-analytical-services/splink) | MIT (pulls GPL-2.0 `igraph`) | Tier-1 probabilistic record linkage (Fellegi–Sunter) and match-weight waterfall — **optional**, not installed by `make deps`; see "Tier-1 engine" above |
 | [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz) | MIT | Tier-1 string/token similarity — the default engine |
 | [sentence-transformers](https://www.sbert.net/) | Apache-2.0 | Tier-2 semantic embeddings (all-MiniLM-L6-v2) — **optional**; TF-IDF is the default |
 | [scikit-learn](https://scikit-learn.org/) | BSD-3-Clause | TF-IDF fallback path, metrics |
@@ -440,6 +451,11 @@ from `pip-licenses` and `license-checker` (wired in M8).
 
 **Deliberately excluded:** `zingg` (AGPL-3.0) — capable entity resolution, but
 copyleft would encumber a government handover.
+
+Four CI gates run on every push: `ruff` over the backend, the full pytest suite,
+a frontend type-check and production build, and the licence gate — which both
+refuses GPL/AGPL in the required set and fails if `THIRD_PARTY_LICENSES.md` is
+stale.
 
 ### What is original to SAMAN
 

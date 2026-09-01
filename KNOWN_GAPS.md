@@ -265,6 +265,25 @@ that could not be true:
   code needs to see. Equivalents and vetoed near-misses are now returned in
   their own lists.
 
+### M8 licensing findings
+
+- **splink requires GPL-2.0 `igraph`.** Not an extra — a hard dependency of the
+  spec-named Tier-1 engine. The required set stays clean because splink is
+  optional here and the demo runs the fallback, but this is exactly what §8's
+  build gate exists to catch, and it is stated at the top of the generated file
+  rather than buried in a table.
+- **`ruff` was never declared.** `make lint` and the CI gate both run it, and it
+  was installed on this machine by hand. The licence walk's "installed but not
+  declared" bucket found it, which is a better reason to keep that bucket than
+  any I would have argued for in advance.
+- **`pip-licenses` walks the whole of `sys.path`**, so it reported an unrelated
+  checkout on this machine as a SAMAN dependency. The inventory is now scoped to
+  distributions installed inside the virtualenv.
+- **Extras were being dropped.** `uvicorn[standard]` pulls in uvloop, httptools,
+  watchfiles and websockets; a walk that ignored the extra marker reported all
+  four as undeclared strays. The closure now follows the extras each requirement
+  actually requested.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**
