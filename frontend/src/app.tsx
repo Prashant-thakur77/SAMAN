@@ -3,6 +3,7 @@ import { Suspense, lazy } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 
 import { RequireRole } from './components/RequireRole'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { RouteTransition } from './components/RouteTransition'
 import { Shell } from './components/Shell'
 import Admin from './routes/Admin'
@@ -61,7 +62,9 @@ export default function App() {
     return (
       <AnimatePresence mode="wait">
         <RouteTransition key="login">
-          <Login />
+          <ErrorBoundary>
+            <Login />
+          </ErrorBoundary>
         </RouteTransition>
       </AnimatePresence>
     )
@@ -79,9 +82,13 @@ export default function App() {
               path={path}
               element={
                 <RouteTransition>
-                  <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
-                    {element}
-                  </Suspense>
+                  {/* Keyed on the path so navigating away from a broken screen
+                      resets the boundary rather than sticking on the error. */}
+                  <ErrorBoundary key={path}>
+                    <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
+                      {element}
+                    </Suspense>
+                  </ErrorBoundary>
                 </RouteTransition>
               }
             />

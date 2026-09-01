@@ -91,6 +91,7 @@ def reset_status() -> None:
         _status = PipelineStatus()
 
 
+
 # --------------------------------------------------------------------------
 # Stage: normalize + extract
 # --------------------------------------------------------------------------
@@ -195,7 +196,12 @@ def _stage_normalize_extract(db: Session, status: PipelineStatus) -> None:
 
 
 def run_pipeline(db: Session, stages: list[str] | None = None) -> PipelineStatus:
-    """Run the registered stages in order, recording progress as we go."""
+    """Run the registered stages in order, recording progress as we go.
+
+    The claim below is what makes a second concurrent run a no-op rather than a
+    corruption: the match stage deletes and rebuilds the pair and cluster
+    tables, so two runs interleaving would not be a slow demo but a wrong one.
+    """
     status = get_status()
     with _lock:
         if status.state == "running":

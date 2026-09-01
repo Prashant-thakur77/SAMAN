@@ -218,3 +218,54 @@ class TestDeterminism:
         # A record whose members yielded no attributes at all has nothing to
         # trace, so this is a strong majority rather than all.
         assert with_provenance / goldens > 0.9
+
+
+class TestConcurrency:
+    """The match stage deletes and rebuilds the pair and cluster tables."""
+
+    def test_a_second_run_is_a_no_op_while_one_is_in_flight(self, db, seeded):
+        import threading
+
+        from app import pipeline as pipeline_mod
+
+        pipeline_mod.reset_status()
+        entered = threading.Event()
+        release = threading.Event()
+        runs = []
+
+        def slow_stage(_db, _status):
+            runs.append(1)
+            entered.set()
+            release.wait(timeout=10)
+
+        original = dict(pipeline_mod.STAGES)
+        pipeline_mod.STAGES.clear()
+        pipeline_mod.STAGES["slow"] = slow_stage
+        try:
+            first = threading.Thread(
+                target=lambda: pipeline_mod.run_pipeline(db, ["slow"])
+            )
+            first.start()
+            assert entered.wait(timeout=10), "the first run never started"
+
+            # A second call while the first holds the claim must not run again.
+            pipeline_mod.run_pipeline(db, ["slow"])
+            assert len(runs) == 1
+
+            release.set()
+            first.join(timeout=10)
+        finally:
+            pipeline_mod.STAGES.clear()
+            pipeline_mod.STAGES.update(original)
+            pipeline_mod.reset_status()
+
+    def test_the_endpoint_reports_the_run_already_in_flight(self, as_registrar, seeded):
+        from app import pipeline as pipeline_mod
+
+        pipeline_mod.reset_status()
+        pipeline_mod.get_status().state = "running"
+        try:
+            body = as_registrar.post("/api/pipeline/run").json()
+            assert body["state"] == "running"
+        finally:
+            pipeline_mod.reset_status()

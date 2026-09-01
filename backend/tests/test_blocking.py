@@ -6,6 +6,7 @@ the blocker never emits is a pair the matcher is never asked about.
 
 import numpy as np
 
+from app import blocking
 from app.blocking import (
     ANN_K,
     BAND_MAX_BUCKET,
@@ -99,3 +100,49 @@ class TestAnnPass:
     def test_ann_is_wide_enough_to_matter(self):
         """Measured as the highest recall per candidate pair of any pass."""
         assert ANN_K >= 20
+
+
+class TestOversizedBuckets:
+    """Skipping a bucket outright cost 0.09 of blocking recall at 150k rows."""
+
+    def _stats(self, buckets, cap, **kwargs):
+        out: set[tuple[int, int]] = set()
+        stats = blocking.BlockingStats()
+        blocking._pairs_from_buckets(buckets, out, stats, "test", cap=cap, **kwargs)
+        return out, stats
+
+    def test_a_bucket_within_its_cap_is_compared_fully(self):
+        out, stats = self._stats({"k": [1, 2, 3]}, cap=10)
+        assert out == {(1, 2), (1, 3), (2, 3)}
+        assert stats.oversized_buckets == 0
+
+    def test_an_oversized_bucket_is_windowed_rather_than_dropped(self):
+        members = list(range(1, 41))
+        out, stats = self._stats({"k": members}, cap=10)
+        assert stats.oversized_buckets == 1
+        assert out, "a skipped bucket contributes nothing at all"
+        # Bounded: every member paired with at most `window` neighbours.
+        assert len(out) <= len(members) * blocking.OVERSIZED_WINDOW
+
+    def test_the_window_is_bounded_not_quadratic(self):
+        """The whole point: a 46,000-member bucket must not cost 1.1 billion
+        comparisons."""
+        members = list(range(2_000))
+        out, _ = self._stats({"k": members}, cap=10)
+        assert len(out) < len(members) * (blocking.OVERSIZED_WINDOW + 1)
+        assert len(out) < len(members) * (len(members) - 1) // 2
+
+    def test_the_bucket_is_sorted_before_windowing(self):
+        """Item order is load order, which groups a CPSE's own rows together —
+        the least useful ordering, since duplicates live across CPSEs."""
+        members = [1, 2, 3, 4]
+        sort_key = {1: "ZZZ", 2: "AAA", 3: "ZZY", 4: "AAB"}
+        out, _ = self._stats({"k": members}, cap=2, sort_key=sort_key)
+        # Sorted order is 2, 4, 3, 1 — so the AAA/AAB pair must be present.
+        assert (2, 4) in out
+
+    def test_a_pass_can_opt_out_of_windowing(self):
+        """A token bucket overflows because the token is "BEARING"."""
+        out, stats = self._stats({"k": list(range(50))}, cap=5, window_oversized=False)
+        assert stats.oversized_buckets == 1
+        assert out == set()
