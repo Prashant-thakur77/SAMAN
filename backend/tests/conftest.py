@@ -62,6 +62,22 @@ def seeded():
     return summary
 
 
+@pytest.fixture(scope="session")
+def pipeline_run(seeded):
+    """Seed, then run the whole pipeline once for the session.
+
+    The matching stages are the slow part, so tests that need clusters, golden
+    records or metrics share a single run.
+    """
+    from app.metrics import compute_metrics
+    from app.pipeline import run_pipeline
+
+    with SessionLocal() as db:
+        status = run_pipeline(db)
+        assert status.state == "done", status.error
+        return {"summary": seeded, "metrics": compute_metrics(db)}
+
+
 @pytest.fixture
 def db():
     with SessionLocal() as session:

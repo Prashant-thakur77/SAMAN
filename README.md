@@ -23,9 +23,12 @@ optional dependency degrades to a working fallback rather than failing.
 
 ```bash
 make setup     # creates backend/.venv on Python 3.12, installs both apps
-make seed      # generates the synthetic catalogue estate (~12k items, 4 CPSEs)
+make demo      # seeds, runs the pipeline, prints the held-out metrics table
 make dev       # API on :8000, UI on :5173
 ```
+
+`make demo` exits non-zero if the §8 M3 gate is not met, so it doubles as the
+quality check.
 
 Sign in with any seeded account — `steward@cpcl.in`, `registrar@min.gov.in`,
 `approver@min.gov.in` and others are listed on the login screen. Every one uses
@@ -69,7 +72,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 |---|---|---|
 | M1 | Scaffold, design tokens, theme, shell, routing + transitions | **Done** |
 | M2 | Models, auth, seed data, ingest, normalize, extract | **Done** |
-| M3 | Embeddings, blocking, tiered match, veto layer, clustering, CNMC, metrics | Not started |
+| M3 | Embeddings, blocking, tiered match, veto layer, clustering, CNMC, metrics | **Done** |
 | M3.4 | Golden-record standardization + provenance | Not started |
 | M3.5 | Functional-equivalence engine | Not started |
 | M4 | Workbench, decisions, role gates, audit chain | Not started |
@@ -98,6 +101,7 @@ metrics do.
 | Planted near-miss traps | 400 products / 1,020 pairs | same |
 | Purchase-history rows | ~21,400 | ~279,500 |
 | Seed + normalize + extract | **2.4 s** | **29.5 s** (~5,300 rows/s) |
+| Full pipeline (`make demo`) | **84 s** | not run — benchmark profile is for load testing only |
 
 Measured on a laptop CPU, single process, no GPU. The demo profile is what every
 screenshot, demo flow and metric gate uses; the benchmark profile exists only
@@ -115,6 +119,48 @@ held-out 40% (§0.6).
 
 ---
 
+## Results
+
+Measured on the **held-out 40%** of ground truth. Thresholds are chosen by
+`make tune`, which reads the 60% tuning split only — nothing below was tuned
+against these numbers.
+
+| M3 gate (spec §8) | Result | Target |
+|---|---|---|
+| Duplicate precision | **0.983** | ≥ 0.92 |
+| Duplicate recall | **0.929** | ≥ 0.80 |
+| Blocking recall | **0.984** | ≥ 0.97 |
+| Veto precision on planted traps | **1.000** | ≥ 0.98 |
+
+A single averaged number would hide more than it shows, so the full report at
+`GET /api/metrics` also carries:
+
+| | Precision | Recall | F1 |
+|---|---|---|---|
+| Pairwise | 0.983 | 0.929 | 0.955 |
+| **B-cubed (cluster level)** | 0.994 | 0.971 | 0.982 |
+| Naive baseline: exact text match | 1.000 | 0.038 | 0.074 |
+
+Pairwise scores can look excellent while clusters are catastrophically
+over-merged, so B-cubed is reported beside them. The baseline is what a plain
+exact-match de-duplication achieves on the same data: it is perfectly precise
+and finds 4% of the duplicates.
+
+**Veto layer**, on the planted near-miss traps: 416 of 416 correctly refused.
+
+| Trap | Accuracy |
+|---|---|
+| Identity-critical mismatch (bore 25 mm vs 30 mm) | 1.00 |
+| Performance outside the band (200 kg vs 500 kg) | 1.00 |
+| Cross-brand equivalent (SKF / FAG / NSK) | 1.00 |
+| Directed substitute (class 300 vs 600) | 1.00 |
+| Performance inside the band — must still merge | 0.82 |
+
+Per class, the weakest is named rather than averaged away: `chemical.reagent`
+at F1 0.905. Automation rate is 0.994, leaving 3,607 pairs for human review.
+
+---
+
 ## Problem-statement traceability
 
 Every capability named in SIH26099, and where it lives in this build. Statuses
@@ -122,11 +168,11 @@ are kept honest — partial is marked partial.
 
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
-| AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | Not started (M3) |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine | Not started (M3, M3.5) |
+| AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine | Partial — duplicates done (P 0.98 / R 0.93); the directed equivalence engine is M3.5 |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | Not started (M3.4) |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
-| Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | Not started (M3) |
+| Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |
 | Mapping of existing CPSE codes to the common national code | mapping block on the item page | Not started (M3.4) |
 | Legacy code rationalization and migration support | plan → dry-run → apply → rollback | Not started (M7.5) |
 | User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | Partial — separation of duties enforced (§0.9); workbench lands in M4 |

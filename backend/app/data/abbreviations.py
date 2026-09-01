@@ -52,7 +52,7 @@ DESCRIPTORS = {
     "LH": "LEFT HAND", "RH": "RIGHT HAND",
     "MAX": "MAXIMUM", "MIN": "MINIMUM", "NOM": "NOMINAL", "APPROX": "APPROXIMATE",
     "TEMP": "TEMPERATURE", "PRESS": "PRESSURE", "PR": "PRESSURE",
-    "CL": "CLASS", "GR": "GRADE", "GRD": "GRADE", "TYP": "TYPE",
+    "CL": "CLASS", "GRD": "GRADE", "TYP": "TYPE",
     "STD": "STANDARD", "SPEC": "SPECIFICATION",
     "W/": "WITH", "W/O": "WITHOUT",
 }

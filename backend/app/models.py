@@ -347,6 +347,21 @@ class AuditEvent(Base):
     hash: Mapped[str] = mapped_column(String(64))
 
 
+class MatchRun(Base):
+    """One pipeline matching run, with the statistics behind it.
+
+    Blocking recall (§2A.1) can only be measured while the candidate set is in
+    memory — persisting every candidate pair would mean hundreds of thousands
+    of rows for a number. The run record keeps the measurement instead.
+    """
+
+    __tablename__ = "match_run"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    stats_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 # --------------------------------------------------------------------------
 # Ground truth — never read by the pipeline, only by metrics (§0.6)
 # --------------------------------------------------------------------------

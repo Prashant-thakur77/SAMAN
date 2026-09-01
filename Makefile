@@ -13,7 +13,7 @@ UVICORN     := $(VENV)/bin/uvicorn
 PYTEST      := $(VENV)/bin/pytest
 
 .PHONY: help setup venv deps deps-optional web-deps dev backend frontend test \
-        lint build clean licenses seed seed-large pipeline demo demo-restore
+        lint build clean licenses seed seed-large pipeline demo demo-restore tune
 
 help:  ## Show available targets
 	@echo "SAMAN — make targets"
@@ -98,7 +98,10 @@ pipeline:  ## Run the pipeline over any unprocessed rows
 	cd backend && ../$(PY) -m app.cli pipeline
 
 demo:  ## Seed, run the pipeline, print the held-out metrics table
-	@echo "!! Not built yet — needs the matching engine and metrics from M3."; exit 1
+	cd backend && ../$(PY) -m app.cli demo --profile demo
+
+tune:  ## Sweep match thresholds on the tuning split (never on held-out)
+	cd backend && ../$(PY) -m app.cli tune
 
 demo-restore:  ## Reset to the pre-baked demo snapshot in under 5s
 	@echo "!! Not built yet — the snapshot lands in M8B (spec §8A)."; exit 1

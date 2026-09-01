@@ -1,0 +1,101 @@
+"""Multi-pass candidate generation — spec §2A.1.
+
+Blocking failures are invisible in precision and matcher recall alike: a pair
+the blocker never emits is a pair the matcher is never asked about.
+"""
+
+import numpy as np
+
+from app.blocking import (
+    ANN_K,
+    BAND_MAX_BUCKET,
+    TOKEN_MAX_BUCKET,
+    ItemKey,
+    content_tokens,
+    generate_candidates,
+)
+
+
+def key(item_id, text, cls="bearing.ball.deep_groove", mpn=None, band=None, gtin=None):
+    import hashlib
+
+    return ItemKey(
+        id=item_id,
+        class_code=cls,
+        norm_text=text,
+        norm_hash=hashlib.sha256(text.encode()).hexdigest(),
+        mpn_norm=mpn,
+        gtin=gtin,
+        block_value=band,
+    )
+
+
+class TestPasses:
+    def test_shared_mpn_produces_a_candidate(self):
+        pairs, _ = generate_candidates([key(1, "A", mpn="62052Z"), key(2, "B", mpn="62052Z")])
+        assert (1, 2) in pairs
+
+    def test_shared_gtin_produces_a_candidate(self):
+        pairs, _ = generate_candidates(
+            [key(1, "A", gtin="12345678"), key(2, "B", gtin="12345678")]
+        )
+        assert (1, 2) in pairs
+
+    def test_identical_text_produces_a_candidate(self):
+        pairs, _ = generate_candidates([key(1, "BEARING 6205"), key(2, "BEARING 6205")])
+        assert (1, 2) in pairs
+
+    def test_shared_band_produces_a_candidate(self):
+        pairs, _ = generate_candidates([key(1, "X ALPHA", band="25"), key(2, "Y BETA", band="25")])
+        assert (1, 2) in pairs
+
+    def test_shared_rare_token_produces_a_candidate(self):
+        """A rare token is a strong key even when everything else differs."""
+        pairs, _ = generate_candidates(
+            [key(1, "BEARING SPECIALTOKEN9 ALPHA"), key(2, "GASKET SPECIALTOKEN9 BETA")]
+        )
+        assert (1, 2) in pairs
+
+    def test_unrelated_items_are_not_paired(self):
+        pairs, _ = generate_candidates([key(1, "ALPHA ONE"), key(2, "BETA TWO", cls="valve.gate")])
+        assert pairs == set()
+
+    def test_pairs_are_order_independent(self):
+        pairs, _ = generate_candidates([key(9, "A", mpn="X1234"), key(2, "B", mpn="X1234")])
+        assert (2, 9) in pairs and (9, 2) not in pairs
+
+
+class TestBucketCaps:
+    def test_an_oversized_bucket_is_skipped_and_reported(self):
+        """An undiscriminating key must not cost quadratic time silently."""
+        items = [key(i, "SAME TEXT EVERYWHERE", band="25") for i in range(BAND_MAX_BUCKET + 50)]
+        _, stats = generate_candidates(items)
+        assert stats.oversized_buckets > 0
+        assert stats.largest_bucket >= BAND_MAX_BUCKET
+
+    def test_caps_are_reported_in_the_stats(self):
+        _, stats = generate_candidates([key(1, "A"), key(2, "B")])
+        caps = stats.as_dict()["bucket_caps"]
+        assert caps["class_band"] == BAND_MAX_BUCKET and caps["token"] == TOKEN_MAX_BUCKET
+
+
+class TestTokens:
+    def test_short_tokens_are_not_blocking_keys(self):
+        assert "AB" not in content_tokens("AB BEARING")
+
+    def test_content_tokens_are_deduplicated(self):
+        assert content_tokens("BEARING BEARING 6205") == {"BEARING", "6205"}
+
+
+class TestAnnPass:
+    def test_near_neighbours_become_candidates(self):
+        vectors = np.array([[1.0, 0.0], [0.99, 0.14], [0.0, 1.0]], dtype=np.float32)
+        vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
+        items = [key(1, "ALPHA"), key(2, "BETA"), key(3, "GAMMA")]
+        pairs, stats = generate_candidates(items, vectors, {1: 0, 2: 1, 3: 2})
+        assert (1, 2) in pairs
+        assert stats.per_pass["ann"] > 0
+
+    def test_ann_is_wide_enough_to_matter(self):
+        """Measured as the highest recall per candidate pair of any pass."""
+        assert ANN_K >= 20

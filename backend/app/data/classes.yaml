@@ -107,7 +107,9 @@ classes:
     noun: CHEMICAL
     keywords: [chemical, acid, caustic, solvent, reagent, hydroxide, chloride, carbonate,
                sulphuric, nitric, phosphoric, acetic, methanol, ethanol, alcohol,
-               isopropyl, acetone, sodium, potassium, calcium]
+               isopropyl, acetone, sodium, potassium, calcium, toluene, xylene,
+               hexane, ammonium, sulphate, permanganate, peroxide, citric,
+               oxalic, boric]
     block_on: concentration_pct
     template: '{noun}, {substance}, {grade} GRADE, {concentration_pct}PCT, {brand} {mpn}'
     attributes:

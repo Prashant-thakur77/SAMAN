@@ -303,9 +303,36 @@ def _decode(class_code: str, index: int) -> dict[str, object]:
     return combo
 
 
-def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Product:
+#: Catalogue-number family prefix per class.
+_MPN_FAMILY = {
+    "valve.gate": "GV", "gasket.spiral_wound": "SW", "pipe.seamless": "SP",
+    "fastener.bolt.hex": "HB", "cable.power": "PW", "chemical.reagent": "CH",
+    "ppe.helmet": "HL",
+}
+
+
+def bearing_mpn(designation: str, seal: str, brand: str, load_class: str, temp: int) -> str:
+    """A bearing part number that identifies exactly one product.
+
+    Manufacturers do this with variant suffixes (6205-2Z/C3), so two bearings
+    sharing a designation but rated differently carry different numbers. An MPN
+    that mapped to several products would be a false anchor key: same number,
+    conflicting specifications, which the matcher would rightly raise as a
+    data-quality conflict.
+    """
+    suffix = "-2RS" if seal == "2RS" else "" if seal == "OPEN" else _BEARING_BRAND_SUFFIX.get(brand, "-2Z")
+    variant = "" if (load_class == "STD" and temp == 120) else f"/{load_class[0]}{temp}"
+    return f"{designation}{suffix}{variant}"
+
+
+def _finalize(
+    class_code: str, combo: dict, rng: random.Random, gid: str, index: int = 0
+) -> Product:
     """Turn a decoded combination into a Product, deriving dependent attributes."""
     brand = rng.choice(BRANDS_FOR[class_code])
+    # Opaque catalogue number keyed to the exact combination, so no two
+    # distinct products can ever share an anchor key.
+    catalogue = f"{brand[:3]}-{_MPN_FAMILY.get(class_code, 'XX')}{index:05d}"
 
     if class_code == "bearing.ball.deep_groove":
         designation = str(combo["designation"])
@@ -318,13 +345,12 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "load_rating_kg": float(base_rating * _LOAD_MULTIPLIER[str(combo["load_class"])]),
             "temp_max_c": combo["temp_max_c"],
         }
-        suffix = _BEARING_BRAND_SUFFIX.get(brand, "-2Z")
-        if combo["seal_type"] == "2RS":
-            suffix = "-2RS"
-        elif combo["seal_type"] == "OPEN":
-            suffix = ""
-        return Product(gid, class_code, attrs, brand, f"{designation}{suffix}" or None,
-                       round(bore * rng.uniform(18, 45), 2))
+        return Product(
+            gid, class_code, attrs, brand,
+            bearing_mpn(designation, str(combo["seal_type"]), brand,
+                        str(combo["load_class"]), int(combo["temp_max_c"])),
+            round(bore * rng.uniform(18, 45), 2),
+        )
 
     if class_code == "valve.gate":
         size = int(combo["size_nb_mm"])
@@ -336,7 +362,7 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "pressure_bar": VALVE_CLASS_BAR[pclass],
             "temp_max_c": combo["temp_max_c"],
         }
-        return Product(gid, class_code, attrs, brand, f"{brand[:3]}-GV{size}-{pclass}",
+        return Product(gid, class_code, attrs, brand, catalogue,
                        round(size * float(pclass) * rng.uniform(0.9, 1.6), 2))
 
     if class_code == "gasket.spiral_wound":
@@ -347,7 +373,7 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "temp_max_c": combo["temp_max_c"],
         }
         return Product(gid, class_code, attrs, brand,
-                       f"{brand[:3]}-SW{size}-{combo['pressure_class']}",
+                       catalogue,
                        round(size * rng.uniform(3, 9), 2))
 
     if class_code == "pipe.seamless":
@@ -357,7 +383,7 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "material": combo["material"], "pressure_bar": combo["pressure_bar"],
             "length_m": 6.0,
         }
-        return Product(gid, class_code, attrs, brand, f"{brand[:3]}-SP{size}",
+        return Product(gid, class_code, attrs, brand, catalogue,
                        round(size * rng.uniform(9, 22), 2))
 
     if class_code == "fastener.bolt.hex":
@@ -368,7 +394,7 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "length_mm": float(length), "grade": combo["grade"],
             "material": combo["material"], "finish": rng.choice(FINISHES),
         }
-        return Product(gid, class_code, attrs, brand, f"{brand[:3]}-HB{nominal}X{length}",
+        return Product(gid, class_code, attrs, brand, catalogue,
                        round(nominal * length * rng.uniform(0.02, 0.08), 2))
 
     if class_code == "cable.power":
@@ -379,7 +405,7 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "voltage_v": combo["voltage_v"], "conductor": combo["conductor"],
             "insulation": combo["insulation"], "temp_max_c": combo["temp_max_c"],
         }
-        return Product(gid, class_code, attrs, brand, f"{brand[:3]}-PWR{cores}X{csa}",
+        return Product(gid, class_code, attrs, brand, catalogue,
                        round(cores * csa * rng.uniform(9, 20), 2))
 
     if class_code == "chemical.reagent":
@@ -387,8 +413,7 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "substance": combo["substance"], "grade": combo["grade"],
             "concentration_pct": combo["concentration_pct"],
         }
-        return Product(gid, class_code, attrs, brand,
-                       f"{brand[:3]}-{str(combo['substance'])[:3]}{int(combo['concentration_pct'])}",
+        return Product(gid, class_code, attrs, brand, catalogue,
                        round(rng.uniform(400, 4500), 2))
 
     if class_code == "ppe.helmet":
@@ -400,7 +425,7 @@ def _finalize(class_code: str, combo: dict, rng: random.Random, gid: str) -> Pro
             "brim": combo["brim"], "colour": rng.choice(COLOURS),
         }
         return Product(gid, class_code, attrs, brand,
-                       f"{brand[:3]}-HL{combo['helmet_class']}",
+                       catalogue,
                        round(rng.uniform(180, 900), 2))
 
     raise ValueError(f"no finalizer for class {class_code!r}")
@@ -692,8 +717,8 @@ def _plant_traps(
         used[class_code].add(index_b)
 
         combo_a, combo_b = _decode(class_code, index_a), _decode(class_code, index_b)
-        a = _finalize(class_code, combo_a, rng, gid())
-        b = _finalize(class_code, combo_b, rng, gid())
+        a = _finalize(class_code, combo_a, rng, gid(), index_a)
+        b = _finalize(class_code, combo_b, rng, gid(), index_b)
         # A trap only works if both sides reach at least two catalogues.
         a.spread = b.spread = 2
         a.tags.append("trap")
@@ -738,8 +763,10 @@ def _plant_traps(
         if index_a is None or index_b is None:
             continue
         used["bearing.ball.deep_groove"].update({index_a, index_b})
-        a = _finalize("bearing.ball.deep_groove", _decode("bearing.ball.deep_groove", index_a), rng, gid())
-        b = _finalize("bearing.ball.deep_groove", _decode("bearing.ball.deep_groove", index_b), rng, gid())
+        a = _finalize("bearing.ball.deep_groove",
+                      _decode("bearing.ball.deep_groove", index_a), rng, gid(), index_a)
+        b = _finalize("bearing.ball.deep_groove",
+                      _decode("bearing.ball.deep_groove", index_b), rng, gid(), index_b)
         a.spread = b.spread = 2
         b.brand = a.brand
         a.tags.append("trap")
@@ -763,11 +790,14 @@ def _plant_traps(
             combo["seal_type"] = "ZZ"
         trio = []
         for brand in ("SKF", "FAG", "NSK"):
-            product = _finalize("bearing.ball.deep_groove", dict(combo), rng, gid())
+            product = _finalize("bearing.ball.deep_groove", dict(combo), rng, gid(), index)
             product.brand = brand
-            designation = str(combo["designation"])
-            suffix = _BEARING_BRAND_SUFFIX[brand] if combo["seal_type"] == "ZZ" else "-2RS"
-            product.mpn = f"{designation}{suffix}"
+            # Same physical bearing, three manufacturers' numbers: the
+            # interchangeability case (§2B), not a duplicate.
+            product.mpn = bearing_mpn(
+                str(combo["designation"]), str(combo["seal_type"]), brand,
+                str(combo["load_class"]), int(combo["temp_max_c"]),
+            )
             product.spread = 2
             product.tags.append("crossbrand")
             trio.append(product)
@@ -797,8 +827,8 @@ def _plant_traps(
         if index_a is None or index_b is None:
             continue
         used["valve.gate"].update({index_a, index_b})
-        a = _finalize("valve.gate", _decode("valve.gate", index_a), rng, gid())
-        b = _finalize("valve.gate", _decode("valve.gate", index_b), rng, gid())
+        a = _finalize("valve.gate", _decode("valve.gate", index_a), rng, gid(), index_a)
+        b = _finalize("valve.gate", _decode("valve.gate", index_b), rng, gid(), index_b)
         a.spread = b.spread = 2
         b.brand = a.brand
         a.tags.append("trap")
@@ -880,7 +910,7 @@ def build_products(
         taken[cls].update(indices)
         for index in indices:
             counter += 1
-            products.append(_finalize(cls, _decode(cls, index), rng, f"G{counter:06d}"))
+            products.append(_finalize(cls, _decode(cls, index), rng, f"G{counter:06d}", index))
 
     # Interleave classes so the shared/singleton cut is not one class deep.
     rng.shuffle(products)

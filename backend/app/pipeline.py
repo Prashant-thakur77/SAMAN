@@ -206,3 +206,331 @@ def run_pipeline(db: Session, stages: list[str] | None = None) -> PipelineStatus
         status.stage = None
         status.finished_at = time.time()
     return status
+
+
+# --------------------------------------------------------------------------
+# Stage: embed
+# --------------------------------------------------------------------------
+
+
+@register_stage("embed")
+def _stage_embed(db: Session, status: PipelineStatus) -> None:
+    """Fit the embedder over the whole corpus and persist one vector per item."""
+    from sqlalchemy import update
+
+    from .embed import Embedder, pack
+    from .models import Item as ItemModel
+
+    rows = db.execute(select(ItemModel.id, ItemModel.norm_text).order_by(ItemModel.id)).all()
+    status.rows_total = len(rows)
+    status.rows_done = 0
+    if not rows:
+        return
+
+    result = Embedder().fit_transform([text or "" for _, text in rows])
+    status.stage = f"embed ({result.mode})"
+
+    updates = [
+        {"id": item_id, "embed_vector": pack(result.vectors[i])}
+        for i, (item_id, _) in enumerate(rows)
+    ]
+    for i in range(0, len(updates), BATCH):
+        db.execute(update(ItemModel), updates[i : i + BATCH])
+        db.commit()
+        status.rows_done = min(i + BATCH, len(updates))
+    status.rows_done = len(updates)
+
+
+# --------------------------------------------------------------------------
+# Stage: block + match
+# --------------------------------------------------------------------------
+
+
+def _block_value(class_code: str, attrs: dict) -> str | None:
+    from .taxonomy import get_schema
+
+    block_on = get_schema(class_code).block_on
+    if not block_on:
+        return None
+    value = attrs.get(block_on)
+    return None if value is None else str(value)
+
+
+@register_stage("match")
+def _stage_match(db: Session, status: PipelineStatus) -> None:
+    """Generate candidates, score every pair, persist the decisions worth keeping."""
+    import numpy as np
+
+    from .blocking import ItemKey, generate_candidates
+    from .match import candidate_from_row, match_pair
+    from .metrics import measure_blocking_recall
+    from .models import Item as ItemModel
+    from .models import MatchRun, Pair, ReviewTask
+
+    rows = db.execute(
+        select(
+            ItemModel.id,
+            ItemModel.class_code,
+            ItemModel.class_confidence,
+            ItemModel.norm_text,
+            ItemModel.norm_hash,
+            ItemModel.mpn_norm,
+            ItemModel.gtin,
+            ItemModel.attrs_json,
+            ItemModel.embed_vector,
+        ).order_by(ItemModel.id)
+    ).all()
+    if not rows:
+        return
+
+    candidates = {row[0]: candidate_from_row(row) for row in rows}
+
+    keys = [
+        ItemKey(
+            id=c.id,
+            class_code=c.class_code,
+            norm_text=c.norm_text,
+            norm_hash=c.norm_hash,
+            mpn_norm=c.mpn_norm,
+            gtin=c.gtin,
+            block_value=_block_value(c.class_code, c.attrs),
+        )
+        for c in candidates.values()
+    ]
+
+    ordered_ids = [c.id for c in candidates.values()]
+    index_by_id = {item_id: i for i, item_id in enumerate(ordered_ids)}
+    first = candidates[ordered_ids[0]].vector
+    vectors = (
+        np.vstack([candidates[i].vector for i in ordered_ids]) if first is not None else None
+    )
+
+    pairs, blocking_stats = generate_candidates(keys, vectors, index_by_id)
+    status.rows_total = len(pairs)
+    status.rows_done = 0
+
+    bands: dict[str, int] = {}
+    verdicts: dict[str, int] = {}
+    accepted: list[tuple[int, int]] = []
+    persist: list[dict] = []
+    equivalence_candidates = 0
+
+    for n, (a, b) in enumerate(pairs, start=1):
+        result = match_pair(candidates[a], candidates[b])
+        bands[result.band] = bands.get(result.band, 0) + 1
+        verdicts[result.verdict] = verdicts.get(result.verdict, 0) + 1
+        if result.equivalence:
+            equivalence_candidates += 1
+
+        if result.verdict == "duplicate":
+            accepted.append((a, b))
+
+        # A vetoed pair is kept even though it was refused: "not a duplicate,
+        # bore 25 mm vs 30 mm" is exactly the evidence a reviewer needs. But
+        # only when the pair looked plausible in the first place — storing every
+        # refused pair in a class would be a million rows for no added insight.
+        looks_plausible = result.tier_scores.get("tier1_fuzzy", 0.0) >= 0.80
+        if result.band != "low" or (result.veto is not None and looks_plausible):
+            persist.append(
+                {
+                    "item_a": result.item_a,
+                    "item_b": result.item_b,
+                    "tier_scores_json": json.dumps(result.tier_scores, sort_keys=True),
+                    "verdict": result.verdict,
+                    "band": result.band,
+                    "confidence": result.confidence,
+                    "veto_json": json.dumps(result.veto, sort_keys=True, default=str)
+                    if result.veto
+                    else None,
+                    "evidence_json": json.dumps(
+                        {**result.evidence, "equivalence": result.equivalence},
+                        sort_keys=True,
+                        default=str,
+                    ),
+                }
+            )
+        if n % 5000 == 0:
+            status.rows_done = n
+
+    status.rows_done = len(pairs)
+
+    # Review tasks reference pairs, so the derived layer goes first.
+    db.query(ReviewTask).delete()
+    db.query(Pair).delete()
+    for i in range(0, len(persist), BATCH):
+        db.execute(insert(Pair), persist[i : i + BATCH])
+    db.commit()
+
+    stats = {
+        "blocking": {**blocking_stats.as_dict(), **measure_blocking_recall(db, pairs)},
+        "bands": bands,
+        "verdicts": verdicts,
+        "accepted_pairs": len(accepted),
+        "persisted_pairs": len(persist),
+        "equivalence_candidates": equivalence_candidates,
+        "items": len(candidates),
+    }
+    db.execute(insert(MatchRun), [{"stats_json": json.dumps(stats, sort_keys=True)}])
+    db.commit()
+
+
+# --------------------------------------------------------------------------
+# Stage: cluster + golden drafts
+# --------------------------------------------------------------------------
+
+
+@register_stage("cluster")
+def _stage_cluster(db: Session, status: PipelineStatus) -> None:
+    """Connected components over accepted pairs, then a golden draft each."""
+    from .cluster import build_clusters, draft_golden, refine_clusters
+    from .models import (
+        Cluster,
+        ClusterMember,
+        Cnmc,
+        GoldenRecord,
+        Item as ItemModel,
+        Pair,
+        ReviewTask,
+    )
+
+    rows = db.execute(
+        select(ItemModel.id, ItemModel.norm_text, ItemModel.class_code, ItemModel.attrs_json)
+    ).all()
+    if not rows:
+        return
+
+    members_by_id = {
+        item_id: {
+            "id": item_id,
+            "norm_text": norm_text or "",
+            "class_code": class_code,
+            "attrs": json.loads(attrs_json or "{}"),
+        }
+        for item_id, norm_text, class_code, attrs_json in rows
+    }
+
+    # A CNMC, once issued, is immutable — so is the cluster it was issued
+    # against. Those clusters are left exactly as they are and their members
+    # are held out of re-clustering; everything else is rebuilt from the pair
+    # graph. Without this, re-running the pipeline would try to delete golden
+    # records that codes already point at.
+    frozen_clusters = set(
+        db.execute(
+            select(GoldenRecord.cluster_id)
+            .join(Cnmc, Cnmc.golden_id == GoldenRecord.id)
+        ).scalars().all()
+    )
+    frozen_items = set(
+        db.execute(
+            select(ClusterMember.item_id).where(
+                ClusterMember.cluster_id.in_(frozen_clusters)
+            )
+        ).scalars().all()
+    ) if frozen_clusters else set()
+
+    accepted = [
+        (a, b)
+        for a, b in db.execute(
+            select(Pair.item_a, Pair.item_b).where(Pair.verdict == "duplicate")
+        ).all()
+        if a not in frozen_items and b not in frozen_items
+    ]
+    conflicted = {
+        item
+        for a, b in db.execute(
+            select(Pair.item_a, Pair.item_b).where(Pair.verdict == "conflict")
+        ).all()
+        for item in (a, b)
+    }
+
+    rebuildable = [i for i in members_by_id if i not in frozen_items]
+    groups = build_clusters(accepted, rebuildable)
+
+    # Transitive closure can chain distinct products together through an
+    # intermediate match. Split any cluster that contains a vetoed pair (§2A).
+    degree: dict[int, int] = {}
+    for a, b in accepted:
+        degree[a] = degree.get(a, 0) + 1
+        degree[b] = degree.get(b, 0) + 1
+    attrs_by_id = {i: m["attrs"] for i, m in members_by_id.items()}
+    class_by_id = {i: m["class_code"] for i, m in members_by_id.items()}
+    mpn_by_id = dict(db.execute(select(ItemModel.id, ItemModel.mpn_norm)).all())
+
+    refined: list[list[int]] = []
+    splits = 0
+    for member_ids in groups.values():
+        parts = refine_clusters(member_ids, attrs_by_id, class_by_id, mpn_by_id, degree)
+        splits += len(parts) - 1
+        refined.extend(parts)
+
+    status.rows_total = len(refined)
+    status.rows_done = 0
+
+    # Rebuild the derived layer for everything not pinned by an issued code.
+    # Order matters: review tasks reference pairs, codes reference goldens.
+    db.query(ReviewTask).delete()
+    if frozen_clusters:
+        db.query(GoldenRecord).filter(
+            GoldenRecord.cluster_id.notin_(frozen_clusters)
+        ).delete(synchronize_session=False)
+        db.query(ClusterMember).filter(
+            ClusterMember.cluster_id.notin_(frozen_clusters)
+        ).delete(synchronize_session=False)
+        db.query(Cluster).filter(Cluster.id.notin_(frozen_clusters)).delete(
+            synchronize_session=False
+        )
+    else:
+        db.query(GoldenRecord).delete()
+        db.query(ClusterMember).delete()
+        db.query(Cluster).delete()
+    db.commit()
+
+    for n, member_ids in enumerate(refined, start=1):
+        drafts = [members_by_id[i] for i in member_ids]
+        has_conflict = any(i in conflicted for i in member_ids)
+        draft = draft_golden(drafts, conflicted=has_conflict)
+
+        cluster = Cluster(status=draft.status)
+        db.add(cluster)
+        db.flush()
+        db.execute(
+            insert(ClusterMember),
+            [{"cluster_id": cluster.id, "item_id": i} for i in member_ids],
+        )
+        db.execute(
+            insert(GoldenRecord),
+            [
+                {
+                    "cluster_id": cluster.id,
+                    "std_description": draft.std_description,
+                    "attrs_json": json.dumps(draft.attrs, sort_keys=True, default=str),
+                    "status": draft.status,
+                }
+            ],
+        )
+        if n % 500 == 0:
+            db.commit()
+            status.rows_done = n
+    db.commit()
+    status.rows_done = len(refined)
+
+    # Review queue: one task per pair a human still has to decide.
+    tasks = [
+        {
+            "pair_id": pair_id,
+            "band": band,
+            "state": "pending",
+            "assignee_role": "steward" if verdict != "conflict" else "approver",
+            "reason": "specification conflict on an anchor-key match"
+            if verdict == "conflict"
+            else "confidence in the grey band",
+        }
+        for pair_id, band, verdict in db.execute(
+            select(Pair.id, Pair.band, Pair.verdict).where(
+                Pair.verdict.in_(("review", "conflict"))
+            )
+        ).all()
+    ]
+    for i in range(0, len(tasks), BATCH):
+        db.execute(insert(ReviewTask), tasks[i : i + BATCH])
+    db.commit()

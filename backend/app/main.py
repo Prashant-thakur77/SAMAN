@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import __version__
 from .config import get_settings
 from .db import init_db
-from .routers import auth, health, ingest, pipeline
+from .routers import auth, cnmc, health, ingest, metrics, pipeline
 
 settings = get_settings()
 
@@ -35,6 +35,8 @@ app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
 app.include_router(pipeline.router, prefix="/api")
+app.include_router(metrics.router, prefix="/api")
+app.include_router(cnmc.router, prefix="/api")
 
 
 @app.on_event("startup")
