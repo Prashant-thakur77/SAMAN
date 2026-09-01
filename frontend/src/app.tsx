@@ -21,6 +21,7 @@ import Migration from './routes/Migration'
 import NotFound from './routes/NotFound'
 import Onboard from './routes/Onboard'
 import Search from './routes/Search'
+import Pprl from './routes/Pprl'
 import SmartCreate from './routes/SmartCreate'
 import Workbench from './routes/Workbench'
 
@@ -40,6 +41,7 @@ const SHELL_ROUTES = [
   // inside the screen, and other CPSEs' valuations are withheld server-side.
   { path: '/migration', element: <Migration /> },
   { path: '/smart-create', element: <SmartCreate /> },
+  { path: '/pprl', element: <Pprl /> },
   {
     path: '/admin',
     element: (

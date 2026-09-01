@@ -755,3 +755,67 @@ export const smartCreateCreate = (body: {
   )
 
 export const getSmartCreateStats = () => api.get<SmartCreateStats>('/smart-create/stats')
+
+// ---- PPRL restricted mode (§5, M10) ----
+
+export type PprlEncoding = { ref: string; bloom: string }
+
+export type PprlPayload = {
+  cpse: string
+  mode: string
+  records: number
+  filter_bits: number
+  hashes_per_feature: number
+  encodings: PprlEncoding[]
+  note: string
+}
+
+export type PprlReport = {
+  left_records: number
+  right_records: number
+  comparisons: number
+  overlap_records_left: number
+  overlap_records_right: number
+  overlap_pct_left: number
+  overlap_pct_right: number
+  possible_matches: number
+  mode: string
+  threshold: number
+  report_threshold: number
+  matches: { left_ref: string; right_ref: string; dice: number; verdict: string }[]
+  truncated: boolean
+  note: string
+}
+
+export type PprlModes = {
+  default: string
+  modes: Record<
+    string,
+    { bits: number; hashes: number; threshold: number; report: number; description: string }
+  >
+}
+
+export type PprlEvaluation = {
+  mode: string
+  pair: string
+  truth_pairs: number
+  predicted_pairs: number
+  precision: number
+  recall: number
+  f1: number
+  threshold: number
+}
+
+export const getPprlKey = () => api.get<{ key: string; note: string }>('/pprl/key')
+export const getPprlModes = () => api.get<PprlModes>('/pprl/modes')
+export const pprlEncode = (body: { cpse: string; key: string; mode: string; limit: number }) =>
+  api.post<PprlPayload>('/pprl/encode', body)
+export const pprlCompare = (body: {
+  left: PprlEncoding[]
+  right: PprlEncoding[]
+  mode: string
+}) => api.post<PprlReport>('/pprl/compare', body)
+export const pprlEvaluate = (left: string, right: string, mode: string) =>
+  api.get<PprlEvaluation>(
+    `/pprl/evaluate?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}&mode=${mode}`,
+  )

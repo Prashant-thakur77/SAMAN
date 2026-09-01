@@ -101,10 +101,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M8 | Smart-Create, licensing | **Done** |
 | M8B | Demo survivability | **Done** |
 | M9 | Motion, accessibility, screenshots | **Done** |
-| M8 | Smart-Create, licensing artefacts | Not started |
-| M8B | Demo survivability + performance | Not started |
-| M9 | Motion polish, a11y pass, screenshots | Not started |
-| M10 | PPRL restricted mode (stretch) | Not started |
+| M10 | PPRL restricted mode (stretch) | **Done** |
 
 ---
 
@@ -123,6 +120,8 @@ them from the running application.
 | **Search** — one field across every CPSE's catalogue; `⌘K` opens the same search anywhere. | **Copilot** — answers with citations and the query behind them. Never free-form SQL, and it cannot see what its viewer may not. |
 | ![Audit](docs/screenshots/audit.png) | ![Admin](docs/screenshots/admin.png) |
 | **Audit** — the hash-chained event stream, verifiable from the page. | **Admin** — which engine is live in each tier, sovereign-mode toggle, prevented-duplicate counter. |
+| ![Smart-Create](docs/screenshots/smart-create.png) | ![Restricted mode](docs/screenshots/restricted-mode.png) |
+| **Smart-Create** — the duplicate check before a code is raised. | **Restricted mode** — two CPSEs find their common materials without either handing over a catalogue. |
 
 ---
 
@@ -424,6 +423,49 @@ pipeline run like any other — a business decision, not an exemption.
 The **prevented-duplicate counter** on the health panel is the honest measure:
 prevented, overridden, and a prevention rate whose denominator is decided checks
 only, so an unanswered check cannot flatter it.
+
+### Restricted mode: matching without handing over the catalogue
+
+A CPSE may be willing to learn that another CPSE stocks the same bearing
+without being willing to hand over its catalogue to find out. Restricted mode
+computes that overlap while exchanging **no plaintext at all**: each side
+encodes its own records into keyed Bloom filters locally, and only the
+encodings are compared, by Dice coefficient.
+
+**The interesting finding is which features to encode.** The classic
+construction — and §5 — hashes character 3-grams. Measured here that tops out
+at **F1 0.64–0.78**, and the reason is structural: a 25 mm bore and a 30 mm bore
+differ in two characters out of seventy, while the same bearing in two CPSE
+house styles differs in thirty. The n-grams cannot see the distinction that
+matters and are dominated by the one that does not.
+
+Encoding the **extracted attributes** instead — `class=bearing.ball.deep_groove`,
+`bore_mm=25`, `seal_type=ZZ` — reaches **F1 0.91–0.92**, because a bore
+difference is now a whole feature. Both sides run SAMAN's own normalizer and
+extractor before hashing, so they derive the same vocabulary without exchanging
+anything. That is the advantage of doing PPRL inside the platform that already
+understands the records.
+
+| Pair | attribute mode | n-gram mode |
+|---|---|---|
+| CPCL × IOCL | P 0.951 · R 0.890 · **F1 0.919** | P 0.867 · R 0.716 · F1 0.784 |
+| CPCL × GAIL | P 0.955 · R 0.889 · **F1 0.921** | P 0.913 · R 0.630 · F1 0.745 |
+| GAIL × ONGC | P 0.944 · R 0.875 · **F1 0.909** | P 0.886 · R 0.502 · F1 0.641 |
+
+Parameters were swept on CPCL × IOCL; GAIL × ONGC is reported as an untuned
+pair. Both modes ship and both are measured, so the comparison is on the table
+rather than asserted. Restricted mode costs recall against the full matcher
+(0.933), which reads attributes, units and a veto layer rather than hashes —
+that gap is the price of the privacy guarantee, and it is stated on the screen.
+
+**What it protects, and what it does not.** It removes plaintext from the
+exchange, which is the requirement. It is not anonymity: Bloom-filter linkage
+is vulnerable to frequency and pattern analysis by an adversary holding many
+encodings, and the keyed hash raises the cost of a dictionary attack without
+eliminating it. The filter is deliberately kept ~38% full rather than sparse —
+with only eight features across a large filter there are almost no collisions to
+shelter behind. A privacy claim that oversells itself is worse than none,
+because someone will rely on it.
 
 ---
 

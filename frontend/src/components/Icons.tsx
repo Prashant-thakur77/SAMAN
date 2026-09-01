@@ -91,6 +91,14 @@ export const IconSmartCreate = (p: IconProps) => (
   </Svg>
 )
 
+export const IconRestricted = (p: IconProps) => (
+  <Svg {...p}>
+    {/* a closed padlock: the catalogue stays where it is */}
+    <path d="M4 9h12v8H4z" />
+    <path d="M7 9V6.5a3 3 0 0 1 6 0V9" />
+  </Svg>
+)
+
 export const IconAudit = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 3h9l3 3v11H4V3Z" />

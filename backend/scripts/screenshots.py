@@ -60,6 +60,11 @@ def _migration_dry_run(page) -> None:
     page.wait_for_selector("text=Safe to apply", timeout=30_000)
 
 
+def _restricted_mode(page) -> None:
+    page.click("button:has-text('Compare')")
+    page.wait_for_selector("text=What actually crossed the wire", timeout=90_000)
+
+
 def _copilot(page) -> None:
     page.fill("input[placeholder*='overpays']", "Which CPSE overpays for gaskets?")
     page.keyboard.press("Enter")
@@ -76,6 +81,15 @@ SHOTS: list[Shot] = [
     Shot("opportunity", "/dashboard/opportunity", "text=Analytics", theme="dark"),
     Shot("smart-create", "/smart-create", "text=Smart-Create", setup=_smart_create),
     Shot("migration", "/migration", "text=ERP migration", setup=_migration_dry_run),
+    Shot(
+        "restricted-mode",
+        "/pprl",
+        "text=Restricted mode",
+        setup=_restricted_mode,
+        # The measured-cost block lands after the overlap does; catching the
+        # page between the two makes it look half-built.
+        settle_ms=4_000,
+    ),
     Shot("copilot", "/copilot", "text=Copilot", theme="dark", setup=_copilot),
     Shot("audit", "/audit", "text=Governance"),
     Shot("admin", "/admin", "text=Engine health"),

@@ -341,6 +341,28 @@ that could not be true:
   1.4.11 wants for a control boundary; the palette is fixed by §1.1, so controls
   are identified by their labels and a 19.8:1 focus ring instead.
 
+### M10 findings
+
+- **Character 3-grams cannot see a bore.** The spec-named PPRL construction
+  measured F1 0.64–0.78 whatever the filter size, because a 25 mm and a 30 mm
+  bearing differ in two characters out of seventy while two house styles differ
+  in thirty. Encoding extracted attributes instead reaches 0.91–0.92. Both modes
+  ship and both are measured; `attribute` is the default and the README states
+  the deviation from §5 rather than quietly taking it.
+- **A sparse Bloom filter is a worse hiding place.** The first parameterisation
+  set ~48 bits in 2048 — 2% full, with almost no collisions to shelter behind.
+  512 bits at 30 hashes fills to ~38%, costs about 0.01 of F1 and makes the
+  payload a quarter of the size.
+- **Restricted mode is quadratic and always will be.** There is no plaintext to
+  block on, so 300 × 300 records is 90,000 comparisons. That is a real cost of
+  the guarantee rather than an oversight, and it is why restricted mode is
+  offered as a periodic overlap report and not as the live matching path.
+- **The screenshot script caught the page mid-render.** It waited for the
+  overlap block, which appears before the measured-cost block, so the first
+  capture showed a half-built page and a disabled button. Worth recording
+  because it is the failure mode of every scripted screenshot: waiting for the
+  first thing that appears rather than the last.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

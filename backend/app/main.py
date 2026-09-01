@@ -21,6 +21,7 @@ from .routers import (
     metrics,
     migration,
     pipeline,
+    pprl,
     relations,
     search,
     smart_create,
@@ -63,6 +64,7 @@ app.include_router(search.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(migration.router, prefix="/api")
 app.include_router(smart_create.router, prefix="/api")
+app.include_router(pprl.router, prefix="/api")
 
 
 @app.on_event("startup")
