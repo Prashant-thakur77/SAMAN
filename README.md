@@ -82,7 +82,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M1 | Scaffold, design tokens, theme, shell, routing + transitions | **Done** |
 | M2 | Models, auth, seed data, ingest, normalize, extract | **Done** |
 | M3 | Embeddings, blocking, tiered match, veto layer, clustering, CNMC, metrics | **Done** |
-| M3.4 | Golden-record standardization + provenance | Not started |
+| M3.4 | Golden-record standardization + provenance | **Done** |
 | M3.5 | Functional-equivalence engine | Not started |
 | M4 | Workbench, decisions, role gates, audit chain | Not started |
 | M5 | Executive + Opportunity dashboards | Not started |
@@ -181,6 +181,32 @@ Fellegi–Sunter match weights and per-comparison waterfall are persisted into
 the evidence object. `SAMAN_DISABLE_OPTIONAL=true` forces the fallbacks even
 when the accelerators are installed, so graceful degradation can be shown live.
 
+### Standardization
+
+Duplicate detection is half the job; the platform also has to produce the clean
+record that replaces them. Three CPSE renderings of one valve — different
+abbreviations, two typos, a barcode — become one canonical description:
+
+```
+GATE 150NB CL 150 CI THRD 19.6 BAR 200 C VLV FLOWSERVE ... BARCODE 8908440682867
+VALVE GATE 150NB CLASS 150 CI TTHREADED 19.6 BAR 200 C FLOWSERVE FLO-GV01634
+VLV,GATE,150NB,CL 150,CI,THRD,19.6 ABR,200 C,FLOWSERVE
+  ->  VALVE, GATE, 150NB, CLASS 150, CI, THREADED, FLOWSERVE FLO-GV01634
+```
+
+Rendering is a deterministic function of the class template and the fused
+attributes, so the same cluster always yields byte-identical text — a golden
+record an ERP keys against cannot drift between runs. Conflicting values are
+resolved by the §2D rules in order (highest-confidence extraction, then
+majority vote, then most recent purchase, then most precise value), and every
+fused field records which member it came from and which rule chose it.
+
+An unresolved disagreement on an identity-critical attribute does **not**
+auto-approve: the cluster is flagged and routed to a steward, and `POST
+/api/cnmc/issue` refuses it with 409. On the demo profile 870 of 7,107 clusters
+are held back this way, every one of them a same-part-number-different-
+specification data-quality error rather than a matching failure.
+
 **Veto layer**, on the planted near-miss traps: 380 of 380 correctly refused.
 
 | Trap | Accuracy |
@@ -206,10 +232,10 @@ are kept honest — partial is marked partial.
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
 | Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine | Partial — duplicates done (P 0.98 / R 0.93); the directed equivalence engine is M3.5 |
-| Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | Not started (M3.4) |
+| Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |
-| Mapping of existing CPSE codes to the common national code | mapping block on the item page | Not started (M3.4) |
+| Mapping of existing CPSE codes to the common national code | mapping block on the item page | Partial — every CPSE's legacy code is returned by `GET /api/clusters/{id}`; the item page lands in M4 |
 | Legacy code rationalization and migration support | plan → dry-run → apply → rollback | Not started (M7.5) |
 | User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | Partial — separation of duties enforced (§0.9); workbench lands in M4 |
 | Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | Not started (M5) |

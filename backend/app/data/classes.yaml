@@ -21,6 +21,8 @@ classes:
     keywords: [bearing, brg, brng, bearng, ball bearing, deep groove, dgbb]
     block_on: bore_mm
     template: '{noun}, BALL DEEP GROOVE, {bore_mm}MM BORE, {outer_dia_mm}MM OD, {width_mm}MM W, {seal_type}, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       bore_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
       outer_dia_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
@@ -36,6 +38,8 @@ classes:
     keywords: [valve, vlv, vv, gate valve, gt valve]
     block_on: size_nb_mm
     template: '{noun}, GATE, {size_nb_mm}NB, CLASS {pressure_class}, {body_material}, {end_connection}, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       size_nb_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
       pressure_class: {type: enum, role: identity_critical, values: ['150', '300', '600', '900']}
@@ -51,6 +55,8 @@ classes:
     keywords: [gasket, gskt, gsk, spiral wound, swg]
     block_on: size_nb_mm
     template: '{noun}, SPIRAL WOUND, {size_nb_mm}NB, CLASS {pressure_class}, {material}, {thickness_mm}MM THK, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       size_nb_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
       pressure_class: {type: enum, role: identity_critical, values: ['150', '300', '600', '900']}
@@ -65,6 +71,8 @@ classes:
     keywords: [pipe, ppe, seamless, smls, tube]
     block_on: nps_mm
     template: '{noun}, SEAMLESS, {nps_mm}NB, {schedule}, {material}, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       nps_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
       schedule: {type: enum, role: identity_critical, values: [SCH20, SCH40, SCH80, SCH160, XS]}
@@ -79,6 +87,8 @@ classes:
     keywords: [bolt, blt, hex bolt, hexagon, screw, stud]
     block_on: length_mm
     template: '{noun}, HEX HEAD, {thread}, {length_mm}MM LG, GRADE {grade}, {material}, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       thread: {type: enum, role: identity_critical, values: []}
       length_mm: {type: numeric, unit: mm, role: identity_critical, tolerance: 0}
@@ -93,6 +103,8 @@ classes:
     keywords: [cable, cbl, wire, armoured, unarmoured, conductor]
     block_on: csa_mm2
     template: '{noun}, POWER, {cores}C X {csa_mm2}SQMM, {conductor}, {insulation}, {voltage_v}V, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       cores: {type: numeric, unit: dimensionless, role: identity_critical, tolerance: 0}
       csa_mm2: {type: numeric, unit: mm**2, role: identity_critical, tolerance: 0}
@@ -112,6 +124,8 @@ classes:
                oxalic, boric]
     block_on: concentration_pct
     template: '{noun}, {substance}, {grade} GRADE, {concentration_pct}PCT, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       substance: {type: enum, role: identity_critical, values: []}
       grade: {type: enum, role: identity_critical, values: [LR, AR, GR, TECH]}
@@ -124,6 +138,8 @@ classes:
     keywords: [helmet, hard hat, safety helmet, ppe, hat]
     block_on: null
     template: '{noun}, SAFETY, CLASS {helmet_class}, {shell_material}, {harness_type}, {chin_strap}, {ventilation}, {brim}, {standard}, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       helmet_class: {type: enum, role: identity_critical, values: [A, B, C, E]}
       standard: {type: enum, role: identity_critical, values: [IS2925, EN397]}
@@ -144,5 +160,7 @@ classes:
     # protect this item. Spec §2A.1: only exact anchor-key matching is allowed
     # here, and the workbench shows a "class uncertain" warning.
     template: '{noun}, {brand} {mpn}'
+    casing: upper
+    max_len: 120
     attributes:
       brand: {type: categorical, role: cosmetic}

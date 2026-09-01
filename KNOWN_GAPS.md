@@ -4,7 +4,7 @@ Per spec §10, anything scoped in the build spec but not yet built is recorded
 here with a one-line reason. An honest gaps list is worth more than a hidden
 hole. This file is updated at the end of every milestone.
 
-## Status: end of M3 (audited)
+## Status: end of M3.4
 
 M1 the scaffold, M2 the data model and synthetic estate, M3 the matching
 engine: embeddings, multi-pass blocking, the §2A veto layer, clustering, CNMC
@@ -14,7 +14,7 @@ issuance and the §0.6 evaluation. All four M3 gates pass on held-out data.
 
 | Gap | Reason | Closes in |
 |---|---|---|
-| Golden descriptions are a representative member, not a rendered template | §2D standardization engine, with attribute fusion and per-field provenance | M3.4 |
+| The LLM may not yet polish an unfilled template slot | §2D allows it, validated back against the template. Rendering drops unfilled segments cleanly instead, which is deterministic; the polish step needs the Ollama client | M6 |
 | The directed equivalence engine is not built | §2B; the truth is seeded and `GET /api/metrics` reports `equivalence.status = not_built` rather than a fabricated number | M3.5 |
 | Tier 3 grey-band adjudication is not wired | The deterministic adjudicator and the optional Ollama path attach to the review queue | M4/M6 |
 | All 12 in-shell routes still render empty states | Nothing may be faked (§10); screens fill as their engines land | M4–M7.5 |

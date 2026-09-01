@@ -44,7 +44,10 @@ class ClassSchema:
     label: str
     noun: str
     keywords: tuple[str, ...]
+    #: §2D description grammar — the ordered slots a golden record renders into.
     template: str
+    casing: str
+    max_len: int
     block_on: str | None
     attributes: dict[str, AttrSpec]
 
@@ -94,6 +97,8 @@ def load_schemas() -> dict[str, ClassSchema]:
             noun=raw["noun"],
             keywords=tuple(raw.get("keywords") or []),
             template=raw["template"],
+            casing=raw.get("casing", "upper"),
+            max_len=int(raw.get("max_len", 120)),
             block_on=block_on,
             attributes=attrs,
         )

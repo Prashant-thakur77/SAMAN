@@ -172,16 +172,40 @@ class TestIssuedCodesAreImmutable:
 class TestDeterminism:
     """§2D: re-running on unchanged data must not change the outcome."""
 
-    def test_rerunning_the_pipeline_is_stable(self, pipeline_run, db):
+    def test_rerunning_the_pipeline_gives_byte_identical_golden_records(
+        self, pipeline_run, db
+    ):
+        """§2D acceptance: unchanged data must produce unchanged descriptions.
+
+        A golden record is what an ERP keys against; text that drifts between
+        runs is not a stable identifier.
+        """
         from app.pipeline import reset_status, run_pipeline
 
-        before = sorted(
-            db.execute(select(GoldenRecord.std_description)).scalars().all()
-        )
+        before = sorted(db.execute(select(GoldenRecord.std_description)).scalars().all())
         reset_status()
-        with db.begin_nested():
-            pass
         status = run_pipeline(db, stages=["match", "cluster"])
         assert status.state == "done"
+        db.expire_all()
         after = sorted(db.execute(select(GoldenRecord.std_description)).scalars().all())
         assert before == after
+
+    def test_golden_records_are_rendered_from_the_class_grammar(self, pipeline_run, db):
+        """Not "the longest member's text" — a deterministic template (§2D)."""
+        descriptions = db.execute(
+            select(GoldenRecord.std_description).limit(200)
+        ).scalars().all()
+        assert descriptions
+        assert all("{" not in d for d in descriptions), "unfilled template slot escaped"
+        assert all(d == d.upper() for d in descriptions)
+
+    def test_every_golden_record_has_field_provenance(self, pipeline_run, db):
+        from app.models import GoldenFieldProvenance
+
+        goldens = db.execute(select(func.count(GoldenRecord.id))).scalar()
+        with_provenance = db.execute(
+            select(func.count(func.distinct(GoldenFieldProvenance.golden_id)))
+        ).scalar()
+        # A record whose members yielded no attributes at all has nothing to
+        # trace, so this is a strong majority rather than all.
+        assert with_provenance / goldens > 0.9

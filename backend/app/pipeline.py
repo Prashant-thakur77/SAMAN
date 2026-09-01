@@ -13,10 +13,11 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from sqlalchemy import insert, select
+from sqlalchemy import func, insert, select
 from sqlalchemy.orm import Session
 
 from .extract import extract
@@ -109,6 +110,12 @@ def build_items(
         ex = extract(norm.norm_text)
 
         attrs = dict(ex.attrs)
+        # Kept for §2D attribute fusion, which ranks values by how they were
+        # obtained rather than treating every extraction as equally reliable.
+        attrs["_sources"] = ex.attr_sources
+        if ex.mpn:
+            # The readable form; `mpn_norm` is punctuation-stripped for anchoring.
+            attrs["_mpn_raw"] = ex.mpn
         if ex.designation:
             attrs["_designation"] = ex.designation
         if ex.conflicts:
@@ -392,18 +399,22 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
 @register_stage("cluster")
 def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     """Connected components over accepted pairs, then a golden draft each."""
-    from .cluster import build_clusters, draft_golden, refine_clusters
+    from .cluster import build_clusters, refine_clusters
     from .models import (
         Cluster,
         ClusterMember,
         Cnmc,
+        GoldenFieldProvenance,
         GoldenRecord,
         Pair,
+        PurchaseHistory,
         ReviewTask,
     )
     from .models import (
         Item as ItemModel,
     )
+    from .standardize import Member, standardize
+    from .taxonomy import get_schema
 
     rows = db.execute(
         select(ItemModel.id, ItemModel.norm_text, ItemModel.class_code, ItemModel.attrs_json)
@@ -411,12 +422,22 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     if not rows:
         return
 
+    # §2D rule 2 breaks a tied majority vote by the most recent purchase.
+    last_purchase = dict(
+        db.execute(
+            select(PurchaseHistory.item_id, func.max(PurchaseHistory.po_date)).group_by(
+                PurchaseHistory.item_id
+            )
+        ).all()
+    )
+
     members_by_id = {
         item_id: {
             "id": item_id,
             "norm_text": norm_text or "",
             "class_code": class_code,
             "attrs": json.loads(attrs_json or "{}"),
+            "last_purchase": last_purchase.get(item_id),
         }
         for item_id, norm_text, class_code, attrs_json in rows
     }
@@ -481,6 +502,21 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     # Rebuild the derived layer for everything not pinned by an issued code.
     # Order matters: review tasks reference pairs, codes reference goldens.
     db.query(ReviewTask).delete()
+    frozen_goldens = (
+        set(
+            db.execute(
+                select(GoldenRecord.id).where(GoldenRecord.cluster_id.in_(frozen_clusters))
+            ).scalars().all()
+        )
+        if frozen_clusters
+        else set()
+    )
+    if frozen_goldens:
+        db.query(GoldenFieldProvenance).filter(
+            GoldenFieldProvenance.golden_id.notin_(frozen_goldens)
+        ).delete(synchronize_session=False)
+    else:
+        db.query(GoldenFieldProvenance).delete()
     if frozen_clusters:
         db.query(GoldenRecord).filter(
             GoldenRecord.cluster_id.notin_(frozen_clusters)
@@ -498,28 +534,57 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     db.commit()
 
     for n, member_ids in enumerate(refined, start=1):
-        drafts = [members_by_id[i] for i in member_ids]
-        has_conflict = any(i in conflicted for i in member_ids)
-        draft = draft_golden(drafts, conflicted=has_conflict)
+        raw_members = [members_by_id[i] for i in member_ids]
+        class_code = Counter(m["class_code"] for m in raw_members).most_common(1)[0][0]
+        schema = get_schema(class_code)
 
-        cluster = Cluster(status=draft.status)
+        members = [
+            Member(
+                id=m["id"],
+                attrs={k: v for k, v in m["attrs"].items() if not k.startswith("_")},
+                sources=m["attrs"].get("_sources", {}),
+                norm_text=m["norm_text"],
+                last_purchase=m["last_purchase"],
+            )
+            for m in raw_members
+        ]
+        readable_mpn = Counter(
+            m["attrs"].get("_mpn_raw") for m in raw_members if m["attrs"].get("_mpn_raw")
+        ).most_common(1)
+        result = standardize(members, schema, readable_mpn[0][0] if readable_mpn else None)
+
+        # An anchor-key conflict flagged by the matcher also blocks approval.
+        anchor_conflict = any(i in conflicted for i in member_ids)
+        record_status = "conflict" if anchor_conflict else result.status
+
+        cluster = Cluster(status=record_status)
         db.add(cluster)
         db.flush()
         db.execute(
             insert(ClusterMember),
             [{"cluster_id": cluster.id, "item_id": i} for i in member_ids],
         )
-        db.execute(
-            insert(GoldenRecord),
-            [
-                {
-                    "cluster_id": cluster.id,
-                    "std_description": draft.std_description,
-                    "attrs_json": json.dumps(draft.attrs, sort_keys=True, default=str),
-                    "status": draft.status,
-                }
-            ],
+        golden = GoldenRecord(
+            cluster_id=cluster.id,
+            std_description=result.std_description,
+            attrs_json=json.dumps(result.attrs, sort_keys=True, default=str),
+            status=record_status,
         )
+        db.add(golden)
+        db.flush()
+        if result.provenance:
+            db.execute(
+                insert(GoldenFieldProvenance),
+                [
+                    {
+                        "golden_id": golden.id,
+                        "field": fused.field,
+                        "source_member_id": fused.source_member_id,
+                        "rule": fused.rule,
+                    }
+                    for fused in result.provenance
+                ],
+            )
         if n % 500 == 0:
             db.commit()
             status.rows_done = n

@@ -379,11 +379,18 @@ def extract_mpn(
 # --------------------------------------------------------------------------
 
 
+#: Where an attribute value came from, most trustworthy first (§2D fusion
+#: rule 1: "structured column > parsed designation > description text > LLM").
+SOURCE_PRIORITY = ("structured", "designation", "text", "llm")
+
+
 @dataclass
 class Extraction:
     class_code: str
     class_confidence: float
     attrs: dict[str, object]
+    #: attribute name -> which of SOURCE_PRIORITY produced it
+    attr_sources: dict[str, str]
     mpn: str | None
     gtin: str | None
     designation: str | None
@@ -476,6 +483,8 @@ def extract(norm_text: str) -> Extraction:
 
     designation = parse_bearing_designation(text)
     attrs = _extract_for_class(text, guess.class_code)
+    # Everything the regex rules found came from the description itself.
+    attr_sources: dict[str, str] = dict.fromkeys(attrs, "text")
     conflicts: list[dict[str, object]] = []
 
     if designation:
@@ -487,6 +496,8 @@ def extract(norm_text: str) -> Extraction:
             existing = attrs.get(key)
             if existing is None:
                 attrs[key] = value
+                # A parsed standard designation outranks free text (§2D).
+                attr_sources[key] = "designation"
             elif isinstance(value, int | float) and isinstance(existing, int | float):
                 if abs(float(existing) - float(value)) > 1e-6:
                     conflicts.append(
@@ -511,6 +522,7 @@ def extract(norm_text: str) -> Extraction:
         class_code=guess.class_code,
         class_confidence=round(guess.confidence, 4),
         attrs=attrs,
+        attr_sources=attr_sources,
         mpn=extract_mpn(text, designation, attrs, guess.class_code),
         gtin=extract_gtin(text),
         designation=designation.raw if designation else None,
