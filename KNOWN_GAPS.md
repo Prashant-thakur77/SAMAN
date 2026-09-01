@@ -385,6 +385,20 @@ that could not be true:
   sentence — seeding is permitted only while the database contains no users at
   all, and the first seed closes the door permanently.
 
+- **The worst class was worst for a fixable reason.** `chemical.reagent` recalled
+  0.847, and the README said that was because reagents carry fewer
+  distinguishing attributes. Checking the actual missed pairs said otherwise:
+  a grade written `TOLUENE GR GR` — a CPSE style that abbreviates the word GRADE
+  itself — matched no pattern, so `grade` extracted as None, identity coverage
+  fell to 0.5 and the thin-evidence guard capped the confidence below the merge
+  threshold. One class-scoped pattern took the class to 0.931 recall and the
+  corpus to 0.939, precision unmoved. The lesson is the audit, not the regex:
+  the explanation in the README had been plausible and wrong.
+- **A render error blanked the whole application.** No error boundary, so one
+  bad render left an empty document — nothing to read, nothing to navigate away
+  from, in front of an audience. The boundary keeps the shell standing, names
+  what broke and offers both ways out.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

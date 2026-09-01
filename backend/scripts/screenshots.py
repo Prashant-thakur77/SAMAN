@@ -66,7 +66,12 @@ def _restricted_mode(page) -> None:
 
 
 def _copilot(page) -> None:
-    page.fill("input[placeholder*='overpays']", "Which CPSE overpays for gaskets?")
+    # Typed rather than filled: `fill` sets the DOM value directly, which leaves
+    # a React-controlled input showing text the component has already cleared.
+    # Driving it as keystrokes photographs the state a person would actually see.
+    field = page.locator("input[placeholder*='overpays']")
+    field.click()
+    field.press_sequentially("Which CPSE overpays for gaskets?", delay=8)
     page.keyboard.press("Enter")
     # The answer types itself in; wait for the citations rather than a guess.
     page.wait_for_selector("text=/cite|source|evidence|query/i", timeout=25_000)

@@ -181,6 +181,16 @@ _P = {
         r"|\b(4\.6|8\.8|10\.9|12\.9)\s*GRADE\b"
         r"|\bGRADE\s*(LR|AR|GR|TECH)\b|\b(LR|AR|GR|TECH)\s*GRADE\b"
     ),
+    # A reagent grade standing on its own, with no "GRADE" beside it. CPSE
+    # style profiles abbreviate the word itself, so "TOLUENE, GR GRADE" is
+    # catalogued elsewhere as "TOLUENE GR GR" -- and the pattern above, which
+    # requires the full word, extracted nothing from it. That cost the grade on
+    # most reagent rows, which dropped identity coverage below the merge
+    # threshold and made `chemical.reagent` the worst-recalling class.
+    #
+    # Only ever applied inside the chemical branch: a bare "GR" in a fastener
+    # description means something else entirely.
+    "chemical_grade_token": re.compile(r"(?<![A-Z0-9])(LR|AR|GR|TECH)(?![A-Z0-9])"),
     "length_mm": re.compile(
         r"\b(\d{1,4}(?:\.\d+)?)\s*MM\s*(?:LG|LONG|LENGTH)\b"
         r"|\b(?:LG|LENGTH)\s*(\d{1,4}(?:\.\d+)?)\s*MM\b"
@@ -540,7 +550,11 @@ def _extract_for_class(text: str, class_code: str) -> dict[str, object]:
 
     elif class_code == "chemical.reagent":
         out["substance"] = _enum(text, "substance")
-        out["grade"] = _first_group(_P["grade"].search(text)) or _enum(text, "grade")
+        out["grade"] = (
+            _first_group(_P["grade"].search(text))
+            or _enum(text, "grade")
+            or _first_group(_P["chemical_grade_token"].search(text))
+        )
         out["concentration_pct"] = _num(text, "concentration")
 
     elif class_code == "ppe.helmet":

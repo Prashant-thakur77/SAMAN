@@ -170,8 +170,8 @@ against these numbers.
 | M3 gate (spec §8) | Result | Target |
 |---|---|---|
 | Duplicate precision | **0.994** | ≥ 0.92 |
-| Duplicate recall | **0.933** | ≥ 0.80 |
-| Blocking recall | **0.984** | ≥ 0.97 |
+| Duplicate recall | **0.939** | ≥ 0.80 |
+| Blocking recall | **0.985** | ≥ 0.97 |
 | Veto precision on planted traps | **1.000** | ≥ 0.98 |
 
 A single averaged number would hide more than it shows, so the full report at
@@ -179,8 +179,8 @@ A single averaged number would hide more than it shows, so the full report at
 
 | | Precision | Recall | F1 |
 |---|---|---|---|
-| Pairwise | 0.994 | 0.933 | 0.963 |
-| **B-cubed (cluster level)** | 0.998 | 0.971 | 0.984 |
+| Pairwise | 0.994 | 0.939 | 0.966 |
+| **B-cubed (cluster level)** | 0.998 | 0.974 | 0.986 |
 | Naive baseline: exact text match | 1.000 | 0.032 | 0.061 |
 
 Pairwise scores can look excellent while clusters are catastrophically
@@ -363,10 +363,17 @@ assert the break is found at the right sequence.
 | Performance inside the band — must still merge | 0.89 |
 
 Per class, the weakest is named rather than averaged away:
-`chemical.reagent` at F1 0.917 — perfectly precise but recalling only 0.847,
-because reagent descriptions carry fewer distinguishing attributes than a
-bearing does. Every class is above 0.91. Automation rate is 0.994, leaving
-3,868 pairs for human review.
+`bearing.ball.deep_groove` at F1 0.933 — precise at 0.989 but recalling 0.884,
+because a designation that fails to parse takes the bore, outer diameter and
+width with it. Every class is above 0.93. Automation rate is 0.995, leaving
+3,712 pairs for human review.
+
+Naming the worst class is not a formality. It was `chemical.reagent` at recall
+0.847 until an audit asked *why*, and the answer was not "reagents are hard": a
+grade written as `TOLUENE GR GR` — a CPSE style that abbreviates the word GRADE
+itself — extracted no grade at all, which dropped identity coverage below the
+merge threshold. One class-scoped pattern took that class from 0.847 to 0.931
+recall and the whole corpus from 0.933 to 0.939, with precision unmoved.
 
 ---
 

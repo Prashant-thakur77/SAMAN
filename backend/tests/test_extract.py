@@ -164,3 +164,39 @@ def test_designation_text_conflict_is_flagged_not_silently_resolved():
     conflict = e.conflicts[0]
     assert conflict["attr"] == "bore_mm"
     assert conflict["from_designation"] == 25 and conflict["from_text"] == 30.0
+
+
+class TestChemicalGrade:
+    """A reagent grade written without the word GRADE beside it.
+
+    CPSE style profiles abbreviate the word itself, so the same reagent is
+    catalogued as "TOLUENE, GR GRADE" in one master and "TOLUENE GR GR" in
+    another. Missing it cost the grade on most reagent rows, dropped identity
+    coverage below the merge threshold, and made `chemical.reagent` the
+    worst-recalling class at 0.847 — 0.931 once it extracts.
+    """
+
+    def test_a_grade_beside_the_word_grade_still_extracts(self):
+        assert extract("CHEMICAL ACETONE AR GRADE 99 PCT MERCK").attrs["grade"] == "AR"
+        assert extract("CHEM, TOLUENE, GRADE LR, 40 PCT").attrs["grade"] == "LR"
+
+    def test_a_standalone_grade_token_extracts(self):
+        assert extract("TOLUENE GR GR 40 PCT CHEM RANKEM").attrs["grade"] == "GR"
+        assert extract("CHEM,TOLUENE,R GR,40 PCT,RANKEM").attrs["grade"] == "GR"
+
+    def test_the_long_form_still_maps(self):
+        assert (
+            extract("CHEMICAL ACETONE LABORATORY REAGENT 99 PCT MERCK").attrs["grade"]
+            == "LR"
+        )
+
+    def test_a_fastener_grade_is_untouched(self):
+        """A bare GR in a fastener description means something else entirely,
+        which is why the standalone rule is scoped to the chemical branch."""
+        result = extract("BLT,HEX,M16X2.0,100MM LG,GR 12.9,SS316,ZINC,UNBRAKO")
+        assert result.class_code == "fastener.bolt.hex"
+        assert result.attrs["grade"] == "12.9"
+
+    def test_a_grade_letter_inside_a_word_is_not_a_grade(self):
+        """RANKEM contains no standalone token; ARGON must not read as AR."""
+        assert extract("CHEMICAL ARGON 99 PCT LINDE").attrs.get("grade") is None
