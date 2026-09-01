@@ -25,18 +25,29 @@ export default function Audit() {
   const [data, setData] = useState<AuditResponse | null>(null)
   const [entity, setEntity] = useState('')
   const [user, setUser] = useState('')
+  const [action, setAction] = useState('')
+  // Held separately so choosing an action does not shrink the list of actions
+  // to choose from — a filter that erases its own options is unusable.
+  const [allActions, setAllActions] = useState<Record<string, number>>({})
   const [verification, setVerification] = useState<VerifyResponse | null>(null)
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      setData(await getAudit({ entity: entity || undefined, user: user || undefined, limit: 100 }))
+      const next = await getAudit({
+        entity: entity || undefined,
+        user: user || undefined,
+        action: action || undefined,
+        limit: 100,
+      })
+      setData(next)
+      if (!entity && !user && !action) setAllActions(next.actions)
       setError(null)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load the ledger.')
     }
-  }, [entity, user])
+  }, [entity, user, action])
 
   useEffect(() => {
     void load()
@@ -122,10 +133,43 @@ export default function Audit() {
             className="w-64 font-mono"
           />
         </div>
+        <div className="space-y-2">
+          <label htmlFor="action" className="micro-label block">
+            Action
+          </label>
+          <select
+            id="action"
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            className="h-10 w-64 border border-hairline bg-bg px-3 font-mono text-sm text-ink"
+          >
+            <option value="">every action</option>
+            {Object.entries(allActions)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([name, count]) => (
+                <option key={name} value={name}>
+                  {name} ({count.toLocaleString('en-IN')})
+                </option>
+              ))}
+          </select>
+        </div>
         {data && (
           <p className="pb-2 text-xs text-muted">
-            {data.total} event{data.total === 1 ? '' : 's'}
+            {data.total.toLocaleString('en-IN')} event{data.total === 1 ? '' : 's'}
           </p>
+        )}
+        {(entity || user || action) && (
+          <button
+            type="button"
+            onClick={() => {
+              setEntity('')
+              setUser('')
+              setAction('')
+            }}
+            className="micro-label pb-2 underline underline-offset-4 hover:text-ink"
+          >
+            Clear filters
+          </button>
         )}
       </div>
 

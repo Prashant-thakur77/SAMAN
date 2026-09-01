@@ -198,3 +198,37 @@ class TestConcurrentAppends:
         result = audit.verify(db)
         assert result["valid"], result["first_break"]
         assert result["events"] == 41  # genesis + 4 workers x 10
+
+
+class TestAuditFiltering:
+    """The stream is only useful if a specific event can be found in it."""
+
+    def test_the_action_filter_narrows_the_stream(self, as_registrar, pipeline_run):
+        everything = as_registrar.get("/api/audit").json()
+        assert everything["actions"], "the stream must report what actions exist"
+        action = max(everything["actions"], key=lambda name: everything["actions"][name])
+
+        filtered = as_registrar.get(f"/api/audit?action={action}").json()
+        assert filtered["total"] == everything["actions"][action]
+        assert all(event["action"].startswith(action) for event in filtered["events"])
+
+    def test_the_action_counts_add_up_to_the_whole_stream(
+        self, as_registrar, pipeline_run
+    ):
+        body = as_registrar.get("/api/audit").json()
+        assert sum(body["actions"].values()) == body["total"]
+
+    def test_filters_combine(self, as_registrar, pipeline_run):
+        body = as_registrar.get("/api/audit").json()
+        event = body["events"][0]
+        narrowed = as_registrar.get(
+            f"/api/audit?action={event['action']}&user={event['user']}"
+        ).json()
+        assert narrowed["total"] >= 1
+        assert all(e["user"] == event["user"] for e in narrowed["events"])
+
+    def test_an_action_nobody_performed_returns_an_empty_stream(
+        self, as_registrar, pipeline_run
+    ):
+        body = as_registrar.get("/api/audit?action=nobody.did.this").json()
+        assert body["total"] == 0 and body["events"] == []
