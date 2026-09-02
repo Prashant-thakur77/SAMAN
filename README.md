@@ -110,8 +110,8 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 
 ## The screens
 
-Ten routes, monochrome, dark and light. `make screenshots` regenerates all of
-them from the running application.
+Thirteen routes, monochrome, dark and light. `make screenshots` regenerates all
+of them from the running application.
 
 | | |
 |---|---|
@@ -125,6 +125,10 @@ them from the running application.
 | **Audit** — the hash-chained event stream, verifiable from the page. | **Admin** — which engine is live in each tier, sovereign-mode toggle, prevented-duplicate counter. |
 | ![Smart-Create](docs/screenshots/smart-create.png) | ![Restricted mode](docs/screenshots/restricted-mode.png) |
 | **Smart-Create** — the duplicate check before a code is raised. | **Restricted mode** — two CPSEs find their common materials without either handing over a catalogue. |
+| ![Item](docs/screenshots/item.png) | ![Cluster](docs/screenshots/cluster.png) |
+| **Item** — the raw row beside the golden record it belongs to, every CPSE's stock of it, and what it last cost. | **Cluster** — the golden record, the template that rendered it, and which member and rule produced every fused field. |
+| ![Onboard](docs/screenshots/onboard.png) | |
+| **Onboard** — upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. | |
 
 ---
 
