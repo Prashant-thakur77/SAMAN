@@ -81,6 +81,9 @@ def _copilot(page) -> None:
 SHOTS: list[Shot] = [
     Shot("home", "/", "text=Overview"),
     Shot("search", "/search?q=6205", "text=Search"),
+    # A coded item with purchase history, so the page shows the whole story:
+    # golden record, CNMC, every CPSE's legacy code, evidence, price trend.
+    Shot("item", "/items/6", "text=Golden record", settle_ms=1_600),
     Shot("workbench", "/workbench", "text=Review", theme="dark"),
     Shot("executive", "/dashboard/executive", "text=Analytics"),
     Shot("opportunity", "/dashboard/opportunity", "text=Analytics", theme="dark"),

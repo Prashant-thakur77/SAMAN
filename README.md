@@ -189,9 +189,9 @@ against these numbers.
 
 | M3 gate (spec §8) | Result | Target |
 |---|---|---|
-| Duplicate precision | **0.994** | ≥ 0.92 |
-| Duplicate recall | **0.940** | ≥ 0.80 |
-| Blocking recall | **0.990** | ≥ 0.97 |
+| Duplicate precision | **0.997** | ≥ 0.92 |
+| Duplicate recall | **0.960** | ≥ 0.80 |
+| Blocking recall | **0.994** | ≥ 0.97 |
 | Veto precision on planted traps | **1.000** | ≥ 0.98 |
 
 A single averaged number would hide more than it shows, so the full report at
@@ -199,9 +199,9 @@ A single averaged number would hide more than it shows, so the full report at
 
 | | Precision | Recall | F1 |
 |---|---|---|---|
-| Pairwise | 0.994 | 0.940 | 0.966 |
-| **B-cubed (cluster level)** | 0.998 | 0.975 | 0.986 |
-| Naive baseline: exact text match | 1.000 | 0.032 | 0.061 |
+| Pairwise | 0.997 | 0.960 | 0.978 |
+| **B-cubed (cluster level)** | 0.999 | 0.983 | 0.991 |
+| Naive baseline: exact text match | 1.000 | 0.029 | 0.056 |
 
 Pairwise scores can look excellent while clusters are catastrophically
 over-merged, so B-cubed is reported beside them. The baseline is what a plain
@@ -288,10 +288,10 @@ class schema itself declares, and an LLM that may only *propose*:
 
 | | Held-out |
 |---|---|
-| Precision | 0.931 |
-| Recall | 0.946 |
-| **Direction accuracy** | **0.989** |
-| Candidate coverage | 0.976 |
+| Precision | 0.927 |
+| Recall | 0.944 |
+| **Direction accuracy** | **0.990** |
+| Candidate coverage | 0.974 |
 | Recall of reachable pairs | 0.969 |
 
 Recall is reported with its ceiling rather than on its own, and reporting it
@@ -442,13 +442,13 @@ assert the break is found at the right sequence.
 | Performance outside the band (200 kg vs 500 kg) | 1.00 |
 | Cross-brand equivalent (SKF / FAG / NSK) | 1.00 |
 | Directed substitute (class 300 vs 600) | 1.00 |
-| Performance inside the band — must still merge | 0.89 |
+| Performance inside the band — must still merge | 0.95 |
 
 Per class, the weakest is named rather than averaged away:
-`bearing.ball.deep_groove` at F1 0.933 — precise at 0.989 but recalling 0.884,
+`bearing.ball.deep_groove` at F1 0.947 — precise at 0.994 but recalling 0.904,
 because a designation that fails to parse takes the bore, outer diameter and
-width with it. Every class is above 0.93. Automation rate is 0.994, leaving
-3,687 pairs for human review.
+width with it. Every class is above 0.94. Automation rate is 0.994, leaving
+3,778 pairs for human review.
 
 Naming the worst class is not a formality. It was `chemical.reagent` at recall
 0.847 until an audit asked *why*, and the answer was not "reagents are hard": a
@@ -597,7 +597,7 @@ are kept honest — partial is marked partial.
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.931 / R 0.946, direction accuracy 0.989 |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.927 / R 0.944, direction accuracy 0.990 |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |

@@ -465,6 +465,21 @@ that could not be true:
   `unanimous` from `majority_vote` also surfaced the useful fact underneath:
   across 45,844 fused fields only 41 needed a tie-break of any kind.
 
+- **A number that was arithmetically right and obviously wrong.** The
+  Opportunity dashboard showed ONGC buying 35,200 individual 80NB gate valves
+  across two purchase orders. Quantity and price were both correctly normalised
+  to the base unit, so the maths checked out; the *data* did not, because the
+  seed applied its pack-basis quirk to every class and nobody buys a 300NB gate
+  valve by the hundred. Restricting it to the four classes actually sold by the
+  box also removed a spurious `, BOX OF 100` from valve and cable descriptions,
+  which had been costing the matcher: duplicate recall 0.940 → 0.960, blocking
+  recall 0.990 → 0.994.
+- **Two tests were checking the fixture, not the code.** One asked the Copilot
+  about a hard-coded bearing description and one hoped the random seed had
+  produced an idle pile of stock next to a shortage. Both broke on a seed change
+  that improved every metric. They now take their input from the database and
+  construct the surplus they test.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**
