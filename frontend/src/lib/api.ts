@@ -65,6 +65,8 @@ export type Health = {
     llm: TierHealth
     /** Not a tier — an optional input to Smart-Create's camera. */
     ocr?: { mode: string; engine: string; available: boolean }
+    /** Local speech-to-text for the assistant's microphone. */
+    stt?: { mode: string; engine: string; available: boolean }
     sovereign_mode: boolean
     degraded: string[]
   }
@@ -900,3 +902,30 @@ export type AssistantReply = {
 }
 export const askAssistant = (question: string, path?: string) =>
   api.post<AssistantReply>('/assistant/query', { question, path })
+
+export type Transcript = {
+  text: string
+  language?: string | null
+  duration?: number
+  confidence?: number
+  engine?: string
+  note?: string
+}
+export const getVoice = () =>
+  api.get<{ available: boolean; mode: string; engine: string; languages: string[]; note: string }>(
+    '/assistant/voice',
+  )
+/** One spoken utterance as a PCM WAV blob, transcribed on the server. */
+export async function transcribeAudio(wav: Blob, language?: string): Promise<Transcript> {
+  const form = new FormData()
+  form.append('audio', wav, 'question.wav')
+  if (language) form.append('language', language)
+  const res = await fetch('/api/assistant/transcribe', {
+    method: 'POST',
+    body: form,
+    credentials: 'include',
+  })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
+  return body as Transcript
+}

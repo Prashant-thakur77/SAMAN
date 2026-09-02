@@ -50,6 +50,7 @@ class Capabilities:
     #: Smart-Create, not a stage of the matcher — but it is reported the same
     #: way so an operator can see in one place what this install can do.
     ocr_mode: str = "absent"
+    stt_mode: str = "absent"
     degraded: list[str] = field(default_factory=list)
     #: True when Tier 1 is on the fallback because an operator chose it, not
     #: because splink is missing. A deliberate choice is not a degradation, and
@@ -88,6 +89,11 @@ class Capabilities:
                 if self.ocr_mode != "absent"
                 else "not installed",
                 "available": self.ocr_mode != "absent",
+            },
+            "stt": {
+                "mode": self.stt_mode,
+                "engine": "faster-whisper (local, CPU)" if self.stt_mode != "absent" else "none",
+                "available": self.stt_mode != "absent",
             },
             "sovereign_mode": self.sovereign_mode,
             "degraded": self.degraded,
@@ -136,6 +142,13 @@ def detect() -> Capabilities:
     # the screen says so itself. Counting it would make the chip cry wolf on a
     # perfectly complete install.
     ocr = "rapidocr" if (_importable("rapidocr_onnxruntime") and not forced) else "absent"
+    from . import stt as _stt
+
+    stt_mode = _stt.mode()
+    if stt_mode == "absent":
+        notes.append(
+            "local speech recognition absent (make deps-stt); voice falls back to the browser"
+        )
     if ocr == "absent":
         notes.append(
             "OCR reader not installed — Smart-Create accepts typed descriptions only"
@@ -155,6 +168,7 @@ def detect() -> Capabilities:
         embedding_mode=embedding,
         llm_mode=llm,
         ocr_mode=ocr,
+        stt_mode=stt_mode,
         sovereign_mode=sovereign,
         # Notes about deliberate choices are worth showing on the health panel,
         # but they are not degradations and must not be counted as such.

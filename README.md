@@ -572,11 +572,21 @@ application screen. It does three things and hands off the rest:
   cannot get around it; a steward asking it about another CPSE's price gets
   the same anonymised band the Copilot gives.
 
-Voice in and voice out ride on the browser's own speech engines
-(`SpeechRecognition`, `speechSynthesis`) and the controls appear only where
-those exist. Note that Chrome's recognition reaches Google's servers; an
-air-gapped deployment should type. The conversation survives moving between
-the front page and the application in the same tab.
+**Voice, kept on the machine.** Press the microphone and speak; the page
+records raw PCM, encodes a 16 kHz WAV, and posts it to
+`POST /api/assistant/transcribe`, where `faster-whisper` (the `base` model,
+int8, CPU) transcribes it locally in about a second. Recording stops on its own
+after a pause. Install with `make deps-stt`, which fetches the weights once into
+`data/models/`; at runtime nothing is downloaded and the audio never leaves the
+server. Without it the widget falls back to the browser's own `SpeechRecognition`
+where one exists (Chrome's reaches Google; Firefox has none) and otherwise shows
+no microphone rather than one that cannot work. `/api/assistant/voice` and
+`/api/health` say which is active.
+
+**Speech out.** Turn the speaker on and replies are read aloud through the
+browser's `speechSynthesis`, preferring an Indian English voice; every reply also
+carries its own "read" button. The conversation survives moving between the
+front page and the application in the same tab.
 
 `POST /api/assistant/query` is public and scoped like every other endpoint.
 

@@ -32,3 +32,5 @@ data/snapshot/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+# local model weights (make deps-stt); never committed
+data/models/

@@ -36,6 +36,14 @@ sentence-transformers==3.3.1     # Apache-2.0 (Tier 2 embeddings, all-MiniLM-L6-
 # at runtime and the offline guarantee holds.
 rapidocr-onnxruntime==1.4.4       # Apache-2.0  (pulls onnxruntime, opencv, Pillow)
 
+# --- local speech recognition for the assistant (§5 voice) ---
+# The browser's recogniser sends audio to a vendor; this one runs on the CPU
+# with weights on disk, so a spoken question never leaves the machine. Optional
+# because it is an input to one widget: without it the microphone falls back to
+# the browser engine where one exists, and /api/health says so. Install with
+# `make deps-stt`, which also fetches the weights once into data/models/.
+faster-whisper==1.2.1            # MIT (pulls ctranslate2 MIT, av BSD, tokenizers Apache-2.0, huggingface-hub Apache-2.0)
+
 # --- documentation tooling (not needed to run or demo SAMAN) ---
 # `make screenshots` drives the built UI in headless Chromium to regenerate the
 # README images, so they can never drift from what the app actually renders.
