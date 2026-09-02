@@ -101,6 +101,31 @@ class TestKnowledge:
         assert "never decides" in reply.answer
 
 
+class TestConversation:
+    @pytest.mark.parametrize("utterance", ["hello", "Hi there!", "namaste", "hey saman"])
+    def test_a_greeting_is_greeted(self, db, pipeline_run, utterance):
+        reply = assistant.answer(db, utterance, REGISTRAR)
+        assert reply.kind == "answer" and "SAMAN's assistant" in reply.answer
+        assert reply.suggestions
+
+    @pytest.mark.parametrize(
+        "utterance",
+        ["isnt saman the name of this project", "what does saman stand for", "who are you"],
+    )
+    def test_asking_what_saman_is_gets_the_answer(self, db, pipeline_run, utterance):
+        reply = assistant.answer(db, utterance, REGISTRAR)
+        assert reply.matched == {"topic": "what_is_saman"}
+
+    def test_off_topic_gets_the_scope_not_a_failed_query(self, db, pipeline_run, monkeypatch):
+        from app import knowledge
+
+        monkeypatch.setattr(knowledge, "answer", lambda q: None)
+        reply = assistant.answer(db, "who is the president of india", REGISTRAR)
+        assert reply.kind == "answer"
+        assert reply.answer == assistant.OUT_OF_SCOPE
+        assert reply.sql is None and not reply.rows
+
+
 class TestCopilotHandoff:
     def test_a_data_question_reaches_the_copilot(self, db, pipeline_run):
         reply = assistant.answer(db, "how many CNMCs have been issued", REGISTRAR)

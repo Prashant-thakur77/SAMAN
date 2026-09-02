@@ -176,6 +176,19 @@ function AnswerBlock({ answer }: { answer: CopilotAnswer }) {
         </div>
       )}
 
+      {answer.link && (
+        <Link to={answer.link.to} className="inline-block text-xs font-medium underline underline-offset-4">
+          {answer.link.label} →
+        </Link>
+      )}
+
+      {answer.sources && answer.sources.length > 0 && (
+        <p className="micro-label">
+          from the project's documents ·{' '}
+          {answer.sources.slice(0, 3).map((src) => `${src.source}: ${src.heading}`).join(' · ')}
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         {answer.sql && (
           <button

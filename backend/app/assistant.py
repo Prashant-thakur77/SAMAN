@@ -43,8 +43,8 @@ _GO_WORDS = re.compile(
 )
 #: Words that make the same screen name a question *about* it instead.
 _ASK_WORDS = re.compile(
-    r"\b(what|why|how|explain|meaning|means|is\s+a|is\s+the|does|kya|kaise|kyon|kyun|"
-    r"matlab|samjhao|batao)\b",
+    r"\b(what|why|how|who|which|when|explain|meaning|means|is\s+a|is\s+the|is\s+it|isn'?t|"
+    r"does|do\s+you|are\s+you|can\s+you|kya|kaise|kyon|kyun|kaun|matlab|samjhao|batao)\b",
     re.IGNORECASE,
 )
 
@@ -143,7 +143,10 @@ TOPICS: tuple[Topic, ...] = (
     Topic(
         "what_is_saman",
         ("what is saman", "what does saman do", "about saman", "saman kya hai", "purpose",
-         "what is this", "what is this site", "what is this website", "yeh kya hai"),
+         "what is this", "what is this site", "what is this website", "yeh kya hai",
+         "name of this project", "this project", "about this project", "saman name",
+         "what does saman stand for", "full form", "saman means", "who are you",
+         "what are you", "what can you do", "tell me about saman"),
         "SAMAN reads the material catalogues of several public sector undertakings, works "
         "out which rows describe the same material, drafts one clean record for each, and "
         "issues a Common National Material Code, the CNMC. Anything uncertain goes to a "
@@ -313,6 +316,24 @@ TOPICS: tuple[Topic, ...] = (
     ),
 )
 
+#: A greeting is answered as a greeting, not as a failed database query.
+_GREETING = re.compile(
+    r"^\s*(hi|hello|hey|namaste|namaskar|hola|good\s+(morning|afternoon|evening)|yo|sup|"
+    r"hii+|helo)\b[\s!.,]*(there|saman|assistant|bot)?[\s!.,]*$",
+    re.IGNORECASE,
+)
+GREETING_REPLY = (
+    "Hello. I am SAMAN's assistant. I can take you to any screen, explain how the system "
+    "decides two rows are one material, or answer questions about the data: duplicates, "
+    "approvals, prices, stock. What would you like?"
+)
+#: What is said when a question is outside everything this system knows.
+OUT_OF_SCOPE = (
+    "That is outside what I know. I can help with SAMAN: its screens, how it decides two "
+    "rows are one material, the CNMC, and the material data itself, such as duplicates, "
+    "pending approvals, price variance and idle stock."
+)
+
 #: What the panel offers before anyone has typed.
 SUGGESTIONS = (
     "Take me to the workbench",
@@ -440,6 +461,10 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
         return Reply("answer", "Ask me where to go, what something means, or a question "
                      "about the data.", suggestions=list(SUGGESTIONS))
 
+    if _GREETING.match(question):
+        return Reply("answer", GREETING_REPLY, suggestions=list(SUGGESTIONS),
+                     matched={"topic": "greeting"})
+
     text = normalise(question)
     topic = match_topic(text)
 
@@ -467,9 +492,14 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
     route, score = match_route(text)
 
     # 2. "Open the workbench" / "workbench" / "वर्कबेंच खोलो".
-    if route and score >= ROUTE_MATCH_THRESHOLD and (wants_to_go or not is_asking) and not (
-        topic and is_asking
-    ):
+    #    An exact screen name stands on its own. A fuzzy one ("varkabencha"
+    #    inside an English sentence scores 83 against nothing) counts only
+    #    with a verb that says go, and a matched topic beats anything short of
+    #    an exact name: "isn't SAMAN the name of this project" is a question.
+    route_exact = route is not None and score == 100
+    route_ok = route_exact or (route is not None and score >= ROUTE_MATCH_THRESHOLD and wants_to_go)
+    topic_wins = topic is not None and (is_asking or not route_exact)
+    if route_ok and (wants_to_go or not is_asking) and not topic_wins:
         # A bare data question that happens to contain a screen word, such as
         # "how many CNMCs have been issued", belongs to the Copilot.
         if not wants_to_go and _looks_like_data_question(text) and not (
@@ -517,6 +547,11 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
             f"I could not answer that directly. {route.label} is the nearest place: {route.blurb}",
             action=_navigate(route), matched={"route": route.path, "score": score},
         )
+    if not useful:
+        # Nothing matched anywhere. Say what this system is for, once, in
+        # plain words, rather than "no matches found" dressed up five ways.
+        return Reply("answer", OUT_OF_SCOPE, suggestions=list(SUGGESTIONS),
+                     matched={"topic": "out_of_scope"})
     return Reply(
         kind,
         result.text,

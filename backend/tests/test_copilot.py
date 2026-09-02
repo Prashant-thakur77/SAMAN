@@ -299,3 +299,30 @@ class TestGuardEscapes:
         answer = copilot.answer(db, "SELECT * FROM users; --", REGISTRAR)
         assert answer.refused
         assert "SQL" in answer.text
+
+
+class TestCopilotPageConversation:
+    """The Copilot screen uses the assistant's router, so it converses."""
+
+    def test_hello_is_not_a_failed_query(self, client, pipeline_run):
+        body = client.post("/api/copilot/query", json={"question": "hello"}).json()
+        assert "SAMAN's assistant" in body["answer"]
+        assert body["sql"] is None and body["refused"] is False
+
+    def test_what_is_saman_is_answered(self, client, pipeline_run):
+        body = client.post(
+            "/api/copilot/query", json={"question": "isnt saman the name of this project"}
+        ).json()
+        assert "Common National Material Code" in body["answer"]
+
+    def test_off_topic_states_the_scope(self, client, pipeline_run, monkeypatch):
+        from app import knowledge
+
+        monkeypatch.setattr(knowledge, "answer", lambda q: None)
+        body = client.post("/api/copilot/query", json={"question": "who is india president"}).json()
+        assert "outside what I know" in body["answer"]
+        assert body["suggestions"]
+
+    def test_data_questions_still_run_the_reviewed_query(self, client, pipeline_run):
+        body = client.post("/api/copilot/query", json={"question": "count duplicates by cpse"}).json()
+        assert body["sql"] and body["template"] == "duplicates_by_cpse"

@@ -440,6 +440,12 @@ export type CopilotAnswer = {
   llm_rejected?: string
   scope: { note: string }
   engine: string
+  /** For answers grounded in the project's documents rather than a query. */
+  sources?: { source: string; heading: string; score: number }[]
+  /** A screen the answer points to. */
+  link?: { type: 'navigate'; to: string; label: string } | null
+  /** Offered when the question was outside scope, or a greeting. */
+  suggestions?: string[]
 }
 
 export type CopilotSuggestions = {

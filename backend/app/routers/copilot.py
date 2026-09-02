@@ -47,22 +47,66 @@ def query(
     user: Annotated[User | None, Depends(current_user_optional)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
-    """Answer one question, guarded and scoped to the viewer's role (§0.9b)."""
+    """Answer one question, guarded and scoped to the viewer's role (§0.9b).
+
+    The same router the floating assistant uses, so a greeting is greeted,
+    "what is SAMAN" is answered, a screen is pointed to, and only a question
+    about the data reaches the reviewed queries. The local model may rephrase
+    a computed data answer; it is never handed a refusal or a "no match" to
+    dress up, which is what produced five different wordings of "nothing
+    found" for five off-topic questions.
+    """
+    from .. import assistant
+
     settings = get_settings()
     scope = scope_for(user)
-    answer = copilot.answer(db, body.question, scope, use_llm=settings.llm_enabled)
+    reply = assistant.answer(db, body.question, scope)
 
-    payload = answer.as_dict()
-    if settings.llm_enabled and not answer.refused:
-        composed, rejection = copilot.compose_with_llm(
-            body.question, answer.text, answer.rows
-        )
-        payload["answer"] = composed
-        payload["mode"] = "template" if rejection else "llm"
-        if rejection:
-            payload["llm_rejected"] = rejection
+    if reply.kind in ("answer", "refusal"):
+        sources = (reply.matched or {}).get("sources") if reply.matched else None
+        payload = {
+            "answer": reply.answer,
+            "citations": [],
+            "sql": None,
+            "params": {},
+            "rows": [],
+            "template": None,
+            "mode": reply.mode if reply.mode != "deterministic" else "template",
+            "refused": reply.kind == "refusal",
+            "note": (
+                "From the project's own documents: "
+                + " · ".join(f"{src['source']} · {src['heading']}" for src in sources[:3])
+                if sources
+                else None
+            ),
+            "sources": sources or [],
+            "suggestions": reply.suggestions,
+        }
+        if reply.action and reply.kind == "answer":
+            payload["link"] = reply.action
+    elif reply.kind == "navigate" and reply.action:
+        payload = {
+            "answer": f"{reply.answer} You will find it at {reply.action['to']}.",
+            "citations": [], "sql": None, "params": {}, "rows": [], "template": None,
+            "mode": "template", "refused": False, "note": None, "sources": [],
+            "link": reply.action, "suggestions": [],
+        }
     else:
-        payload["mode"] = "template"
+        # A data question: the reviewed query, with citations and SQL, exactly
+        # as before, and the model allowed to rephrase a real answer only.
+        answer = copilot.answer(db, body.question, scope, use_llm=settings.llm_enabled)
+        payload = answer.as_dict()
+        has_data = bool(answer.rows or answer.citations or answer.template)
+        if settings.llm_enabled and not answer.refused and has_data:
+            composed, rejection = copilot.compose_with_llm(
+                body.question, answer.text, answer.rows
+            )
+            payload["answer"] = composed
+            payload["mode"] = "template" if rejection else "llm"
+            if rejection:
+                payload["llm_rejected"] = rejection
+        else:
+            payload["mode"] = "template"
 
     payload["scope"] = scope.as_dict()
     payload["engine"] = detect().llm_mode

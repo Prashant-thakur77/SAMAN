@@ -110,7 +110,7 @@ describe('the landing page', () => {
   it('states the rule the veto layer exists for', () => {
     renderLanding()
     expect(screen.getByText('25 mm is not 30 mm.')).toBeInTheDocument()
-    expect(screen.getByText(/no score is permitted to overrule it/i)).toBeInTheDocument()
+    expect(screen.getByText(/no score overrules it/i)).toBeInTheDocument()
   })
 
   it('takes a real issued code apart', () => {

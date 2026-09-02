@@ -814,10 +814,13 @@ export default function Landing() {
                 </p>
               </Item>
               <Item>
-                <p className="max-w-[50ch] pt-8 text-lead text-muted">
-                  Two rows can read alike and still be different parts. Identity attributes
-                  are compared in real units, and a disagreement refuses the match. No score
-                  is permitted to overrule it.
+                <p className="max-w-[44ch] pt-8 text-lead text-muted">
+                  <strong className="font-semibold text-ink">
+                    Two rows can read alike and still be different parts.
+                  </strong>{' '}
+                  Every identity attribute is compared in real units.{' '}
+                  <strong className="font-semibold text-ink">One mismatch refuses the match.</strong>{' '}
+                  No score overrules it.
                 </p>
               </Item>
             </div>
