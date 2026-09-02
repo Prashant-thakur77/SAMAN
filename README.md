@@ -597,8 +597,8 @@ are kept honest — partial is marked partial.
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.927 / R 0.944, direction accuracy 0.990 |
-| Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.997 / R 0.960; directed equivalence P 0.927 / R 0.944, direction accuracy 0.990 |
+| Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance naming the rule that chose each value |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |
 | Mapping of existing CPSE codes to the common national code | mapping block on the item page | **Done** — `/items/:id` lists every CPSE's code under one CNMC |
@@ -609,8 +609,8 @@ are kept honest — partial is marked partial.
 | Integration capability with SAP/ERP | `ErpAdapter` + mock ERP in `app/erp.py` | **Partial** — MARA/MAKT/EKPO/MARD/MBEW written and reversed through a named adapter contract, against a mock rather than a real SAP system |
 | Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | **Done** — 12-month demand windows, price-per-base-unit variance, vendor overlap, last-price trend |
 | Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done** — pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |
-| Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done** — one position across 11,778 rows; 37 transfer suggestions avoiding ₹58.9 Cr of purchase, 2,032 dead-stock materials |
-| Inter-CPSE collaboration | sharing engine + joint tenders | **Done** — 1,801 joint-tender candidates across two or more CPSEs |
+| Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done** — one position across 11,778 rows; 28 transfer suggestions avoiding ₹15.9 Cr of purchase, 2,047 dead-stock materials worth ₹1,524 Cr |
+| Inter-CPSE collaboration | sharing engine + joint tenders | **Done** — 1,832 joint-tender candidates across two or more CPSEs, ₹235 Cr of identified saving under a stated 60% capture assumption |
 | Faster procurement/specification finalization | Smart-Create (`app/smart_create.py`, `/smart-create`) + §2D specs | **Done** — the same matcher and veto layer run before a code is raised; overrides need a reason and are audited |
 | Foundation for strategic sourcing | vendor overlap + combined-volume analysis | **Done** — combined volume and vendor overlap on the Opportunity dashboard |
 
