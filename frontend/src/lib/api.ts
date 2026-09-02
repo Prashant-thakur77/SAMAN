@@ -911,10 +911,29 @@ export type Transcript = {
   engine?: string
   note?: string
 }
-export const getVoice = () =>
-  api.get<{ available: boolean; mode: string; engine: string; languages: string[]; note: string }>(
-    '/assistant/voice',
-  )
+export type VoiceStatus = {
+  available: boolean
+  mode: string
+  engine: string
+  languages: string[]
+  note: string
+  tts?: { available: boolean; mode: string; engine: string; note: string }
+}
+export const getVoice = () => api.get<VoiceStatus>('/assistant/voice')
+/** One reply as a WAV, synthesised on the server. */
+export async function speakText(text: string): Promise<Blob> {
+  const res = await fetch('/api/assistant/speak', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text }),
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
+  }
+  return res.blob()
+}
 /** One spoken utterance as a PCM WAV blob, transcribed on the server. */
 export async function transcribeAudio(wav: Blob, language?: string): Promise<Transcript> {
   const form = new FormData()

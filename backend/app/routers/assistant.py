@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import assistant, knowledge, stt
+from .. import assistant, knowledge, stt, tts
 from ..auth import current_user_optional
 from ..capabilities import detect
 from ..config import get_settings
@@ -81,6 +82,17 @@ def voice() -> dict:
         "mode": stt.mode(),
         "engine": stt.engine_label(),
         "languages": list(stt.LANGUAGES),
+        "tts": {
+            "available": tts.available(),
+            "mode": tts.mode(),
+            "engine": tts.engine_label(),
+            "note": (
+                "Replies are synthesised on this server and never leave it."
+                if tts.available()
+                else "Local speech synthesis is not installed; run `make deps-tts`. "
+                "The widget falls back to the browser's voices where it has any."
+            ),
+        },
         "note": (
             "Audio is transcribed on this server and never leaves it."
             if stt.available()
@@ -106,3 +118,22 @@ async def transcribe(
         return stt.transcribe(payload, language=language)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+class Speak(BaseModel):
+    text: str = Field(max_length=tts.MAX_CHARS)
+
+
+@router.post("/speak")
+def speak(body: Speak) -> Response:
+    """One reply, as PCM WAV, synthesised locally. 503 when the engine is absent."""
+    if not tts.available():
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Local speech synthesis is not installed on this server (`make deps-tts`).",
+        )
+    try:
+        audio = tts.synthesize(body.text)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return Response(content=audio, media_type="audio/wav", headers={"Cache-Control": "no-store"})

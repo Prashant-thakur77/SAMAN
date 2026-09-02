@@ -9,10 +9,20 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getHealth = vi.fn()
-vi.mock('../lib/api', () => ({
-  getHealth: (...args: unknown[]) => getHealth(...args),
-  searchItems: vi.fn(async () => ({ items: [], total: 0 })),
-}))
+vi.mock('../lib/api', async () => {
+  // Everything else real: the shell mounts the assistant, which asks the API
+  // about voice on mount, and a mock that lacks those functions crashes the
+  // render for a reason that has nothing to do with the shell.
+  const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
+  return {
+    ...actual,
+    getHealth: (...args: unknown[]) => getHealth(...args),
+    searchItems: vi.fn(async () => ({ items: [], total: 0 })),
+    getVoice: vi.fn(async () => {
+      throw new Error('no api in this test')
+    }),
+  }
+})
 vi.mock('../lib/session', () => ({
   useSession: () => ({ user: null, loading: false, can: () => false }),
 }))

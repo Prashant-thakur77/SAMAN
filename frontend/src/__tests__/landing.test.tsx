@@ -11,6 +11,13 @@ import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../lib/api', async () => {
+  const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
+  // The assistant widget asks the API about voice when it mounts. That is the
+  // widget's business; the page itself must still fetch nothing.
+  return { ...actual, getVoice: vi.fn(async () => ({ available: false, tts: { available: false } })) }
+})
+
 import Landing from '../routes/Landing'
 import { ThemeProvider } from '../lib/theme'
 

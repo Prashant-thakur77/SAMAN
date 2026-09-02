@@ -462,5 +462,5 @@ browser.
 
 | Asset | Source | Licence |
 |---|---|---|
-| India country outline (`frontend/src/assets/india.svg`) | [India boundaries](https://github.com/datameet/maps/blob/master/Country/india-composite.geojson) by the [DataMeet India community](http://datameet.org/), simplified for display | CC BY 4.0 |
 | Whisper `base` weights (`data/models/whisper-base`, fetched by `make deps-stt`, not committed) | [Systran/faster-whisper-base](https://huggingface.co/Systran/faster-whisper-base), a CTranslate2 conversion of OpenAI Whisper | MIT |
+| Piper voice `en_US-arctic-medium` (`data/models/piper`, fetched by `make deps-tts`, not committed; default speaker `ksp`) | [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices), trained on [CMU ARCTIC](http://www.festvox.org/cmu_arctic/) | CMU ARCTIC (BSD-style, free for any use with the notice) |

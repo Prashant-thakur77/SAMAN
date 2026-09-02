@@ -20,7 +20,7 @@ export default {
       inverse: withAlpha('--inverse'),
       ok: withAlpha('--ok'),
       danger: withAlpha('--danger'),
-      // The one accent (spec §1.1 amended): active, linked, focused. Never a fill.
+      // Resolves to ink: active, linked, focused are drawn in the text colour.
       accent: withAlpha('--accent'),
       'accent-soft': withAlpha('--accent-soft'),
       // Front page only (see .landing in tokens.css). Outside it these
@@ -65,7 +65,7 @@ export default {
       // Only overlays get elevation (spec §1.1).
       boxShadow: {
         sm: '0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 1px -1px rgb(0 0 0 / 0.04)',
-        card: '0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -8px rgb(0 0 0 / 0.08)',
+        card: '0 1px 2px rgb(0 0 0 / 0.03), 0 6px 20px -12px rgb(0 0 0 / 0.10)',
       },
     },
   },

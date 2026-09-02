@@ -51,6 +51,7 @@ class Capabilities:
     #: way so an operator can see in one place what this install can do.
     ocr_mode: str = "absent"
     stt_mode: str = "absent"
+    tts_mode: str = "absent"
     degraded: list[str] = field(default_factory=list)
     #: True when Tier 1 is on the fallback because an operator chose it, not
     #: because splink is missing. A deliberate choice is not a degradation, and
@@ -94,6 +95,11 @@ class Capabilities:
                 "mode": self.stt_mode,
                 "engine": "faster-whisper (local, CPU)" if self.stt_mode != "absent" else "none",
                 "available": self.stt_mode != "absent",
+            },
+            "tts": {
+                "mode": self.tts_mode,
+                "engine": "piper (local, CPU)" if self.tts_mode != "absent" else "none",
+                "available": self.tts_mode != "absent",
             },
             "sovereign_mode": self.sovereign_mode,
             "degraded": self.degraded,
@@ -143,7 +149,13 @@ def detect() -> Capabilities:
     # perfectly complete install.
     ocr = "rapidocr" if (_importable("rapidocr_onnxruntime") and not forced) else "absent"
     from . import stt as _stt
+    from . import tts as _tts
 
+    tts_mode = _tts.mode()
+    if tts_mode == "absent":
+        notes.append(
+            "local speech synthesis absent (make deps-tts); replies use the browser's voices"
+        )
     stt_mode = _stt.mode()
     if stt_mode == "absent":
         notes.append(
@@ -169,6 +181,7 @@ def detect() -> Capabilities:
         llm_mode=llm,
         ocr_mode=ocr,
         stt_mode=stt_mode,
+        tts_mode=tts_mode,
         sovereign_mode=sovereign,
         # Notes about deliberate choices are worth showing on the health panel,
         # but they are not degradations and must not be counted as such.

@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const askAssistant = vi.fn()
 const getVoice = vi.fn()
 const transcribeAudio = vi.fn()
+const speakText = vi.fn()
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
   return {
@@ -20,6 +21,7 @@ vi.mock('../lib/api', async () => {
     askAssistant: (...args: unknown[]) => askAssistant(...args),
     getVoice: (...args: unknown[]) => getVoice(...args),
     transcribeAudio: (...args: unknown[]) => transcribeAudio(...args),
+    speakText: (...args: unknown[]) => speakText(...args),
   }
 })
 
@@ -97,7 +99,11 @@ describe('voice in the assistant', () => {
     renderAssistant()
     open()
     expect(screen.queryByRole('button', { name: /speak your question/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /read replies aloud/i })).not.toBeInTheDocument()
+    // The speaker button stays, and explains itself when pressed (tested below).
+    expect(screen.getByRole('button', { name: /read replies aloud/i })).toHaveAttribute(
+      'title',
+      expect.stringMatching(/no speech engine/i),
+    )
   })
 
   it('offers the browser recogniser when that is all there is', () => {
@@ -157,6 +163,50 @@ describe('voice in the assistant', () => {
     renderAssistant()
     open()
     expect(screen.queryByRole('button', { name: /talk mode/i })).not.toBeInTheDocument()
+  })
+
+  it('speaks through the server when the server has a voice', async () => {
+    getVoice.mockResolvedValue({
+      available: false,
+      mode: 'absent',
+      engine: 'none',
+      languages: [],
+      note: '',
+      tts: { available: true, mode: 'piper', engine: 'piper', note: '' },
+    })
+    speakText.mockResolvedValue(new Blob([new Uint8Array([82, 73, 70, 70])], { type: 'audio/wav' }))
+    const played: string[] = []
+    const realPlay = window.HTMLMediaElement.prototype.play
+    window.HTMLMediaElement.prototype.play = vi.fn(function (this: HTMLMediaElement) {
+      played.push(this.src)
+      return Promise.resolve()
+    })
+    ;(globalThis as unknown as { URL: typeof URL }).URL.createObjectURL ??= vi.fn(() => 'blob:wav')
+    ;(globalThis as unknown as { URL: typeof URL }).URL.revokeObjectURL ??= vi.fn()
+    try {
+      renderAssistant()
+      open()
+      const toggle = await screen.findByRole('button', {
+        name: /read replies aloud/i,
+      })
+      await waitFor(() => expect(toggle).toHaveAttribute('title', expect.stringMatching(/server/i)))
+      fireEvent.click(toggle)
+      await waitFor(() => expect(speakText).toHaveBeenCalled())
+      // The toggle's confirmation is spoken through the server too.
+      expect(speakText.mock.calls[0][0]).toMatch(/speaker on/i)
+      await waitFor(() => expect(played.length).toBeGreaterThan(0))
+    } finally {
+      window.HTMLMediaElement.prototype.play = realPlay
+    }
+  })
+
+  it('says so when neither the browser nor the server can speak', async () => {
+    // No speechSynthesis at all in this jsdom, and the server reports none.
+    getVoice.mockResolvedValue({ available: false, mode: 'absent', engine: 'none', languages: [], note: '', tts: { available: false, mode: 'absent', engine: 'none', note: '' } })
+    renderAssistant()
+    open()
+    fireEvent.click(screen.getByRole('button', { name: /read replies aloud/i }))
+    expect(await screen.findByText(/no voices and the server has no speech engine/i)).toBeInTheDocument()
   })
 
   it('reads a reply aloud when the speaker is on, and on request', async () => {

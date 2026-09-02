@@ -6,6 +6,7 @@ import {
   ApiError,
   askAssistant,
   getVoice,
+  speakText,
   transcribeAudio,
   type AssistantReply,
 } from '../lib/api'
@@ -269,7 +270,13 @@ export function Assistant() {
   const [voiceMode, setVoiceMode] = useState<VoiceMode>(() =>
     recognitionCtor() ? 'browser' : 'none',
   )
-  const [voiceOut] = useState(() => canSpeak())
+  /** Where spoken replies come from: the server's voice, the browser's, or
+   *  nowhere (in which case the speaker button says so instead of pretending). */
+  const [speechMode, setSpeechMode] = useState<'server' | 'browser' | 'none'>(() =>
+    canSpeak() ? 'browser' : 'none',
+  )
+  const voiceOut = speechMode !== 'none'
+  const player = useRef<HTMLAudioElement | null>(null)
   const recognition = useRef<SpeechRecognitionLike | null>(null)
   const capture = useRef<Capture | null>(null)
   const voicesRef = useRef<SpeechSynthesisVoice[]>([])
@@ -285,16 +292,44 @@ export function Assistant() {
   // the page can capture audio; the browser's is second; otherwise none.
   useEffect(() => {
     let alive = true
-    if (!canCapture()) return
     getVoice()
       .then((voice) => {
-        if (alive && voice.available) setVoiceMode('server')
+        if (!alive) return
+        if (voice.available && canCapture()) setVoiceMode('server')
+        if (voice.tts?.available) setSpeechMode('server')
       })
       .catch(() => {
-        /* the API being down leaves the browser engine, or nothing */
+        /* the API being down leaves the browser engines, or nothing */
       })
     return () => {
       alive = false
+    }
+  }, [])
+
+  // The browser's synthesiser counts only if it has a voice to speak with.
+  // Linux Chromium reports none and fails `speak()` silently, which is how a
+  // widget ends up "talking" to a room that hears nothing.
+  useEffect(() => {
+    if (!canSpeak()) return
+    let settled = false
+    const check = () => {
+      if (settled) return
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length > 0) {
+        settled = true
+        return
+      }
+    }
+    check()
+    const timer = window.setTimeout(() => {
+      if (!settled && window.speechSynthesis.getVoices().length === 0) {
+        setSpeechMode((current) => (current === 'server' ? current : 'none'))
+      }
+    }, 1500)
+    window.speechSynthesis.addEventListener?.('voiceschanged', check)
+    return () => {
+      window.clearTimeout(timer)
+      if (canSpeak()) window.speechSynthesis.removeEventListener?.('voiceschanged', check)
     }
   }, [])
 
@@ -339,17 +374,70 @@ export function Assistant() {
   }, [turns, reduce])
 
   const stopSpeaking = useCallback(() => {
-    if (!canSpeak()) return
-    try {
-      window.speechSynthesis.cancel()
-    } catch {
-      /* nothing was speaking */
+    if (player.current) {
+      try {
+        player.current.pause()
+        player.current.src = ''
+      } catch {
+        /* nothing was playing */
+      }
+      player.current = null
+    }
+    if (canSpeak()) {
+      try {
+        window.speechSynthesis.cancel()
+      } catch {
+        /* nothing was speaking */
+      }
     }
     setSpeaking(false)
   }, [])
 
+  const pushError = useCallback((text: string) => {
+    setTurns((prev) => [...prev, { id: ++counter.current, role: 'assistant', text, error: true }])
+  }, [])
+
+  const speakViaServer = useCallback(
+    async (text: string, onDone?: () => void) => {
+      try {
+        const blob = await speakText(text)
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        player.current = audio
+        const finish = () => {
+          URL.revokeObjectURL(url)
+          if (player.current === audio) player.current = null
+          setSpeaking(false)
+          onDone?.()
+        }
+        audio.onended = finish
+        audio.onerror = finish
+        setSpeaking(true)
+        await audio.play()
+      } catch (err) {
+        setSpeaking(false)
+        pushError(
+          err instanceof ApiError
+            ? err.message
+            : 'The reply could not be played. Check the browser allows audio on this site.',
+        )
+        onDone?.()
+      }
+    },
+    [pushError],
+  )
+
   const say = useCallback((text: string, onDone?: () => void) => {
-    if (!canSpeak() || !text) {
+    if (!text) {
+      onDone?.()
+      return
+    }
+    stopSpeaking()
+    if (speechMode === 'server') {
+      void speakViaServer(text, onDone)
+      return
+    }
+    if (speechMode !== 'browser' || !canSpeak()) {
       onDone?.()
       return
     }
@@ -380,17 +468,13 @@ export function Assistant() {
       setSpeaking(false)
       onDone?.()
     }
-  }, [])
+  }, [speechMode, speakViaServer, stopSpeaking])
 
   // Nothing keeps talking after the panel is closed or the page moves on.
   useEffect(() => {
     if (!open) stopSpeaking()
   }, [open, stopSpeaking])
   useEffect(() => () => stopSpeaking(), [stopSpeaking])
-
-  const pushError = useCallback((text: string) => {
-    setTurns((prev) => [...prev, { id: ++counter.current, role: 'assistant', text, error: true }])
-  }, [])
 
   const ask = useCallback(
     async (raw: string, heard?: string) => {
@@ -642,6 +726,12 @@ export function Assistant() {
   }
 
   function toggleSpeak() {
+    if (speechMode === 'none') {
+      pushError(
+        'This browser has no voices and the server has no speech engine. Run `make deps-tts` for local speech.',
+      )
+      return
+    }
     setSpeak((current) => {
       const next = !current
       try {
@@ -744,13 +834,19 @@ export function Assistant() {
                   <IconMic className="h-3.5 w-3.5" /> Talk
                 </button>
               )}
-              {voiceOut && (
+              {(
                 <button
                   type="button"
                   onClick={toggleSpeak}
-                  aria-pressed={speak}
-                  aria-label={speak ? 'Stop reading replies aloud' : 'Read replies aloud'}
-                  title={speak ? 'Reading replies aloud' : 'Read replies aloud'}
+                  aria-pressed={speak && voiceOut}
+                  aria-label={speak && voiceOut ? 'Stop reading replies aloud' : 'Read replies aloud'}
+                  title={
+                    speechMode === 'server'
+                      ? 'Read replies aloud (voice synthesised on this server)'
+                      : speechMode === 'browser'
+                        ? 'Read replies aloud (browser voice)'
+                        : 'No speech engine available'
+                  }
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full border border-hairline',
                     speak ? 'bg-inverse text-bg' : 'text-muted hover:text-ink',

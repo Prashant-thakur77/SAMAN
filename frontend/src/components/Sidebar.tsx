@@ -32,14 +32,17 @@ export function Sidebar({
     >
       {/* Wordmark: SAMAN, Plex Sans, uppercase, 20px, tracking 0.18em (spec §1.2) */}
       <div className="flex h-commandbar shrink-0 items-center border-b border-hairline px-4">
-        <span
+        {/* The wordmark is the way back to the front page from anywhere. */}
+        <NavLink
+          to="/welcome"
+          title="SAMAN front page"
           className={cn(
-            'select-none font-sans text-lg font-medium uppercase tracking-wordmark text-ink',
+            'select-none font-sans text-lg font-medium uppercase tracking-wordmark text-ink hover:text-accent',
             collapsed && 'text-sm',
           )}
         >
           {collapsed ? 'SM' : 'SAMAN'}
-        </span>
+        </NavLink>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4" aria-label="Main">

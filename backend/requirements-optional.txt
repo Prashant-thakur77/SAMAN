@@ -44,6 +44,12 @@ rapidocr-onnxruntime==1.4.4       # Apache-2.0  (pulls onnxruntime, opencv, Pill
 # `make deps-stt`, which also fetches the weights once into data/models/.
 faster-whisper==1.2.1            # MIT (pulls ctranslate2 MIT, av BSD, tokenizers Apache-2.0, huggingface-hub Apache-2.0)
 
+# --- local speech synthesis for the assistant (§5 voice) ---
+# Linux Chromium ships no voices, so the browser's speechSynthesis fails
+# silently; piper speaks on the CPU from a voice on disk instead. Optional for
+# the same reason as the recogniser. Install with `make deps-tts`.
+piper-tts==1.7.0                 # MIT (onnxruntime MIT; the voice, en_US-arctic, is CMU ARCTIC's permissive licence)
+
 # --- documentation tooling (not needed to run or demo SAMAN) ---
 # `make screenshots` drives the built UI in headless Chromium to regenerate the
 # README images, so they can never drift from what the app actually renders.

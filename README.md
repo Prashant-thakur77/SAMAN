@@ -589,10 +589,16 @@ room's noise floor. **Talk mode** makes it a conversation: listen, answer, read
 the answer aloud, listen again, until you switch it off. A question that arrived
 by voice is always answered by voice.
 
-**Speech out.** Turn the speaker on and replies are read aloud through the
-browser's `speechSynthesis`, preferring an Indian English voice; every reply also
-carries its own "read" button. The conversation survives moving between the
-front page and the application in the same tab.
+**Speech out, kept on the machine too.** Turn the speaker on and replies are
+read aloud. With `make deps-tts` installed, the server synthesises them with
+`piper` (CPU, a voice on disk, ~0.1 s per sentence) and the page plays the WAV;
+nothing leaves the machine. Without it the widget uses the browser's own voices
+where the browser actually has any. Linux Chromium ships none and fails
+silently, which is why the server path exists: the speaker button says which
+engine it has, and says plainly when there is none. Every reply also carries its
+own "read" button. A question that arrived by voice is answered by voice. The
+conversation survives moving between the front page and the application in the
+same tab.
 
 **A local model for everything else.** When Ollama is running on the machine
 (auto-detected on `localhost:11434`; set `OLLAMA_URL` to point elsewhere or
@@ -930,13 +936,12 @@ stale.
 
 Two surfaces, one family.
 
-**The application** is a product surface in the manner of Sarvam's Indus
-console: a soft grey page (`#F5F5F7`), white cards with one quiet border
-(`#E6E6E6`) and a soft shadow, near-black text and pill buttons, IBM Plex Sans
-and Mono. One accent, blue-indigo (`#3333CC`, `#8B94FF` in dark), marks what is
-active, linked or focused; status chips sit on a 10% tint of their own tone.
-Nothing is ever a large colour fill. Dark mode inverts the same tokens with the
-accent lifted, not the page simply negated.
+**The application** is monochrome (spec §1.1) with solid components in the
+manner of Sarvam's Indus console: a white page, cards with one quiet border and
+a soft shadow, pill buttons, rounded inputs, IBM Plex Sans and Mono. What is
+active, linked or focused is drawn in ink on a light grey pill; status chips sit
+on a 10% tint of their own tone, the only functional colour there is. Nothing
+is ever a large colour fill.
 
 **The front page** runs its own warm palette on the same tokens, scoped to one
 class: paper, a light-brown wash, ochre and its shades, black. Everything drawn

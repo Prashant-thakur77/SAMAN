@@ -2,7 +2,6 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import indiaSilhouette from '../assets/india.svg'
 
 import { Assistant, AssistantMark } from '../components/Assistant'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -383,30 +382,6 @@ function Jali({ className }: { className?: string }) {
   )
 }
 
-/**
- * India, as a silhouette behind the hero.
- *
- * The outline is DataMeet's composite country boundary (CC BY 4.0), which
- * follows the Survey of India depiction: its extent is 68.17–97.40 E and
- * 6.75–37.10 N, which is how you check that it is the Government of India's
- * map and not somebody else's. Simplified offline from 252,604 points to
- * 1,765 for a 21 KB asset; islands are kept. Applied as a CSS mask so it takes
- * a palette colour in either theme rather than a baked-in fill.
- */
-function BharatSilhouette({ className }: { className?: string }) {
-  const style: CSSProperties = {
-    WebkitMaskImage: `url(${indiaSilhouette})`,
-    maskImage: `url(${indiaSilhouette})`,
-    WebkitMaskRepeat: 'no-repeat',
-    maskRepeat: 'no-repeat',
-    WebkitMaskSize: 'contain',
-    maskSize: 'contain',
-    WebkitMaskPosition: 'right center',
-    maskPosition: 'right center',
-  }
-  return <div aria-hidden style={style} className={cn('bg-earth', className)} />
-}
-
 /** Textures for the giant wordmark, as data-URI SVG patterns in the page's
  *  own colours. One is picked per load, the way Sarvam's footer rotates the
  *  art behind its name; here the art is generated rather than photographed. */
@@ -669,15 +644,6 @@ export default function Landing() {
           animate="animate"
           className="relative flex min-h-[calc(100vh-4rem)] flex-col overflow-hidden"
         >
-          <motion.div
-            aria-hidden
-            initial={{ opacity: 0, scale: reduce ? 1 : 0.98 }}
-            animate={{ opacity: 1, scale: 1, transition: { duration: 1.1, ease: EASE, delay: 0.15 } }}
-            className="pointer-events-none absolute left-1/2 top-1/2 hidden h-[30rem] w-[40rem] -translate-x-1/2 -translate-y-[56%] md:block"
-          >
-            <BharatSilhouette className="h-full w-full opacity-[0.10]" />
-          </motion.div>
-
           <Band className="relative flex flex-1 flex-col items-center justify-center py-16 text-center md:py-20">
             <Item>
               <Ornament className="mx-auto h-6 w-48 text-earth" />
@@ -996,9 +962,7 @@ export default function Landing() {
           <p className="text-xs text-muted">
             A prototype. Not an official service of the Government of India.
           </p>
-          <p className="text-xs text-muted">
-            Map outline: DataMeet India community, CC BY 4.0. Everything else drawn in the page.
-          </p>
+          <p className="text-xs text-muted">Everything on this page is drawn in the page.</p>
         </Band>
         <GiantWordmark />
       </footer>

@@ -14,7 +14,7 @@ PYTEST      := $(VENV)/bin/pytest
 
 .PHONY: help setup venv deps deps-optional web-deps dev backend frontend test \
         lint build clean licenses licenses-check seed seed-large pipeline demo demo-splink \
-        demo-snapshot demo-restore tune test-web preview screenshots check deps-ocr deps-stt
+        demo-snapshot demo-restore tune test-web preview screenshots check deps-ocr deps-stt deps-tts
 
 help:  ## Show available targets
 	@echo "SAMAN — make targets"
@@ -55,6 +55,10 @@ deps-ocr: venv  ## Install the OCR reader for Smart-Create's camera input
 deps-stt: venv  ## Install local speech recognition for the assistant (one-time ~140 MB weight download)
 	@if command -v uv >/dev/null 2>&1; then uv pip install --python $(PY) faster-whisper==1.2.1; else $(PIP) install faster-whisper==1.2.1; fi
 	HF_HUB_DISABLE_XET=1 $(PY) -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-base', local_dir='data/models/whisper-base', allow_patterns=['*.bin','*.json','*.txt','*.model']); print('weights in data/models/whisper-base')"
+
+deps-tts: venv  ## Install local speech synthesis for the assistant (one-time ~75 MB voice download, CMU ARCTIC)
+	@if command -v uv >/dev/null 2>&1; then uv pip install --python $(PY) piper-tts==1.7.0; else $(PIP) install piper-tts==1.7.0; fi
+	$(PY) -m piper.download_voices --download-dir data/models/piper en_US-arctic-medium && echo "voice in data/models/piper"
 
 deps-optional: venv  ## Install splink + sentence-transformers (SAMAN runs without them)
 	@if command -v uv >/dev/null 2>&1; then \
