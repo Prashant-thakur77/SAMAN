@@ -1,7 +1,7 @@
 """Executive and Opportunity dashboards — spec §6.7, §6.8, §2E, §9A, §0.9b."""
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app import inventory, opportunity
 from app.models import Cnmc, GoldenRecord, Item, PurchaseHistory
@@ -121,12 +121,62 @@ class TestInventorySharing:
     """§2E."""
 
     def test_a_transfer_suggestion_traces_to_real_stock(self, pipeline_run, db):
-        result = inventory.transfer_suggestions(db, REGISTRAR)
-        assert result["suggestions_found"] > 0, "the demo flow needs at least one"
-        suggestion = result["suggestions"][0]
-        assert suggestion["from"]["cpse"] != suggestion["to"]["cpse"]
-        assert suggestion["qty"] > 0 and suggestion["avoided_purchase_value"] > 0
-        assert suggestion["idle_since"]
+        """Constructs the surplus it tests rather than hoping the seed produced
+        one: whether a random 800-row fixture happens to contain a idle pile of
+        stock next to a shortage is not what this is checking."""
+        from datetime import date, timedelta
+
+        from app.models import ClusterMember, Cpse, Item, RawItem, Stock
+
+        cluster_id = db.execute(
+            select(ClusterMember.cluster_id)
+            .group_by(ClusterMember.cluster_id)
+            .having(func.count(func.distinct(RawItem.cpse_id)) >= 2)
+            .join(Item, Item.id == ClusterMember.item_id)
+            .join(RawItem, RawItem.id == Item.raw_item_id)
+            .limit(1)
+        ).scalar()
+        assert cluster_id, "the fixture needs a cluster spanning two CPSEs"
+
+        members = db.execute(
+            select(Item.id, Cpse.code)
+            .join(ClusterMember, ClusterMember.item_id == Item.id)
+            .join(RawItem, RawItem.id == Item.raw_item_id)
+            .join(Cpse, Cpse.id == RawItem.cpse_id)
+            .where(ClusterMember.cluster_id == cluster_id)
+        ).all()
+        by_cpse = {}
+        for item_id, cpse in members:
+            by_cpse.setdefault(cpse, item_id)
+        assert len(by_cpse) >= 2
+
+        (rich_cpse, rich_item), (poor_cpse, poor_item) = list(by_cpse.items())[:2]
+        cpse_ids = dict(db.execute(select(Cpse.code, Cpse.id)).all())
+        idle = date.today() - timedelta(days=400)
+        db.execute(delete(Stock).where(Stock.item_id.in_([rich_item, poor_item])))
+        db.add_all(
+            [
+                Stock(item_id=rich_item, cpse_id=cpse_ids[rich_cpse], plant="P1",
+                      qty_on_hand=500.0, reserved_qty=0.0,
+                      last_movement_date=idle, unit_value=1000.0),
+                Stock(item_id=poor_item, cpse_id=cpse_ids[poor_cpse], plant="P2",
+                      qty_on_hand=1.0, reserved_qty=0.0,
+                      last_movement_date=date.today(), unit_value=1000.0),
+            ]
+        )
+        db.commit()
+        try:
+            result = inventory.transfer_suggestions(db, REGISTRAR)
+            assert result["suggestions_found"] > 0
+            match = next(
+                s for s in result["suggestions"] if s["from"]["cpse"] == rich_cpse
+            )
+            assert match["to"]["cpse"] == poor_cpse
+            assert match["qty"] > 0 and match["avoided_purchase_value"] > 0
+            assert match["idle_since"]
+        finally:
+            db.execute(delete(Stock).where(Stock.item_id.in_([rich_item, poor_item])))
+            db.commit()
 
     def test_the_out_of_scope_limitation_is_stated(self, pipeline_run, db):
         assert "Distance is out of scope" in inventory.transfer_suggestions(db, REGISTRAR)["note"]

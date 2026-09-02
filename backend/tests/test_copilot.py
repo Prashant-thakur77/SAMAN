@@ -107,7 +107,22 @@ class TestRouting:
         assert "which material class" in answer.text.lower()
 
     def test_an_item_question_falls_through_to_retrieval(self, db, pipeline_run):
-        answer = copilot.answer(db, "BEARING BALL 6205 ZZ SKF", REGISTRAR)
+        """Asks about a material the fixture actually contains.
+
+        The question used to be a hard-coded bearing description, which made
+        the test a check on whether one particular row survived the seed rather
+        than on whether retrieval works.
+        """
+        from sqlalchemy import select
+
+        from app.models import GoldenRecord
+
+        description = db.execute(
+            select(GoldenRecord.std_description).limit(1)
+        ).scalar()
+        assert description, "the fixture needs at least one golden record"
+
+        answer = copilot.answer(db, description, REGISTRAR)
         assert answer.template == "retrieval" and answer.citations
 
     def test_an_unanswerable_question_says_so(self, db, pipeline_run):

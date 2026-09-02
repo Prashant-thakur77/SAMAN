@@ -1069,6 +1069,22 @@ SUBSTITUTION_RULES: dict[str, str] = {
 # Seeding
 # --------------------------------------------------------------------------
 
+#: Classes a CPSE plausibly catalogues by the box, and the pack sizes each is
+#: actually sold in. Nobody buys a 300NB gate valve by the hundred.
+PACKAGED_CLASSES = {
+    "fastener.bolt.hex",
+    "gasket.spiral_wound",
+    "ppe.helmet",
+    "chemical.reagent",
+}
+
+PACK_SIZES = {
+    "fastener.bolt.hex": (25, 50, 100),
+    "gasket.spiral_wound": (10, 25, 50),
+    "ppe.helmet": (10, 25),
+    "chemical.reagent": (10, 25),
+}
+
 PROFILES = {
     # The demo profile keeps §7's shape exactly: each product is rendered into
     # 1-4 CPSE-specific descriptions. Every demo flow and metric gate uses it.
@@ -1215,9 +1231,16 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
 
             # Pack basis quirk: a minority of rows are catalogued by the box,
             # which is what exercises the §2A.1 pack-size normalization.
+            #
+            # Only for things that are actually sold by the box. Applying it to
+            # every class put 35,200 individual 80NB gate valves behind two
+            # purchase orders on the Opportunity dashboard — arithmetically
+            # correct, since quantity and price were both normalised to the
+            # base unit, and still not a number any procurement officer would
+            # believe. A demo that fails a domain sniff test fails.
             pack = 1
-            if rng.random() < 0.08:
-                pack = rng.choice((10, 25, 50, 100))
+            if product.class_code in PACKAGED_CLASSES and rng.random() < 0.08:
+                pack = rng.choice(PACK_SIZES[product.class_code])
                 description = f"{description}, BOX OF {pack}"
                 uom_word = "BOX"
 
