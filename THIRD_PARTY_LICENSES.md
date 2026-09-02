@@ -464,3 +464,4 @@ browser.
 |---|---|---|
 | Whisper `base` weights (`data/models/whisper-base`, fetched by `make deps-stt`, not committed) | [Systran/faster-whisper-base](https://huggingface.co/Systran/faster-whisper-base), a CTranslate2 conversion of OpenAI Whisper | MIT |
 | Piper voice `en_US-arctic-medium` (`data/models/piper`, fetched by `make deps-tts`, not committed; default speaker `ksp`) | [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices), trained on [CMU ARCTIC](http://www.festvox.org/cmu_arctic/) | CMU ARCTIC (BSD-style, free for any use with the notice) |
+| Peacock feather drawing on the front page (`frontend/src/components/art/PeacockFeather.tsx`) | [Peacock feather.svg](https://commons.wikimedia.org/wiki/File:Peacock_feather.svg) on Wikimedia Commons, recoloured to the page's palette | CC0 1.0 (public domain dedication) |

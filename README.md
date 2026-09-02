@@ -40,8 +40,8 @@ make dev       # API on :8000, UI on :5173
 ```
 
 `make demo` exits non-zero if the §8 M3 gate is not met, so it doubles as the
-quality check. `make check` runs everything CI does: ruff, 882 backend tests,
-67 frontend tests, the type-check and the licence gate. `make demo-snapshot`
+quality check. `make check` runs everything CI does: ruff, 902 backend tests,
+69 frontend tests, the type-check and the licence gate. `make demo-snapshot`
 and `make demo-restore` take and reinstate a restore point in under a second,
 for when a demo goes somewhere unplanned.
 
@@ -945,8 +945,10 @@ is ever a large colour fill.
 
 **The front page** runs its own warm palette on the same tokens, scoped to one
 class: paper, a light-brown wash, ochre and its shades, black. Everything drawn
-on it is generated in the page except the India silhouette, which is credited
-above.
+on it is generated in the page except the peacock feather, which is
+[Peacock feather.svg](https://commons.wikimedia.org/wiki/File:Peacock_feather.svg)
+from Wikimedia Commons (CC0, public domain) recoloured to the palette, and
+listed in `THIRD_PARTY_LICENSES.md`.
 
 Motion follows §1.5 throughout: route slides, 20 ms list staggers, a 4 px shake
 on a failed sign-in, and every animation collapses to opacity under

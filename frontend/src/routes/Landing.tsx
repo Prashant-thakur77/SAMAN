@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 
 
 import { Assistant, AssistantMark } from '../components/Assistant'
+import { PeacockFeather } from '../components/art/PeacockFeather'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { cn } from '../lib/cn'
@@ -302,61 +303,6 @@ function Lotus({ className }: { className?: string }) {
   )
 }
 
-/**
- * One peacock feather. A gently curved rachis; barbs that leave it at a
- * rising angle and follow a teardrop envelope, sparse at the foot and dense
- * and long just below the eye; the eye itself in three layers with the dark
- * heart at its centre that makes it a peacock's and not a fern.
- */
-function PeacockFeather({ className }: { className?: string }) {
-  const top = -340
-  // The stem bends slightly; barbs are placed along it by sampling the curve.
-  const stemAt = (t: number) => {
-    const y = 20 + (top - 20) * t
-    const x = 14 * Math.sin(t * Math.PI) // a soft S: out on the way up, back at the eye
-    return { x, y }
-  }
-  const barbs = Array.from({ length: 64 }, (_, i) => {
-    const t = 0.08 + (i / 63) * 0.92
-    const { x, y } = stemAt(t)
-    // envelope: long just below the eye, tapering to a point above it, so
-    // the eye sits inside the barbs the way it does on the bird
-    const env = Math.pow(Math.sin(Math.min(1, t) * Math.PI), 0.7)
-    const len = 18 + env * 100
-    const lift = 0.62 // barbs rise as they leave the stem
-    return (
-      <g key={i}>
-        <path d={`M${x} ${y} q ${-len * 0.42} ${-len * lift * 0.5} ${-len} ${-len * lift}`} />
-        <path d={`M${x} ${y} q ${len * 0.42} ${-len * lift * 0.5} ${len} ${-len * lift}`} />
-      </g>
-    )
-  })
-  const eye = stemAt(0.84)
-  return (
-    <svg
-      viewBox="-150 -440 300 490"
-      aria-hidden
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1"
-      strokeLinecap="round"
-      className={className}
-    >
-      <g opacity="0.85">{barbs}</g>
-      <path d={`M${stemAt(0).x} ${stemAt(0).y} Q ${stemAt(0.5).x * 2} ${stemAt(0.5).y} ${eye.x} ${eye.y}`} strokeWidth="2.4" />
-      {/* the eye */}
-      <ellipse cx={eye.x} cy={eye.y - 18} rx="46" ry="60" fill="rgb(var(--earth-soft))" stroke="rgb(var(--earth))" strokeWidth="1.2" />
-      <ellipse cx={eye.x} cy={eye.y - 14} rx="31" ry="42" fill="rgb(var(--earth))" opacity="0.7" stroke="none" />
-      <path
-        d={`M${eye.x} ${eye.y + 4} C ${eye.x - 22} ${eye.y - 16}, ${eye.x - 22} ${eye.y - 44}, ${eye.x} ${eye.y - 34} C ${eye.x + 22} ${eye.y - 44}, ${eye.x + 22} ${eye.y - 16}, ${eye.x} ${eye.y + 4} Z`}
-        fill="rgb(var(--ink))"
-        opacity="0.8"
-        stroke="none"
-      />
-      <ellipse cx={eye.x - 6} cy={eye.y - 30} rx="4" ry="6" fill="rgb(var(--bg))" opacity="0.7" stroke="none" />
-    </svg>
-  )
-}
 
 /** The catalogue itself: a bearing, a gate valve, a flange, a bolt, a pipe. */
 function MaterialFrieze() {
@@ -916,7 +862,7 @@ export default function Landing() {
         {/* ---- the veto, given the room it deserves ---- */}
         <Reveal className="relative overflow-hidden border-t border-hairline bg-surface">
           {/* One peacock feather owns the right side; nothing is set over it. */}
-          <Backdrop className="absolute bottom-0 right-[8%] hidden h-[96%] w-[22%] text-earth/80 lg:block">
+          <Backdrop className="absolute bottom-0 right-[5%] hidden h-[94%] w-[30%] opacity-80 lg:block">
             <PeacockFeather className="h-full w-full" />
           </Backdrop>
           <Band className="relative py-20 md:py-24">
