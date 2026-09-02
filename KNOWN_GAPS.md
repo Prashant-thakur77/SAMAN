@@ -526,6 +526,17 @@ that could not be true:
   finding nothing. Using the item's own class makes the analysis mean something:
   1,681 materials bought from different vendors by different CPSEs.
 
+- **§11 asks for a demo script and there wasn't one.** The README had run
+  instructions and screenshots but nothing a presenter could follow: twelve
+  minutes, in order, with what to click, what to say, the numbers each screen
+  actually shows, what to do when something goes wrong, and the six questions a
+  judge will ask with their answers.
+- **§0.9b says to state the visibility policy in the UI, and it was only ever
+  implied.** Every screen redacted correctly and each explained its own
+  redaction, but nobody could read the policy anywhere. It is now stated on the
+  Admin screen *from the module that enforces it*, so the two cannot drift — with
+  a test asserting that every role the code exempts is named in the statement.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

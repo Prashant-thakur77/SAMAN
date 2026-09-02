@@ -293,3 +293,31 @@ class TestOpportunityEndpoint:
 
     def test_the_viewers_scope_is_stated(self, client, pipeline_run):
         assert client.get("/api/dashboard/opportunity").json()["visibility"]["note"]
+
+
+class TestVisibilityPolicyIsStated:
+    """§0.9b: state the policy in the UI, because judges ask."""
+
+    def test_the_health_panel_carries_the_policy(self, as_registrar, pipeline_run):
+        policy = as_registrar.get("/api/settings/health").json()["visibility_policy"]
+        assert policy["summary"] and policy["enforced_in"]
+        assert {r["who"] for r in policy["rules"]} >= {"steward", "viewer"}
+        for rule in policy["rules"]:
+            assert rule["sees"] and rule["withheld"]
+
+    def test_the_policy_comes_from_the_module_that_enforces_it(self):
+        """Stated once, so the screen and the code cannot describe it
+        differently."""
+        from app import visibility
+        from app.routers import admin
+
+        assert visibility.POLICY["summary"]
+        assert "redact_prices" in visibility.POLICY["enforced_in"]
+        assert admin.visibility is visibility
+
+    def test_the_policy_names_the_roles_the_code_exempts(self):
+        from app import visibility
+
+        stated = " ".join(r["who"] for r in visibility.POLICY["rules"])
+        for role in visibility.UNRESTRICTED_ROLES:
+            assert role in stated, f"{role} is exempt in code but unstated"

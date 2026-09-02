@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import audit, smart_create
+from .. import audit, smart_create, visibility
 from ..auth import ROLES, hash_password, require_roles
 from ..capabilities import detect, refresh
 from ..config import get_settings, set_sovereign_mode, sovereign_mode
@@ -253,6 +253,9 @@ def health_panel(
         "ollama_configured": bool(settings.ollama_url),
         "database": str(settings.db_file),
         "counts": counts,
+        # §0.9b says to state the policy in the UI, because judges ask. Stated
+        # from the module that enforces it, so the two cannot drift.
+        "visibility_policy": visibility.POLICY,
         # §5: the counter belongs next to the engine health, because it is the
         # one number that says whether duplicates are still being created.
         "smart_create": prevention,

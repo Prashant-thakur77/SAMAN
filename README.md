@@ -132,6 +132,117 @@ of them from the running application.
 
 ---
 
+## Demo script
+
+Twelve minutes, in order, with what to say and what to click. Every number below
+is what a freshly seeded `make demo` actually shows. Take a snapshot first —
+`make demo-snapshot` — so a wrong turn costs a second rather than the demo.
+
+**0 · Before they arrive (1 min).** `make demo` (60 s), then `make dev`. Sign in
+as **R. Krishnan · registrar**. Leave the browser on Home.
+
+**1 · The problem, in one search (90 s).** Go to **Search**, type `6205`.
+Twelve rows appear across all four CPSEs: `BRG,BALL,6205,OPEN,500 KG,150 C,NTN`,
+`बेयरिंग BALL 6205 ZZ 800 KG 100 C NSK`, `BALL 25MM BORE 52MM OD 15MM W…`. Same
+bearings, four house styles, one of them in Hindi.
+
+> "Four CPSEs, four ways of writing the same bearing. Nobody can see that today
+> because nothing joins them."
+
+**2 · What the platform did with it (90 s).** Click any row. The item page puts
+the **raw record beside the golden record** it now belongs to, with its CNMC, the
+stock every CPSE holds of it — three plants, one tied-up value — and what it last
+cost. Click **open cluster**: the golden description, the template that rendered
+it, and **which member and which rule produced every fused field**.
+
+> "One code, one description, and a full account of where each field came from.
+> That last column is what an auditor asks for."
+
+**3 · Where it refuses to guess (2 min).** Go to **Workbench → Grey**. The card
+shows two records side by side, tier scores, and an attribute comparison with the
+identity-critical fields marked. Read the **Tier 3 recommendation** aloud — it
+names the attribute that decided it. Press `A`, then `R` on the next card.
+
+> "3,687 pairs out of 94,000 come to a human. The other 99.4% were decided, and
+> every one of them is inspectable. The recommendation is a recommendation —
+> the pair stays in the queue until a person acts."
+
+Switch to **Auto-low**. These are the pairs the veto layer *refused*.
+
+> "This is the important tab. A 25 mm bore is not a 30 mm bore however similar
+> the text is. Similarity never overrides a specification."
+
+**4 · Stopping the next duplicate (2 min).** Go to **Smart-Create**. Paste:
+
+```
+वाल्व GATE 32NB CL 300 CS FLGD 51.1 BAR KITZ
+```
+
+> "A house style that appears nowhere in the catalogue — abbreviated, reordered,
+> with a Hindi token."
+
+It comes back **99.8%** against an existing coded material, shows the attributes
+it read, lists a different manufacturer's **interchangeable** part separately,
+and names the near-misses it ruled out — *"Close, but size nb mm is 25.0, not
+32.0."*
+
+> "Everything else here cleans up duplicates. This is the part that stops them
+> being made."
+
+**5 · The money (90 s).** **Opportunity → Joint tenders.** ₹233 Cr across 1,830
+materials two or more CPSEs both buy. Move the discount slider.
+
+> "The assumption is on the screen, not in a footnote: 60% of the observed
+> spread, capturable at combined volume. Change it and the number changes."
+
+**Inventory sharing** tab: 30 transfer suggestions, ₹19.3 Cr of purchases avoided
+because stock already sits idle at another CPSE's plant.
+
+**6 · Into SAP (2 min).** **Migration → Run a dry run.** The traffic light: safe,
+**held — open purchase order**, and stranded value. Apply, then open the journal
+and **roll it back**.
+
+> "The consolidation is worth nothing until it reaches the system the buyer uses,
+> and the way consolidations fail is by changing a material under a live PO. That
+> one is held. And the rollback is byte-identical — the test suite hashes every
+> row of the ERP to prove it."
+
+**7 · Governance (90 s).** **Audit → Verify chain.**
+
+> "Every mutation, hash-chained. The hash covers its own sequence number, so the
+> chain detects reordering as well as tampering. Deletions are void events, never
+> deletes."
+
+**Admin** shows which engine is live in each tier, the sovereign-mode toggle, and
+the prevented-duplicate counter.
+
+**8 · If they ask about privacy (1 min).** **Restricted mode.** Compare two
+CPSEs. Show the encodings crossing the wire.
+
+> "Two CPSEs find their common materials without either handing over a catalogue.
+> That's the payload — no description, no code, no price. It costs recall against
+> the full matcher, and that cost is on the screen."
+
+### If something goes wrong
+
+- **Wrong turn in the data:** `make demo-restore` — under a second.
+- **Backend died:** the UI says so and tells you to restart it; `make backend`.
+- **Asked for a fresh ingest:** **Onboard** takes a ~2,000-row CSV end to end in
+  under a minute, on top of the existing state. Never re-run the 150k profile.
+
+### Questions they will ask
+
+| Question | Answer |
+|---|---|
+| "How do you know it's right?" | 40% held-out split, never tuned against. P 0.997 / R 0.960 pairwise, B-cubed beside it, and a naive baseline at R 0.029 so the lift is visible. |
+| "What's the worst class?" | `bearing.ball.deep_groove`, F1 0.947 — named on the metrics page rather than averaged away. |
+| "Does it scale?" | 156,000 rows in 19 minutes on one laptop core, all four gates still passing. |
+| "What if it's wrong?" | Nothing auto-merges past the veto layer; every decision is reversible; the ERP write-back rolls back byte-identical. |
+| "Can I see another CPSE's prices?" | Not as a steward — you get an anonymised band. Enforced in one place so the dashboards and the Copilot cannot diverge. |
+| "Does it need the internet?" | No. `/api/health` shows which engine is live in each tier and every optional one has a working fallback. |
+
+---
+
 ## Data
 
 `make seed` builds a synthetic estate with full ground truth, reproducibly from

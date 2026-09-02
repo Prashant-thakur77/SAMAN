@@ -168,6 +168,34 @@ export default function Admin() {
         </section>
       )}
 
+      {health && (
+        <section className="space-y-4">
+          <h2 className="micro-label">Who can see what</h2>
+          <p className="max-w-prose text-sm text-muted">
+            {health.visibility_policy.summary}
+          </p>
+          <Table>
+            <THead>
+              <TH>Role</TH>
+              <TH>Sees</TH>
+              <TH>Withheld</TH>
+            </THead>
+            <TBody>
+              {health.visibility_policy.rules.map((rule) => (
+                <TR key={rule.who}>
+                  <TD mono>{rule.who}</TD>
+                  <TD>{rule.sees}</TD>
+                  <TD className="text-muted">{rule.withheld}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+          <p className="max-w-prose text-xs text-muted">
+            {health.visibility_policy.enforced_in}
+          </p>
+        </section>
+      )}
+
       <section className="space-y-4">
         <h2 className="micro-label">Users</h2>
         <Table>

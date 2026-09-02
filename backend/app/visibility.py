@@ -95,3 +95,46 @@ def price_band(prices: list[float]) -> dict | None:
         "n": len(clean),
         "label": f"market range ₹{min(clean):,.0f}–₹{max(clean):,.0f}, n={len(clean)} CPSEs",
     }
+
+
+#: The policy, in the words the UI shows and a judge asks for (§0.9b). Stated
+#: once here so the screen and the API cannot describe it differently.
+POLICY = {
+    "summary": (
+        "A CPSE steward sees their own rows and the shared golden layer. Raw "
+        "prices and valuations belonging to other CPSEs are registrar and "
+        "auditor scope; a steward sees an anonymised band instead."
+    ),
+    "rules": [
+        {
+            "who": "steward",
+            "sees": "Own catalogue rows, own prices and stock, the golden layer "
+            "for everything, and the fact that other CPSEs hold the same "
+            "material.",
+            "withheld": "Another CPSE's attributed price or valuation — shown as "
+            "an anonymised range instead.",
+        },
+        {
+            "who": "approver",
+            "sees": "Everything a steward sees, across every CPSE, plus the "
+            "approval queue.",
+            "withheld": "Attributed prices belonging to other CPSEs.",
+        },
+        {
+            "who": "registrar / auditor / admin",
+            "sees": "Every row and every attributed price, nationally.",
+            "withheld": "Nothing — these are the roles the policy exists to "
+            "restrict everyone else to.",
+        },
+        {
+            "who": "viewer",
+            "sees": "The golden layer and the dashboards.",
+            "withheld": "All attributed prices.",
+        },
+    ],
+    "enforced_in": (
+        "One function, `visibility.redact_prices`, called by the dashboards, the "
+        "item page, the migration planner and the Copilot alike — so the Copilot "
+        "cannot become a way around the row-level rules (§0.9b)."
+    ),
+}

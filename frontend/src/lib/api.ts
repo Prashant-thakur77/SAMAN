@@ -592,6 +592,11 @@ export type HealthPanel = {
   database: string
   counts: Record<string, number>
   smart_create: SmartCreateStats
+  visibility_policy: {
+    summary: string
+    rules: { who: string; sees: string; withheld: string }[]
+    enforced_in: string
+  }
   audit: VerifyResponse
 }
 
