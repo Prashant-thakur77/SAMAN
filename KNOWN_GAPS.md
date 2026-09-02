@@ -486,5 +486,5 @@ that could not be true:
   and prints the table. The chosen value is frozen in `match.T_HIGH`.
 - Every number in `GET /api/metrics` and in `make demo` is from the **40%
   held-out split**. A pair counts only when both its items are held out.
-- Blocking configuration was selected on tuning recall (0.9853) and reports
-  held-out separately (0.9836).
+- Blocking configuration was selected on tuning recall (0.9953) and reports
+  held-out separately (0.9944).
