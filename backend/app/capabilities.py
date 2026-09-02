@@ -46,6 +46,10 @@ class Capabilities:
     embedding_mode: str  # "sentence-transformers" | "tfidf"
     llm_mode: str  # "ollama" | "deterministic"
     sovereign_mode: bool
+    #: "rapidocr" | "absent". Not a tier — reading a nameplate is an input to
+    #: Smart-Create, not a stage of the matcher — but it is reported the same
+    #: way so an operator can see in one place what this install can do.
+    ocr_mode: str = "absent"
     degraded: list[str] = field(default_factory=list)
     #: True when Tier 1 is on the fallback because an operator chose it, not
     #: because splink is missing. A deliberate choice is not a degradation, and
@@ -77,6 +81,13 @@ class Capabilities:
                 "mode": self.llm_mode,
                 "engine": "ollama" if self.llm_mode == "ollama" else "rule-based adjudicator",
                 "degraded": self.llm_mode != "ollama",
+            },
+            "ocr": {
+                "mode": self.ocr_mode,
+                "engine": "rapidocr (PP-OCRv4, bundled weights)"
+                if self.ocr_mode != "absent"
+                else "not installed",
+                "available": self.ocr_mode != "absent",
             },
             "sovereign_mode": self.sovereign_mode,
             "degraded": self.degraded,
@@ -121,6 +132,15 @@ def detect() -> Capabilities:
             else "sentence-transformers unavailable — Tier 2 using TF-IDF char 3-5grams"
         )
 
+    # Not counted as a degradation: OCR is an optional input to one screen, and
+    # the screen says so itself. Counting it would make the chip cry wolf on a
+    # perfectly complete install.
+    ocr = "rapidocr" if (_importable("rapidocr_onnxruntime") and not forced) else "absent"
+    if ocr == "absent":
+        notes.append(
+            "OCR reader not installed — Smart-Create accepts typed descriptions only"
+        )
+
     if settings.llm_enabled:
         llm = "ollama"
     else:
@@ -134,6 +154,7 @@ def detect() -> Capabilities:
         linkage_mode=linkage,
         embedding_mode=embedding,
         llm_mode=llm,
+        ocr_mode=ocr,
         sovereign_mode=sovereign,
         # Notes about deliberate choices are worth showing on the health panel,
         # but they are not degradations and must not be counted as such.

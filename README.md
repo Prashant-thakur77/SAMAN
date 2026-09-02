@@ -127,8 +127,8 @@ of them from the running application.
 | **Smart-Create** — the duplicate check before a code is raised. | **Restricted mode** — two CPSEs find their common materials without either handing over a catalogue. |
 | ![Item](docs/screenshots/item.png) | ![Cluster](docs/screenshots/cluster.png) |
 | **Item** — the raw row beside the golden record it belongs to, every CPSE's stock of it, and its price history as a sparkline. | **Cluster** — the golden record, the template that rendered it, and which member and rule produced every fused field. |
-| ![Onboard](docs/screenshots/onboard.png) | |
-| **Onboard** — upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. | |
+| ![Onboard](docs/screenshots/onboard.png) | ![Scanning a marking](docs/screenshots/scan.png) |
+| **Onboard** — upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. | **Camera input** — photograph a material's marking and the same duplicate check runs on what the reader saw. |
 
 ---
 
@@ -188,6 +188,18 @@ and names the near-misses it ruled out — *"Close, but size nb mm is 25.0, not
 
 > "Everything else here cleans up duplicates. This is the part that stops them
 > being made."
+
+**4a · If you have a phone to hand (60 s).** Still on **Smart-Create**, press
+**Photograph the marking** and shoot a valve nameplate or a bearing race.
+
+> "It reads the marking, not the part. A photograph cannot tell a 25 mm bore
+> from a 30 mm one, cannot see a seal type and cannot tell a Class 300 valve
+> from a Class 600 — and those are exactly what decides whether two records are
+> the same material. So we read the manufacturer's own stamped text and hand it
+> to the same check. Nothing downstream knows it came from a camera."
+
+The chips show what the reader saw, with its confidence; the description box
+shows the repaired text; the result is the ordinary Smart-Create answer.
 
 **5 · The money (90 s).** **Opportunity → Joint tenders.** ₹233 Cr across 1,830
 materials two or more CPSEs both buy. Move the discount slider.
@@ -723,6 +735,70 @@ With `OLLAMA_URL` set, a local model rephrases the sentence — and only the
 sentence. If it introduces a figure that is not in the evidence, its output is
 discarded and the deterministic wording stands, the same guard the Copilot uses.
 
+### Reading a material's marking
+
+A storekeeper holding an unlabelled part cannot type its description, but the
+part usually states it: a bearing has `6205-2Z SKF` stamped on the race, a valve
+carries a nameplate. **Smart-Create takes a photograph of that marking**, reads
+it, and runs the ordinary duplicate check on the text.
+
+**It reads the marking; it does not recognise the part.** That distinction is
+the whole design, and it is the honest answer to "why not a vision model?". A
+photograph cannot tell a 25 mm bore from a 30 mm one without a reference scale,
+cannot see a seal type, and cannot separate a Class 300 valve from a Class 600
+one. Those are precisely the identity-critical attributes the §2A veto layer
+decides on — so a classifier trained on shapes would be confidently wrong about
+the only things that matter. Reading the manufacturer's own text is a claim the
+platform can stand behind.
+
+Nothing downstream is special-cased: the reader's output is just another
+description, scored by the same tiers and refused by the same veto layer. A
+misread produces a bad query and the answer "nothing matched", which is correct
+behaviour rather than a new failure mode.
+
+**Measured, on held-out materials, at four image qualities:**
+
+| Image | Resolves to the right material | Reader confidence |
+|---|---|---|
+| Clean plate | **0.967** | 0.98 |
+| Angled, slight blur | **0.900** | 0.98 |
+| Phone photo: shake, lost contrast, JPEG | 0.300 | 0.88 |
+| Past legibility | 0.000 — reads *nothing* | — |
+
+The plates are rendered and then degraded, not photographed, so this measures
+the reader, normalizer, extractor and matcher together on progressively harder
+images. It does not measure a scratched race under sodium light, which would
+need photographs nobody has. The number is honest about which question it
+answers.
+
+**The reader's own confidence predicts the outcome, sharply** — which is what
+makes the retake prompt honest rather than decorative:
+
+| Reader confidence | Resolves correctly |
+|---|---|
+| 0.90 and up | 0.855 |
+| 0.80 – 0.90 | 0.286 |
+| below 0.70 | 0.000 |
+
+So below 90% the screen asks for another photograph instead of presenting a
+result. That threshold is set from the sweep, not by eye.
+
+**Three repairs earn most of the accuracy.** The reader's failures are almost
+all spacing: a designation split in half (`63 13`), a token broken after a digit
+(`SS3 16-PTFE`), `O` read for zero beside a digit (`17OMM`), and two words run
+together (`GATEVALVE`, which costs the class assignment and with it every
+attribute). Each repair is conservative by construction and was checked against
+what it must *not* touch — splitting `SS316` into `SS 316` would destroy a
+material grade, so a short alphabetic prefix is never split, and a run-together
+token is only divided when both halves are words the taxonomy already knows.
+Together they took clean plates from 0.867 to 0.967 and phone-quality ones from
+0.133 to 0.300.
+
+The reader is optional: `make deps-ocr` installs it, `/api/health` reports
+whether it is present, and without it Smart-Create still takes typed
+descriptions. Weights ship inside the wheel, so nothing is downloaded and the
+offline guarantee holds.
+
 ---
 
 ## Problem-statement traceability
@@ -747,7 +823,7 @@ are kept honest — partial is marked partial.
 | Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done** — pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |
 | Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done** — one position across 11,778 rows; 30 transfer suggestions avoiding ₹19.3 Cr of purchase, 2,028 dead-stock materials worth ₹1,538 Cr |
 | Inter-CPSE collaboration | sharing engine + joint tenders | **Done** — 1,830 joint-tender candidates across two or more CPSEs, ₹233 Cr of identified saving under a stated 60% capture assumption |
-| Faster procurement/specification finalization | Smart-Create (`app/smart_create.py`, `/smart-create`) + §2D specs | **Done** — the same matcher and veto layer run before a code is raised; overrides need a reason and are audited |
+| Faster procurement/specification finalization | Smart-Create (`app/smart_create.py`, `/smart-create`) + §2D specs | **Done** — the same matcher and veto layer run before a code is raised; overrides need a reason and are audited. Camera input reads a material's marking into the same check (0.967 on a clean plate, held out) |
 | Foundation for strategic sourcing | vendor overlap + combined-volume analysis | **Done** — combined volume plus vendor overlap on 1,681 materials bought from different vendors by different CPSEs |
 
 ---

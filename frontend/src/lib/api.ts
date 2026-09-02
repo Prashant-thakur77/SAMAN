@@ -63,6 +63,8 @@ export type Health = {
     linkage: TierHealth
     embedding: TierHealth
     llm: TierHealth
+    /** Not a tier — an optional input to Smart-Create's camera. */
+    ocr?: { mode: string; engine: string; available: boolean }
     sovereign_mode: boolean
     degraded: string[]
   }
@@ -734,6 +736,19 @@ export type SmartCreateResult = {
   }
   create_token: string
   token_expires_in: number
+  /** Present only when the description came from a photographed marking. */
+  ocr?: OcrReading
+  scanned?: boolean
+  retake?: boolean
+}
+
+export type OcrReading = {
+  engine: string
+  text: string
+  lines: { text: string; confidence: number; uncertain: boolean }[]
+  mean_confidence: number
+  uncertain_lines: number
+  seconds: number
 }
 
 export type SmartCreateStats = {
@@ -770,6 +785,20 @@ export const smartCreateCreate = (body: {
   )
 
 export const getSmartCreateStats = () => api.get<SmartCreateStats>('/smart-create/stats')
+
+export async function smartCreateScan(file: File, uom?: string): Promise<SmartCreateResult> {
+  const form = new FormData()
+  form.append('file', file)
+  if (uom) form.append('uom', uom)
+  const res = await fetch('/api/smart-create/scan', {
+    method: 'POST',
+    body: form,
+    credentials: 'include',
+  })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
+  return body as SmartCreateResult
+}
 
 // ---- PPRL restricted mode (§5, M10) ----
 

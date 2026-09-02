@@ -14,7 +14,7 @@ PYTEST      := $(VENV)/bin/pytest
 
 .PHONY: help setup venv deps deps-optional web-deps dev backend frontend test \
         lint build clean licenses licenses-check seed seed-large pipeline demo demo-splink \
-        demo-snapshot demo-restore tune test-web preview screenshots check
+        demo-snapshot demo-restore tune test-web preview screenshots check deps-ocr
 
 help:  ## Show available targets
 	@echo "SAMAN — make targets"
@@ -48,6 +48,9 @@ deps: venv  ## Install required backend dependencies
 	else \
 	  $(PIP) install --upgrade pip && $(PIP) install -r backend/requirements.txt; \
 	fi
+
+deps-ocr: venv  ## Install the OCR reader for Smart-Create's camera input
+	$(PIP) install rapidocr-onnxruntime==1.4.4
 
 deps-optional: venv  ## Install splink + sentence-transformers (SAMAN runs without them)
 	@if command -v uv >/dev/null 2>&1; then \

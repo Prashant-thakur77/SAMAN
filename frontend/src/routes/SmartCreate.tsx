@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
@@ -11,11 +11,13 @@ import {
   smartCreateCheck,
   smartCreateCreate,
   smartCreateReuse,
+  smartCreateScan,
   type SmartCreateMatch,
   type SmartCreateResult,
   type SmartCreateStats,
 } from '../lib/api'
 import { cn } from '../lib/cn'
+import { useHealth } from '../lib/useHealth'
 
 const ACTION_TONE = {
   reuse: 'danger',
@@ -47,6 +49,9 @@ export default function SmartCreate() {
   const [message, setMessage] = useState<{ tone: 'ok' | 'danger'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [resolved, setResolved] = useState(false)
+  const { health } = useHealth()
+  const camera = useRef<HTMLInputElement>(null)
+  const ocrReady = health?.capabilities.ocr?.available ?? false
 
   useEffect(() => {
     void getSmartCreateStats().then(setStats).catch(() => setStats(null))
@@ -67,6 +72,16 @@ export default function SmartCreate() {
       setBusy(false)
     }
   }
+
+  const scan = (file: File) =>
+    run(async () => {
+      setResolved(false)
+      // The photograph never reaches the matcher — the server reads the
+      // marking and runs the same check on the resulting text.
+      const scanned = await smartCreateScan(file, uom || undefined)
+      setDescription(scanned.ocr?.text ?? '')
+      setResult(scanned)
+    })
 
   const check = () =>
     run(async () => {
@@ -168,9 +183,50 @@ export default function SmartCreate() {
             />
           </Field>
         </div>
-        <Button variant="primary" disabled={busy || !description.trim()} onClick={() => void check()}>
-          {busy ? 'Checking…' : 'Check before creating'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="primary"
+            disabled={busy || !description.trim()}
+            onClick={() => void check()}
+          >
+            {busy ? 'Checking…' : 'Check before creating'}
+          </Button>
+
+          {ocrReady ? (
+            <>
+              <input
+                ref={camera}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                aria-label="Photograph the marking"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (file) void scan(file)
+                }}
+              />
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => camera.current?.click()}
+              >
+                Photograph the marking
+              </Button>
+              <span className="max-w-sm text-xs text-muted">
+                Point at the stamped marking or the nameplate, not the part — the
+                reader reads text, and a photograph cannot tell a 25 mm bore from a
+                30 mm one.
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-muted">
+              Camera input needs the OCR reader — <span className="font-mono">make deps-ocr</span>.
+              Typing the description does the same check.
+            </span>
+          )}
+        </div>
       </section>
 
       {message && (
@@ -182,6 +238,40 @@ export default function SmartCreate() {
         >
           {message.text}
         </p>
+      )}
+
+      {result?.ocr && (
+        <section className="space-y-3 border border-hairline p-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="micro-label">What the reader saw</p>
+            <StatusChip tone={result.retake ? 'danger' : 'ok'}>
+              {Math.round(result.ocr.mean_confidence * 100)}% confident
+            </StatusChip>
+            <span className="font-mono text-xs text-muted">
+              {result.ocr.engine} · {result.ocr.seconds}s
+            </span>
+          </div>
+          <ul className="flex flex-wrap gap-2">
+            {result.ocr.lines.map((line, index) => (
+              <li
+                key={`${line.text}-${index}`}
+                title={`${Math.round(line.confidence * 100)}% confident`}
+                className={cn(
+                  'border border-hairline px-2 py-1 font-mono text-xs',
+                  line.uncertain ? 'text-danger' : 'text-ink',
+                )}
+              >
+                {line.text}
+              </li>
+            ))}
+          </ul>
+          {result.retake && (
+            <p className="max-w-prose text-sm text-danger">
+              Below 90% confidence a reading resolves to the right material about one
+              time in five. Move closer, steady the camera, or type it instead.
+            </p>
+          )}
+        </section>
       )}
 
       {result && action && (

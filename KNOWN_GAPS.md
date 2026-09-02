@@ -20,6 +20,7 @@ pass on the held-out split of the demo profile.
 | Equivalence recall is 0.946 | Up from 0.607 this session. Candidate coverage 0.976, and the engine finds 0.969 of what reaches it — both halves of the old loss are closed. Still reported with its ceiling rather than as a bare number | The residue is spread thinly rather than concentrated in one cause, which is where further tuning stops paying |
 | An LLM never *proposes* equivalences | §2B names it as source 4, the lowest-trust one. The basis and its 0.50 weight exist; nothing emits it | Would need a model installed, and it can only ever add review-queue suggestions |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries — measured at **22 ms** for a full page of the grey queue, so it is a real N+1 and not a real problem yet | Worth batching if the queue view is ever paged deeply; measured rather than assumed either way |
+| Camera input is measured on rendered plates | 0.967 on a clean plate and 0.300 on a phone-quality one, held out — but the plates are drawn and then degraded, not photographed. A scratched bearing race under warehouse light is untested | It would need images nobody has. The report says which question it answers rather than implying the other one |
 | Restricted mode is quadratic | 300 x 300 records is 90,000 comparisons, and there is no plaintext to block on | A real cost of the privacy guarantee, which is why it is a periodic overlap report and not the live matching path |
 | Login throttling is in-process | Eight failures per (client, account) per five minutes, held in memory | SAMAN is a single-process deployment by design; a multi-worker one would need shared storage |
 
@@ -556,6 +557,35 @@ that could not be true:
   it the worst kind of bug: two numbers for one material, in a platform whose
   entire purpose is to stop exactly that. The ERP now seeds from `stock`, with a
   test comparing 25 materials across both.
+
+### Camera input findings
+
+- **A photograph cannot see what decides identity.** This is why the feature
+  reads the marking rather than recognising the part, and it is worth stating as
+  a design decision rather than a limitation: a 25 mm and a 30 mm bore are
+  identical in an image without a reference scale, a seal type is invisible, and
+  a Class 300 valve looks like a Class 600 one. Those are exactly the
+  identity-critical attributes §2A vetoes on. A shape classifier would be
+  confidently wrong about the only things that matter.
+- **The reader's own confidence turned out to predict the outcome.** Above 0.90
+  a reading resolves to the right material 0.855 of the time; between 0.80 and
+  0.90, 0.286; below 0.70, never. That sweep set the retake threshold at 0.90 —
+  a number from a measurement rather than a guess, and the reason the screen can
+  honestly say "this reading is not worth showing you".
+- **Nearly every failure was spacing, not character recognition.** A designation
+  split in half (`63 13`), a token broken after a digit (`SS3 16-PTFE`), `O` for
+  zero beside a digit (`17OMM`), and two words run together (`GATEVALVE`, which
+  cost the class assignment and with it every attribute). Three conservative
+  repairs took clean plates 0.867 → 0.967 and phone-quality ones 0.133 → 0.300.
+  Each was checked against what it must not touch: splitting `SS316` into
+  `SS 316` would destroy a material grade, so a run-together token is only
+  divided when both halves are words the taxonomy already knows.
+- **A test fixture lied and the code was right.** The large-image test drew
+  fixed-size text on a bigger canvas, so the marking shrank as the file grew —
+  a property of the fixture, not of any camera. Fixing it surfaced the property
+  actually worth asserting: when downscaling destroys the lettering the reader
+  reports *low confidence* rather than a confident misread, which is what the
+  retake threshold acts on.
 
 ### Measurement honesty
 

@@ -56,6 +56,22 @@ def _open_drawer(page) -> None:
     page.wait_for_selector("[role=dialog]", timeout=15_000)
 
 
+#: A rendered valve nameplate, used for the camera screenshot. Drawn rather
+#: than photographed so the image is reproducible; the reader treats it the same
+#: either way.
+NAMEPLATE = REPO / "docs" / "fixtures" / "nameplate.png"
+
+
+def _scan_nameplate(page) -> None:
+    """Drive the camera input with a nameplate image (§5).
+
+    A file input with `capture` opens the camera on a phone and a file picker on
+    a laptop; Playwright sets the file directly, which is the same code path.
+    """
+    page.set_input_files("input[type=file]", str(NAMEPLATE))
+    page.wait_for_selector("text=What the reader saw", timeout=30_000)
+
+
 def _smart_create(page) -> None:
     page.fill("#sc-description", SMART_CREATE_PROBE)
     page.fill("#sc-uom", "NOS")
@@ -99,6 +115,13 @@ SHOTS: list[Shot] = [
     Shot("executive", "/dashboard/executive", "text=Analytics"),
     Shot("opportunity", "/dashboard/opportunity", "text=Analytics", theme="dark"),
     Shot("smart-create", "/smart-create", "text=Smart-Create", setup=_smart_create),
+    Shot(
+        "scan",
+        "/smart-create",
+        "text=Smart-Create",
+        setup=_scan_nameplate,
+        settle_ms=1_200,
+    ),
     Shot("migration", "/migration", "text=ERP migration", setup=_migration_dry_run),
     Shot(
         "restricted-mode",

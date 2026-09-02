@@ -26,6 +26,16 @@ sentence-transformers==3.3.1     # Apache-2.0 (Tier 2 embeddings, all-MiniLM-L6-
 # Weights are loaded from the local cache only; SAMAN never downloads a model at
 # runtime (spec §9). Without a warm cache, Tier 2 stays on TF-IDF.
 
+# --- camera input to Smart-Create (§5) ---
+# Reads a material's stamped marking or nameplate so a storekeeper can check a
+# part they cannot type. Optional because it is one screen's input, not a tier:
+# without it Smart-Create still takes typed descriptions and /api/health says
+# the reader is absent. Install with `make deps-ocr`.
+#
+# The PP-OCRv4 weights ship inside the wheel (16 MB), so nothing is downloaded
+# at runtime and the offline guarantee holds.
+rapidocr-onnxruntime==1.4.4       # Apache-2.0  (pulls onnxruntime, opencv, Pillow)
+
 # --- documentation tooling (not needed to run or demo SAMAN) ---
 # `make screenshots` drives the built UI in headless Chromium to regenerate the
 # README images, so they can never drift from what the app actually renders.

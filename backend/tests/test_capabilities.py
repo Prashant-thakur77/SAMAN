@@ -18,6 +18,18 @@ def clear_caches():
     capabilities.detect.cache_clear()
 
 
+def test_ocr_absence_is_not_counted_as_a_degraded_tier(monkeypatch):
+    """OCR is an optional input to one screen, and the screen says so itself.
+    Counting it as a degraded tier would make the chip cry wolf on an otherwise
+    complete install."""
+    monkeypatch.setattr(capabilities, "_importable", lambda module: module != "rapidocr_onnxruntime")
+    monkeypatch.setattr(capabilities, "get_settings", lambda: Settings(ollama_url="http://x"))
+
+    caps = capabilities.detect().as_dict()
+    assert caps["ocr"]["available"] is False
+    assert all(caps[tier]["degraded"] is False for tier in ("linkage", "embedding", "llm"))
+
+
 def test_all_optional_present_upgrades_every_tier(monkeypatch):
     monkeypatch.setattr(capabilities, "_importable", lambda _module: True)
     monkeypatch.setattr(
@@ -42,7 +54,14 @@ def test_nothing_present_degrades_every_tier(monkeypatch):
     assert caps.linkage_mode == "rapidfuzz"
     assert caps.embedding_mode == "tfidf"
     assert caps.llm_mode == "deterministic"
-    assert len(caps.degraded) == 3
+    assert caps.ocr_mode == "absent"
+
+    # One note per tier, plus the OCR reader. Asserted by content rather than by
+    # count so that adding an optional component does not silently change what
+    # this test is checking.
+    notes = " | ".join(caps.degraded)
+    for expected in ("splink", "sentence-transformers", "Tier 3", "OCR reader"):
+        assert expected in notes
 
 
 def test_sovereign_mode_overrides_ollama_url(monkeypatch):
