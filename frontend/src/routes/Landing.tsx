@@ -213,7 +213,7 @@ function FortSkyline() {
     <svg
       aria-hidden
       viewBox="0 0 1440 300"
-      preserveAspectRatio="xMidYMax slice"
+      preserveAspectRatio="xMidYMax meet"
       fill="currentColor"
       className="h-full w-full"
     >
@@ -260,6 +260,81 @@ function FortSkyline() {
       {chhatri(40, G - 120, 16)}
       {chhatri(1400, G - 120, 16)}
       <rect x="0" y={G - 6} width="1440" height="6" />
+    </svg>
+  )
+}
+
+/** A lotus, the national flower: layered petals from a single teardrop,
+ *  rotated, on a leaf. Filled in the soft tone, outlined in the deep one. */
+function Lotus({ className }: { className?: string }) {
+  const petal = 'M0 0 C -18 -36, -18 -78, 0 -104 C 18 -78, 18 -36, 0 0 Z'
+  const rows: Array<[number, number, number]> = [
+    // [count, spread in degrees, scale]
+    [7, 110, 1],
+    [6, 96, 0.82],
+    [5, 70, 0.64],
+  ]
+  return (
+    <svg viewBox="-140 -130 280 170" aria-hidden className={className}>
+      <ellipse cx="0" cy="18" rx="120" ry="16" fill="rgb(var(--earth))" opacity="0.28" />
+      {rows.map(([count, spread, scale], r) =>
+        Array.from({ length: count }, (_, i) => {
+          const angle = -spread / 2 + (spread / (count - 1)) * i
+          return (
+            <path
+              key={`${r}-${i}`}
+              d={petal}
+              transform={`rotate(${angle}) scale(${scale})`}
+              fill="rgb(var(--earth-soft))"
+              stroke="rgb(var(--earth))"
+              strokeWidth={1.2 / scale}
+              opacity={0.85}
+            />
+          )
+        }),
+      )}
+    </svg>
+  )
+}
+
+/** Peacock feathers, the national bird: a fan of three, each a stalk, a
+ *  spray of barbs and the eye. Line art in the ochre tone. */
+function PeacockFeathers({ className }: { className?: string }) {
+  const feather = (rotate: number, key: string) => {
+    const barbs = Array.from({ length: 26 }, (_, i) => {
+      const t = i / 25
+      const y = -40 - t * 250
+      const len = 26 + Math.sin(t * Math.PI) * 44
+      return (
+        <g key={i}>
+          <path d={`M0 ${y} q-${len * 0.5} -6 -${len} -14`} />
+          <path d={`M0 ${y} q${len * 0.5} -6 ${len} -14`} />
+        </g>
+      )
+    })
+    return (
+      <g key={key} transform={`rotate(${rotate})`}>
+        <path d="M0 0 L0 -300" strokeWidth="2.2" />
+        {barbs}
+        <ellipse cx="0" cy="-300" rx="34" ry="46" fill="rgb(var(--earth-soft))" opacity="0.9" />
+        <ellipse cx="0" cy="-300" rx="22" ry="30" fill="rgb(var(--earth))" opacity="0.55" />
+        <ellipse cx="0" cy="-296" rx="10" ry="14" fill="rgb(var(--ink))" opacity="0.7" />
+      </g>
+    )
+  }
+  return (
+    <svg
+      viewBox="-260 -380 520 400"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.1"
+      strokeLinecap="round"
+      className={className}
+    >
+      {feather(-26, 'l')}
+      {feather(0, 'c')}
+      {feather(26, 'r')}
     </svg>
   )
 }
@@ -655,30 +730,30 @@ export default function Landing() {
           variants={listVariants(reduce)}
           initial="initial"
           animate="animate"
-          className="relative flex min-h-[calc(100vh-4rem)] flex-col overflow-hidden"
+          className="relative flex h-[calc(100vh-4rem)] min-h-[36rem] flex-col overflow-hidden"
         >
-          <Band className="relative flex flex-1 flex-col items-center justify-center py-16 text-center md:py-20">
+          <Band className="relative flex shrink-0 flex-col items-center justify-center py-8 text-center md:py-10">
             <Item>
-              <Ornament className="mx-auto h-6 w-48 text-earth" />
+              <Ornament className="mx-auto h-7 w-56 text-earth" />
             </Item>
             <Item className="pt-4">
               <Eyebrow>Standardised Asset &amp; Material Analysis Network</Eyebrow>
             </Item>
             <Item>
-              <h1 className="mx-auto max-w-[16ch] pt-7 text-display font-medium">
+              <h1 className="mx-auto max-w-[16ch] pt-6 text-display font-medium">
                 One Nation, One Material Code
               </h1>
             </Item>
             <Item>
-              <div aria-hidden className="mx-auto mt-8 h-1 w-24 bg-earth" />
+              <div aria-hidden className="mx-auto mt-6 h-1 w-24 bg-earth" />
             </Item>
             <Item>
-              <p className="mx-auto max-w-[44ch] pt-8 text-lead text-muted">
+              <p className="mx-auto max-w-[44ch] pt-6 text-lead text-muted">
                 Every public sector undertaking codes the same part differently. SAMAN works
                 out which rows are one material, and gives it one code.
               </p>
             </Item>
-            <Item className="flex flex-wrap items-center justify-center gap-4 pt-10">
+            <Item className="flex flex-wrap items-center justify-center gap-4 pt-8">
               <a href="#how">
                 <Button variant="primary">See how it decides</Button>
               </a>
@@ -688,8 +763,11 @@ export default function Landing() {
             </Item>
           </Band>
 
-          {/* The city, pale and whole, inside the first screen. */}
-          <Backdrop className="relative h-40 w-full shrink-0 text-earth-soft opacity-60 md:h-52 lg:h-60">
+          {/* The fort, whole, along the foot of the first screen. Its height is
+              a share of the viewport and the drawing fits inside it (`meet`), so
+              on any screen the whole fort is on the first page, towers and all;
+              on a short screen it is a little smaller, never a little cropped. */}
+          <Backdrop className="relative mx-auto min-h-[5rem] w-full flex-1 text-earth-soft opacity-75">
             <FortSkyline />
           </Backdrop>
         </motion.div>
@@ -737,8 +815,11 @@ export default function Landing() {
         </Reveal>
 
         {/* ---- problem by problem ---- */}
-        <Reveal id="fixes" className="border-t border-hairline bg-surface">
-          <Band className="py-20 md:py-24">
+        <Reveal id="fixes" className="relative border-t border-hairline bg-surface">
+          <Backdrop className="absolute inset-x-0 top-0 h-12 text-earth/35">
+            <Jali />
+          </Backdrop>
+          <Band className="relative py-20 md:py-24">
             <Item>
               <Eyebrow>What it fixes</Eyebrow>
             </Item>
@@ -772,18 +853,14 @@ export default function Landing() {
             </ul>
           </Band>
 
-          <Backdrop className="relative h-28 text-earth/25 md:h-36">
+          <Backdrop className="relative h-28 text-earth/50 md:h-36">
             <MaterialFrieze />
           </Backdrop>
         </Reveal>
 
         {/* ---- how it works ---- */}
-        <Reveal id="how" className="relative overflow-hidden border-t border-hairline">
-          <Backdrop className="absolute inset-x-0 bottom-0 h-32 text-earth-soft opacity-45 md:h-44">
-            <FortSkyline />
-          </Backdrop>
-          {/* The list ends above the skyline, never on top of it. */}
-          <Band className="relative pb-44 pt-20 md:pb-60 md:pt-24">
+        <Reveal id="how" className="relative border-t border-hairline">
+          <Band className="relative pb-6 pt-20 md:pt-24">
             <Item>
               <Eyebrow>How it works</Eyebrow>
             </Item>
@@ -808,13 +885,17 @@ export default function Landing() {
               ))}
             </ol>
           </Band>
+          {/* The same fort, whole, closing the section. */}
+          <Backdrop className="relative mx-auto mt-6 aspect-[1440/300] w-full max-w-[1440px] text-earth-soft opacity-60">
+            <FortSkyline />
+          </Backdrop>
         </Reveal>
 
         {/* ---- the veto, given the room it deserves ---- */}
         <Reveal className="relative overflow-hidden border-t border-hairline bg-surface">
-          {/* The lattice owns the right third; nothing is set over it. */}
-          <Backdrop className="absolute inset-y-0 right-0 hidden w-1/3 text-earth/[0.14] lg:block">
-            <Jali />
+          {/* Peacock feathers own the right side; nothing is set over them. */}
+          <Backdrop className="absolute bottom-0 right-[4%] hidden h-[92%] w-[34%] text-earth/70 lg:block">
+            <PeacockFeathers className="h-full w-full" />
           </Backdrop>
           <Band className="relative py-20 md:py-24">
             <div className="max-w-[60%] lg:max-w-[58ch]">
@@ -841,8 +922,12 @@ export default function Landing() {
         </Reveal>
 
         {/* ---- the code ---- */}
-        <Reveal id="code" className="border-t border-hairline">
-          <Band className="py-20 md:py-24">
+        <Reveal id="code" className="relative border-t border-hairline">
+          <Band className="relative py-20 md:py-24">
+            {/* A lotus at the shoulder of the section, whole, beside the title. */}
+            <Backdrop className="absolute right-6 top-14 hidden h-44 w-72 md:right-10 lg:block">
+              <Lotus className="h-full w-full" />
+            </Backdrop>
             <Item>
               <Eyebrow>The code</Eyebrow>
             </Item>
@@ -877,14 +962,14 @@ export default function Landing() {
               ))}
             </dl>
           </Band>
-          <Backdrop className="relative h-24 text-earth/20 md:h-32">
+          <Backdrop className="relative h-24 text-earth/45 md:h-32">
             <Colonnade />
           </Backdrop>
         </Reveal>
 
         {/* ---- guarantees, over the racking ---- */}
         <Reveal id="guarantees" className="relative overflow-hidden border-t border-hairline bg-surface">
-          <Backdrop className="absolute inset-x-0 bottom-0 h-40 text-earth/[0.12] md:h-52">
+          <Backdrop className="absolute inset-x-0 bottom-0 h-40 text-earth/30 md:h-52">
             <Racking />
           </Backdrop>
           <Band className="relative pb-48 pt-20 md:pb-64 md:pt-24">
