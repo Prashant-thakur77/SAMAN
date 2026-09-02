@@ -30,6 +30,9 @@ none of them can drift from what the application actually renders.*
 
 ## Run it
 
+Needs Python 3.12 (or [uv](https://docs.astral.sh/uv/)) and Node 22 or newer;
+the frontend test runner uses jsdom 30, which will not start on Node 20.
+
 ```bash
 make setup     # creates backend/.venv on Python 3.12, installs both apps
 make demo      # seeds, runs the pipeline, prints the held-out metrics table

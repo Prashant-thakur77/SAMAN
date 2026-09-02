@@ -6,8 +6,8 @@ hole. This file is updated at the end of every milestone.
 
 ## Status: M1–M10 complete
 
-Every milestone in §8 is built, including the M10 stretch. 752 backend tests and
-19 frontend tests pass; `make check` runs what CI runs. The four §8 M3 gates
+Every milestone in §8 is built, including the M10 stretch. 822 backend tests and
+51 frontend tests pass; `make check` runs what CI runs. The four §8 M3 gates
 pass on the held-out split of the demo profile.
 
 ### Not built, or built only as far as stated

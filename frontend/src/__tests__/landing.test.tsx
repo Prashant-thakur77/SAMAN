@@ -74,6 +74,21 @@ describe('the landing page', () => {
     expect(screen.getByText(/^[A-Z]{4}-\d{3}-\d{6}-\d$/)).toBeInTheDocument()
   })
 
+  it('pairs each problem with the mechanism that closes it', () => {
+    renderLanding()
+    const fixes = screen.getByRole('list', { name: /twelve problems/i })
+    // Every row must carry both halves. A problem with no named mechanism is a
+    // complaint; a mechanism with no named problem is a feature list.
+    const rows = within(fixes).getAllByRole('listitem')
+    expect(rows).toHaveLength(12)
+    for (const row of rows) {
+      expect(within(row).getByRole('heading', { level: 3 })).toBeInTheDocument()
+      expect(row.textContent?.length ?? 0).toBeGreaterThan(120)
+    }
+    expect(rows[0]).toHaveTextContent(/one material, many codes/i)
+    expect(rows[11]).toHaveTextContent(/no network call at runtime/i)
+  })
+
   it('gives the pipeline as five ordered steps', () => {
     renderLanding()
     const steps = screen.getByRole('list', { name: /cheap certainty first/i })

@@ -23,6 +23,7 @@ import { listItemVariants, listVariants } from '../lib/motion'
 
 const NAV = [
   { href: '#problem', label: 'The problem' },
+  { href: '#fixes', label: 'What it fixes' },
   { href: '#how', label: 'How it works' },
   { href: '#code', label: 'The code' },
 ] as const
@@ -49,6 +50,74 @@ const SAME_BEARING = [
 
 const GOLDEN = 'BEARING, BALL DEEP GROOVE, 85MM BORE, 150MM OD, 28MM W, ZZ, FAG 6217-2ZR'
 const GOLDEN_CODE = 'BRNG-010-000003-7'
+
+/**
+ * What is broken in a material master today, and the mechanism in this build
+ * that closes it. Paired deliberately: a problem without a named mechanism is a
+ * complaint, and a mechanism without a named problem is a feature list.
+ */
+const FIXES = [
+  {
+    problem: 'One material, many codes',
+    today: 'Each organisation raises its own code for the same part, so nothing can be counted, compared or tendered across them.',
+    fix: 'A tiered matcher decides which rows are the same material and issues one national code, with every legacy code mapped to it.',
+  },
+  {
+    problem: 'Look-alikes get merged',
+    today: 'De-duplication by text similarity eventually merges two parts that read alike and differ where it matters, and a crew is issued something that does not fit.',
+    fix: 'Identity-critical attributes are compared in real units, and a disagreement refuses the match outright. No score can overrule it.',
+  },
+  {
+    problem: 'Substitutes are invisible',
+    today: 'A higher-rated part that would have done the job sits in another store, unrecorded as an alternative, because nothing models substitution.',
+    fix: 'Equivalence is a directed relation of its own. Substitutes keep separate codes and carry a link that records which way round it is safe.',
+  },
+  {
+    problem: 'Descriptions are free text',
+    today: 'Abbreviations, orderings and spellings differ between organisations and within them, so search fails and specification takes days.',
+    fix: 'A per-class template renders one canonical description from normalised attributes, deterministically, with the source of every fused field recorded.',
+  },
+  {
+    problem: 'Units and pack sizes hide the price',
+    today: 'A box of a hundred is compared against a single piece, and the resulting price analysis is confidently wrong.',
+    fix: 'Unit of measure is canonicalised and pack quantity extracted separately, so every price is compared per base unit.',
+  },
+  {
+    problem: 'Stock nobody can see',
+    today: 'One organisation raises a purchase order for an item another holds in surplus, because no query spans both catalogues.',
+    fix: 'Once rows share a code, the position consolidates: stock per organisation and plant, transfer suggestions, and a dead-stock report.',
+  },
+  {
+    problem: 'The same item, bought separately',
+    today: 'Several organisations buy one material from different vendors at different prices, with no combined volume to negotiate on.',
+    fix: 'Twelve-month demand windows surface joint-tender candidates and vendor overlap, with the capture assumption stated and adjustable.',
+  },
+  {
+    problem: 'New duplicates arrive daily',
+    today: 'A cleaned master starts drifting the moment it is cleaned, because nothing checks a request before a code is raised.',
+    fix: 'The same matcher and veto layer run at the point of creation. Creating anyway needs a reason, and the reason is audited.',
+  },
+  {
+    problem: 'Cleaning the master risks the ERP',
+    today: 'Consolidation touches live masters with open purchase orders and valuations attached, which is why it is so often deferred.',
+    fix: 'Plan, dry run, impact, apply, verify, roll back. Records with open transactions are held automatically and nothing is ever deleted.',
+  },
+  {
+    problem: 'Nobody can audit the machine',
+    today: 'An algorithm that merges records without saying why cannot be signed off by anyone accountable for the result.',
+    fix: 'Every decision keeps its evidence and every change is one event in a hash chain that detects reordering as readily as editing.',
+  },
+  {
+    problem: 'Catalogues are commercially sensitive',
+    today: 'Finding the overlap between two organisations normally means one of them hands over its catalogue first.',
+    fix: 'Restricted mode compares keyed encodings instead. Neither side learns a description it did not already hold.',
+  },
+  {
+    problem: 'Procurement data cannot leave the building',
+    today: 'A cloud service is not an option for national procurement data, and an offline one usually means a weaker one.',
+    fix: 'Everything runs on one machine with no network call at runtime. Optional components fall back rather than fail, and the active mode is stated.',
+  },
+] as const
 
 const STAGES = [
   {
@@ -296,6 +365,57 @@ export default function Landing() {
                 <p className="pt-5 font-mono text-lg md:text-xl">{GOLDEN_CODE}</p>
               </Item>
             </div>
+          </Band>
+        </Reveal>
+
+        {/* ---- problem by problem ---- */}
+        <Reveal id="fixes" className="border-t border-hairline">
+          <Band className="py-20 md:py-28">
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,32rem)_1fr] lg:gap-20">
+              <div>
+                <Item>
+                  <p className="micro-label">What it fixes</p>
+                </Item>
+                <Item>
+                  <h2 id="fixes-title" className="pt-6 text-headline font-medium">
+                    Twelve problems, and what closes each.
+                  </h2>
+                </Item>
+              </div>
+              <Item className="lg:self-end">
+                <p className="max-w-[52ch] text-lead text-muted">
+                  A material master fails in more than one way, and the failures have
+                  different causes. Each one below is paired with the mechanism in this
+                  build that answers it, rather than with a feature.
+                </p>
+              </Item>
+            </div>
+
+            <ul aria-labelledby="fixes-title" className="pt-16">
+              <li
+                aria-hidden
+                className="hidden gap-12 border-b border-hairline pb-3 md:grid md:grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)]"
+              >
+                <span />
+                <span className="micro-label">The problem today</span>
+                <span className="micro-label">What SAMAN does</span>
+              </li>
+              {FIXES.map((entry, index) => (
+                <ItemLi
+                  key={entry.problem}
+                  className="grid gap-3 border-b border-hairline py-8 md:grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)] md:gap-12"
+                >
+                  <p className="font-mono text-sm text-muted">
+                    {String(index + 1).padStart(2, '0')}
+                  </p>
+                  <div className="space-y-2">
+                    <h3 className="text-base font-medium">{entry.problem}</h3>
+                    <p className="max-w-[52ch] text-sm text-muted">{entry.today}</p>
+                  </div>
+                  <p className="max-w-[52ch] text-sm md:pt-0.5">{entry.fix}</p>
+                </ItemLi>
+              ))}
+            </ul>
           </Band>
         </Reveal>
 
