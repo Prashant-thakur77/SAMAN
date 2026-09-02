@@ -589,11 +589,12 @@ export default function Landing() {
 
         {/* ---- the veto, given the room it deserves ---- */}
         <Reveal className="relative overflow-hidden border-t border-hairline bg-surface">
-          <Backdrop className="absolute inset-y-0 right-0 w-1/3 text-earth/[0.14]">
+          {/* The lattice owns the right third; nothing is set over it. */}
+          <Backdrop className="absolute inset-y-0 right-0 hidden w-1/3 text-earth/[0.14] lg:block">
             <Jali />
           </Backdrop>
-          <Band className="relative grid gap-10 py-20 md:py-24 lg:grid-cols-[auto_1fr] lg:gap-20">
-            <div>
+          <Band className="relative py-20 md:py-24">
+            <div className="max-w-[60%] lg:max-w-[58ch]">
               <Item>
                 <Eyebrow>Why it can be trusted</Eyebrow>
               </Item>
@@ -602,10 +603,8 @@ export default function Landing() {
                   25 mm is not 30 mm.
                 </p>
               </Item>
-            </div>
-            <div className="lg:pt-14">
               <Item>
-                <p className="max-w-[50ch] text-lead text-muted">
+                <p className="max-w-[50ch] pt-8 text-lead text-muted">
                   Two rows can read alike and still be different parts. Identity attributes
                   are compared in real units, and a disagreement refuses the match. No score
                   is permitted to overrule it.
