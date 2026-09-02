@@ -264,77 +264,96 @@ function FortSkyline() {
   )
 }
 
-/** A lotus, the national flower: layered petals from a single teardrop,
- *  rotated, on a leaf. Filled in the soft tone, outlined in the deep one. */
+/**
+ * A lotus, fully open: three rows of pointed petals rising from one base, a
+ * seed-pod at the centre, a midrib on each petal, a pad beneath. The outer
+ * petals lean out and are drawn a shade lighter, so the flower has depth
+ * without a second colour.
+ */
 function Lotus({ className }: { className?: string }) {
-  const petal = 'M0 0 C -18 -36, -18 -78, 0 -104 C 18 -78, 18 -36, 0 0 Z'
-  const rows: Array<[number, number, number]> = [
-    // [count, spread in degrees, scale]
-    [7, 110, 1],
-    [6, 96, 0.82],
-    [5, 70, 0.64],
+  const petal = 'M0 0 C -26 -34, -30 -84, 0 -118 C 30 -84, 26 -34, 0 0 Z'
+  const rows: Array<[number, number, number, number]> = [
+    // [count, spread°, scale, fill opacity]
+    [9, 170, 1, 0.55],
+    [7, 118, 0.84, 0.75],
+    [5, 66, 0.66, 0.95],
   ]
   return (
-    <svg viewBox="-140 -130 280 170" aria-hidden className={className}>
-      <ellipse cx="0" cy="18" rx="120" ry="16" fill="rgb(var(--earth))" opacity="0.28" />
-      {rows.map(([count, spread, scale], r) =>
+    <svg viewBox="-160 -136 320 176" aria-hidden className={className}>
+      <ellipse cx="0" cy="24" rx="150" ry="14" fill="rgb(var(--earth))" opacity="0.22" />
+      <path d="M-150 24 Q -20 6 150 24" fill="none" stroke="rgb(var(--earth))" strokeWidth="1" opacity="0.4" />
+      {rows.map(([count, spread, scale, alpha], r) =>
         Array.from({ length: count }, (_, i) => {
           const angle = -spread / 2 + (spread / (count - 1)) * i
           return (
-            <path
-              key={`${r}-${i}`}
-              d={petal}
-              transform={`rotate(${angle}) scale(${scale})`}
-              fill="rgb(var(--earth-soft))"
-              stroke="rgb(var(--earth))"
-              strokeWidth={1.2 / scale}
-              opacity={0.85}
-            />
+            <g key={`${r}-${i}`} transform={`rotate(${angle}) scale(${scale})`}>
+              <path d={petal} fill="rgb(var(--earth-soft))" opacity={alpha} />
+              <path d={petal} fill="none" stroke="rgb(var(--earth))" strokeWidth={1.2 / scale} opacity="0.9" />
+              <path d="M0 -8 L0 -100" stroke="rgb(var(--earth))" strokeWidth={0.8 / scale} opacity="0.55" />
+            </g>
           )
         }),
       )}
+      <ellipse cx="0" cy="-26" rx="15" ry="10" fill="rgb(var(--earth))" opacity="0.85" />
+      {[-8, 0, 8].map((x) => (
+        <circle key={x} cx={x} cy="-27" r="2" fill="rgb(var(--earth-soft))" />
+      ))}
     </svg>
   )
 }
 
-/** Peacock feathers, the national bird: a fan of three, each a stalk, a
- *  spray of barbs and the eye. Line art in the ochre tone. */
-function PeacockFeathers({ className }: { className?: string }) {
-  const feather = (rotate: number, key: string) => {
-    const barbs = Array.from({ length: 26 }, (_, i) => {
-      const t = i / 25
-      const y = -40 - t * 250
-      const len = 26 + Math.sin(t * Math.PI) * 44
-      return (
-        <g key={i}>
-          <path d={`M0 ${y} q-${len * 0.5} -6 -${len} -14`} />
-          <path d={`M0 ${y} q${len * 0.5} -6 ${len} -14`} />
-        </g>
-      )
-    })
+/**
+ * One peacock feather. A gently curved rachis; barbs that leave it at a
+ * rising angle and follow a teardrop envelope, sparse at the foot and dense
+ * and long just below the eye; the eye itself in three layers with the dark
+ * heart at its centre that makes it a peacock's and not a fern.
+ */
+function PeacockFeather({ className }: { className?: string }) {
+  const top = -340
+  // The stem bends slightly; barbs are placed along it by sampling the curve.
+  const stemAt = (t: number) => {
+    const y = 20 + (top - 20) * t
+    const x = 14 * Math.sin(t * Math.PI) // a soft S: out on the way up, back at the eye
+    return { x, y }
+  }
+  const barbs = Array.from({ length: 64 }, (_, i) => {
+    const t = 0.08 + (i / 63) * 0.92
+    const { x, y } = stemAt(t)
+    // envelope: long just below the eye, tapering to a point above it, so
+    // the eye sits inside the barbs the way it does on the bird
+    const env = Math.pow(Math.sin(Math.min(1, t) * Math.PI), 0.7)
+    const len = 18 + env * 100
+    const lift = 0.62 // barbs rise as they leave the stem
     return (
-      <g key={key} transform={`rotate(${rotate})`}>
-        <path d="M0 0 L0 -300" strokeWidth="2.2" />
-        {barbs}
-        <ellipse cx="0" cy="-300" rx="34" ry="46" fill="rgb(var(--earth-soft))" opacity="0.9" />
-        <ellipse cx="0" cy="-300" rx="22" ry="30" fill="rgb(var(--earth))" opacity="0.55" />
-        <ellipse cx="0" cy="-296" rx="10" ry="14" fill="rgb(var(--ink))" opacity="0.7" />
+      <g key={i}>
+        <path d={`M${x} ${y} q ${-len * 0.42} ${-len * lift * 0.5} ${-len} ${-len * lift}`} />
+        <path d={`M${x} ${y} q ${len * 0.42} ${-len * lift * 0.5} ${len} ${-len * lift}`} />
       </g>
     )
-  }
+  })
+  const eye = stemAt(0.84)
   return (
     <svg
-      viewBox="-260 -380 520 400"
+      viewBox="-150 -440 300 490"
       aria-hidden
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.1"
+      strokeWidth="1"
       strokeLinecap="round"
       className={className}
     >
-      {feather(-26, 'l')}
-      {feather(0, 'c')}
-      {feather(26, 'r')}
+      <g opacity="0.85">{barbs}</g>
+      <path d={`M${stemAt(0).x} ${stemAt(0).y} Q ${stemAt(0.5).x * 2} ${stemAt(0.5).y} ${eye.x} ${eye.y}`} strokeWidth="2.4" />
+      {/* the eye */}
+      <ellipse cx={eye.x} cy={eye.y - 18} rx="46" ry="60" fill="rgb(var(--earth-soft))" stroke="rgb(var(--earth))" strokeWidth="1.2" />
+      <ellipse cx={eye.x} cy={eye.y - 14} rx="31" ry="42" fill="rgb(var(--earth))" opacity="0.7" stroke="none" />
+      <path
+        d={`M${eye.x} ${eye.y + 4} C ${eye.x - 22} ${eye.y - 16}, ${eye.x - 22} ${eye.y - 44}, ${eye.x} ${eye.y - 34} C ${eye.x + 22} ${eye.y - 44}, ${eye.x + 22} ${eye.y - 16}, ${eye.x} ${eye.y + 4} Z`}
+        fill="rgb(var(--ink))"
+        opacity="0.8"
+        stroke="none"
+      />
+      <ellipse cx={eye.x - 6} cy={eye.y - 30} rx="4" ry="6" fill="rgb(var(--bg))" opacity="0.7" stroke="none" />
     </svg>
   )
 }
@@ -788,6 +807,9 @@ export default function Landing() {
                   spans them.
                 </p>
               </Item>
+              <Item className="hidden pt-12 lg:block">
+                <Lotus className="h-44 w-80" />
+              </Item>
             </div>
 
             <div>
@@ -893,9 +915,9 @@ export default function Landing() {
 
         {/* ---- the veto, given the room it deserves ---- */}
         <Reveal className="relative overflow-hidden border-t border-hairline bg-surface">
-          {/* Peacock feathers own the right side; nothing is set over them. */}
-          <Backdrop className="absolute bottom-0 right-[4%] hidden h-[92%] w-[34%] text-earth/70 lg:block">
-            <PeacockFeathers className="h-full w-full" />
+          {/* One peacock feather owns the right side; nothing is set over it. */}
+          <Backdrop className="absolute bottom-0 right-[8%] hidden h-[96%] w-[22%] text-earth/80 lg:block">
+            <PeacockFeather className="h-full w-full" />
           </Backdrop>
           <Band className="relative py-20 md:py-24">
             <div className="max-w-[60%] lg:max-w-[58ch]">
@@ -924,10 +946,6 @@ export default function Landing() {
         {/* ---- the code ---- */}
         <Reveal id="code" className="relative border-t border-hairline">
           <Band className="relative py-20 md:py-24">
-            {/* A lotus at the shoulder of the section, whole, beside the title. */}
-            <Backdrop className="absolute right-6 top-14 hidden h-44 w-72 md:right-10 lg:block">
-              <Lotus className="h-full w-full" />
-            </Backdrop>
             <Item>
               <Eyebrow>The code</Eyebrow>
             </Item>
