@@ -19,7 +19,7 @@ export function PageHeader({
     <header className="border-b border-hairline pb-6">
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0 space-y-2">
-          <p className="micro-label">{section}</p>
+          <p className="micro-label text-accent">{section}</p>
           <h1 className="text-xl font-medium tracking-tight text-ink">{title}</h1>
           <p className="max-w-prose text-sm text-muted">{description}</p>
         </div>

@@ -14,9 +14,9 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 // white-on-black in dark mode). Nothing else carries a large colour fill.
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-inverse text-bg border border-inverse hover:opacity-90',
-  secondary: 'bg-transparent text-ink border border-hairline hover:bg-surface',
+  secondary: 'bg-surface text-ink border border-hairline hover:bg-bg',
   ghost: 'bg-transparent text-muted border border-transparent hover:text-ink hover:bg-surface',
-  danger: 'bg-transparent text-danger border border-hairline hover:bg-surface',
+  danger: 'bg-surface text-danger border border-hairline hover:bg-bg',
 }
 
 const SIZES: Record<Size, string> = {
@@ -32,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       className={cn(
-        'inline-flex items-center justify-center gap-2 font-medium',
+        'inline-flex items-center justify-center gap-2 rounded-full font-medium',
         'transition-opacity duration-150',
         'disabled:cursor-not-allowed disabled:opacity-40',
         VARIANTS[variant],

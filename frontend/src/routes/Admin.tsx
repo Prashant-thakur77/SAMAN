@@ -91,11 +91,11 @@ export default function Admin() {
       {health && (
         <section className="space-y-4">
           <h2 className="micro-label">Engine health</h2>
-          <div className="grid gap-px border border-hairline bg-hairline md:grid-cols-3">
+          <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3">
             {(['linkage', 'embedding', 'llm'] as const).map((tier) => {
               const entry = health.capabilities[tier]
               return (
-                <div key={tier} className="space-y-2 bg-bg p-5">
+                <div key={tier} className="space-y-2 bg-surface p-5">
                   <p className="micro-label">{tier}</p>
                   <p className="font-mono text-sm">{entry.mode}</p>
                   <p className="text-xs text-muted">{entry.engine}</p>
@@ -116,7 +116,7 @@ export default function Admin() {
             </ul>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-4 border border-hairline p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4 card p-5">
             <div className="max-w-prose space-y-1">
               <p className="micro-label">Sovereign mode</p>
               <p className="text-sm text-muted">
@@ -135,16 +135,16 @@ export default function Admin() {
             />
           </div>
 
-          <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-3 lg:grid-cols-4">
             {Object.entries(health.counts).map(([key, value]) => (
-              <div key={key} className="space-y-1 bg-bg p-4">
+              <div key={key} className="space-y-1 bg-surface p-4">
                 <p className="micro-label">{key.replace(/_/g, ' ')}</p>
                 <p className="font-mono text-sm">{value.toLocaleString('en-IN')}</p>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 border border-hairline p-4">
+          <div className="flex flex-wrap items-center gap-4 card p-4">
             <StatusChip tone={health.smart_create.prevented > 0 ? 'ok' : 'neutral'}>
               {health.smart_create.prevented} duplicates prevented at source
             </StatusChip>
@@ -157,7 +157,7 @@ export default function Admin() {
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 border border-hairline p-4">
+          <div className="flex flex-wrap items-center gap-4 card p-4">
             <StatusChip tone={health.audit.valid ? 'ok' : 'danger'}>
               {health.audit.valid ? 'audit chain intact' : 'audit chain broken'}
             </StatusChip>
@@ -256,7 +256,7 @@ export default function Admin() {
           </TBody>
         </Table>
 
-        <div className="space-y-3 border border-hairline p-5">
+        <div className="space-y-3 card p-5">
           <p className="micro-label">Add a user</p>
           <div className="flex flex-wrap gap-3">
             <Input

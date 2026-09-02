@@ -127,7 +127,7 @@ export default function Workbench() {
             {(['A approve', 'R reject', 'J/K move', 'M cluster'] as const).map((hint) => (
               <kbd
                 key={hint}
-                className="border border-hairline px-2 py-1 font-mono text-[10px] text-muted"
+                className="card px-2 py-1 font-mono text-[10px] text-muted"
               >
                 {hint}
               </kbd>
@@ -157,7 +157,7 @@ export default function Workbench() {
       </div>
 
       {error && (
-        <p role="alert" className="border border-hairline px-4 py-3 text-sm text-danger">
+        <p role="alert" className="card px-4 py-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -185,7 +185,7 @@ export default function Workbench() {
             variants={decisionCardVariants(reduce)}
             initial="initial"
             animate={exiting ?? 'animate'}
-            className="space-y-6 border border-hairline p-6"
+            className="space-y-6 card p-6"
           >
             <header className="flex flex-wrap items-start justify-between gap-4 border-b border-hairline pb-4">
               <div className="space-y-1">
@@ -210,7 +210,7 @@ export default function Workbench() {
             </header>
 
             {task.adjudication && (
-              <section className="border border-hairline px-4 py-3">
+              <section className="card px-4 py-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="micro-label">Tier 3 · recommendation</p>
                   <StatusChip tone={ADJUDICATION_TONE[task.adjudication.recommendation]}>
@@ -246,7 +246,7 @@ export default function Workbench() {
             )}
 
             {task.refused_because && task.refused_because.length > 0 && (
-              <div className="border border-hairline px-4 py-3">
+              <div className="card px-4 py-3">
                 <p className="micro-label mb-2 text-danger">Not a duplicate</p>
                 <ul className="space-y-1">
                   {task.refused_because.map((reason) => (

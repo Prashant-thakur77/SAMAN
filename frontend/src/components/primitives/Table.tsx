@@ -11,7 +11,7 @@ import { listItemVariants, listVariants } from '../../lib/motion'
 
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('w-full overflow-x-auto', className)}>
+    <div className={cn('card w-full overflow-x-auto', className)}>
       <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   )
@@ -19,7 +19,7 @@ export function Table({ children, className }: { children: ReactNode; className?
 
 export function THead({ children }: { children: ReactNode }) {
   return (
-    <thead className="border-b border-hairline">
+    <thead className="border-b border-hairline bg-bg/60">
       <tr>{children}</tr>
     </thead>
   )

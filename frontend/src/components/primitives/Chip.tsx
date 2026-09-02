@@ -16,12 +16,13 @@ const DOT: Record<StatusTone, string> = {
 }
 
 const TEXT: Record<StatusTone, string> = {
-  ok: 'text-ok',
-  danger: 'text-danger',
-  neutral: 'text-muted',
+  ok: 'text-ok bg-ok/10',
+  danger: 'text-danger bg-danger/10',
+  neutral: 'text-accent bg-accent-soft',
 }
 
-/** Status = a dot + text. Colour never becomes a fill (spec §1.1). */
+/** Status = a dot + text on a 10% tint of its own tone: legible at a glance,
+ *  still nothing like a large fill (spec §1.1, amended). */
 export function StatusChip({
   tone = 'neutral',
   children,
@@ -32,7 +33,13 @@ export function StatusChip({
   className?: string
 }) {
   return (
-    <span className={cn('inline-flex items-center gap-2 text-xs', TEXT[tone], className)}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium',
+        TEXT[tone],
+        className,
+      )}
+    >
       <span aria-hidden className={cn('h-1.5 w-1.5 rounded-full', DOT[tone])} />
       {children}
     </span>

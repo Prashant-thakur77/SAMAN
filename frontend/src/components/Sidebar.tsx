@@ -25,7 +25,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'sticky top-0 flex h-screen shrink-0 flex-col border-r border-hairline bg-bg',
+        'sticky top-0 flex h-screen shrink-0 flex-col border-r border-hairline bg-surface',
         'transition-[width] duration-200 ease-saman',
         collapsed ? 'w-rail' : 'w-sidebar',
       )}
@@ -58,11 +58,11 @@ export function Sidebar({
                       title={collapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         cn(
-                          'flex h-10 items-center gap-3 border-l-2 px-4 text-sm',
+                          'mx-2 flex h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors duration-150',
                           collapsed && 'justify-center px-0',
                           isActive
-                            ? 'border-inverse font-medium text-ink'
-                            : 'border-transparent text-muted hover:text-ink',
+                            ? 'bg-accent-soft font-medium text-accent'
+                            : 'text-muted hover:bg-surface hover:text-ink',
                         )
                       }
                     >

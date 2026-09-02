@@ -23,7 +23,7 @@
   /* Visible focus ring everywhere — keyboard-first (spec §0.9). Two-tone so it
      stays visible against both --bg and --inverse fills. */
   :focus-visible {
-    @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-bg;
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
   }
 
   ::selection {
@@ -44,7 +44,12 @@
 
   /* CNMC and every issued code: Plex Mono in a 1px-border chip (spec §1.3). */
   .code-chip {
-    @apply inline-flex items-center border border-hairline px-2 py-0.5 font-mono text-xs;
+    @apply inline-flex items-center rounded-md border border-hairline bg-surface px-2 py-0.5 font-mono text-xs;
+  }
+
+  /* A solid card: white on the grey page, one quiet border, a soft shadow. */
+  .card {
+    @apply rounded-xl border border-hairline bg-surface shadow-card;
   }
 }
 

@@ -23,6 +23,7 @@ Three rules govern it, and they are the point:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from .compare import IN_BAND, MATCH, MISMATCH, UNKNOWN
 from .config import get_settings
@@ -71,6 +72,29 @@ class Adjudication:
 
 
 def adjudicate(
+    evidence: dict,
+    tier_scores: dict,
+    confidence: float,
+    verdict: str = "review",
+    veto: dict | None = None,
+    rephrase: bool = True,
+) -> Adjudication:
+    """Tier 3: a recommendation with its reasons, and optionally model prose.
+
+    The decision is `_decide`, deterministic. The prose is a courtesy that costs
+    a model call per card, so the queue asks for it only on the card in front of
+    the reviewer; every other card carries the deterministic sentence, which
+    says the same thing.
+    """
+    result = _decide(evidence, tier_scores, confidence, verdict, veto)
+    if rephrase:
+        _maybe_rephrase(result, evidence)
+    else:
+        result.prose_note = "deterministic sentence; model prose only on the current card"
+    return result
+
+
+def _decide(
     evidence: dict,
     tier_scores: dict,
     confidence: float,
@@ -182,14 +206,12 @@ HEADLINE = {
 
 
 def _finish(
-    recommendation: str, confidence: float, reasons: list[str], evidence: dict
+    recommendation: str, confidence: float, reasons: list[str], _evidence: dict
 ) -> Adjudication:
     summary = f"{HEADLINE[recommendation]}. {reasons[0]}" if reasons else HEADLINE[
         recommendation
     ]
-    result = Adjudication(recommendation, confidence, reasons, summary)
-    _maybe_rephrase(result, evidence)
-    return result
+    return Adjudication(recommendation, confidence, reasons, summary)
 
 
 _PROMPT = """You are helping a materials reviewer at an Indian public-sector company.
@@ -205,14 +227,27 @@ Reasons:
 One sentence:"""
 
 
+@lru_cache(maxsize=512)
+def _generate(url: str, model: str, prompt: str) -> str:
+    """One model call per distinct prompt. The same pair rephrased the same
+    way every time it is shown, and never twice."""
+    import httpx
+
+    response = httpx.post(
+        f"{url}/api/generate",
+        json={"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1}},
+        timeout=8.0,
+    )
+    response.raise_for_status()
+    return (response.json().get("response") or "").strip()
+
+
 def _maybe_rephrase(result: Adjudication, _evidence: dict) -> None:
     """Let a local model polish the sentence, under the Copilot's guard."""
     settings = get_settings()
     if not settings.llm_enabled:
         result.prose_note = "no local model configured"
         return
-
-    import httpx
 
     from .copilot import _numbers_in
 
@@ -221,18 +256,7 @@ def _maybe_rephrase(result: Adjudication, _evidence: dict) -> None:
         reasons="\n".join(f"- {reason}" for reason in result.reasons),
     )
     try:
-        response = httpx.post(
-            f"{settings.ollama_url.rstrip('/')}/api/generate",
-            json={
-                "model": settings.ollama_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.1},
-            },
-            timeout=20.0,
-        )
-        response.raise_for_status()
-        candidate = (response.json().get("response") or "").strip()
+        candidate = _generate(settings.ollama_url.rstrip("/"), settings.ollama_model, prompt)
     except Exception as exc:
         result.prose_note = f"local model unavailable ({type(exc).__name__})"
         return

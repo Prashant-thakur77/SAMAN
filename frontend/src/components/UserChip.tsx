@@ -16,7 +16,7 @@ export function UserChip() {
     return (
       <Link
         to="/login"
-        className="flex h-8 items-center border border-hairline px-3 text-xs text-muted hover:text-ink"
+        className="flex h-8 items-center rounded-full border border-hairline bg-surface px-3 text-xs text-muted hover:text-ink"
       >
         Sign in
       </Link>
@@ -38,7 +38,7 @@ export function UserChip() {
           await signOut()
           navigate('/login')
         }}
-        className="flex h-8 items-center border border-hairline px-3 text-xs text-muted hover:text-ink"
+        className="flex h-8 items-center rounded-full border border-hairline bg-surface px-3 text-xs text-muted hover:text-ink"
       >
         Sign out
       </button>

@@ -133,7 +133,7 @@ export default function Login() {
           <form onSubmit={onSubmit} className="space-y-6">
             <Field label="Sign in as" hint="Seeded demo accounts.">
               {users.length > 0 ? (
-                <ul className="divide-y divide-hairline border border-hairline">
+                <ul className="card divide-y divide-hairline overflow-hidden">
                   {users.map((u) => (
                     <li key={u.email}>
                       <button
@@ -162,7 +162,7 @@ export default function Login() {
                   ))}
                 </ul>
               ) : (
-                <div className="space-y-3 border border-hairline px-3 py-4">
+                <div className="space-y-3 card px-3 py-4">
                   <p className="text-sm text-muted">
                     This database is empty. Load the demo estate (four CPSEs, about 12,000
                     catalogue rows), or run{' '}

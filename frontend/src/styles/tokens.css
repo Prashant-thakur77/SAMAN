@@ -10,13 +10,19 @@
  */
 
 :root {
-  /* ---- light mode ---- */
-  --bg: 255 255 255; /* #FFFFFF */
-  --surface: 250 250 250; /* #FAFAFA */
-  --ink: 10 10 10; /* #0A0A0A */
+  /* ---- light mode: the product surface ----
+     Page is a soft grey, cards are white, borders are one quiet grey, text is
+     near-black. One accent, blue-indigo, for what is active, linked or focused;
+     it is never a large fill. */
+  --bg: 245 245 247; /* #F5F5F7 page */
+  --surface: 255 255 255; /* #FFFFFF cards, inputs, tables */
+  --ink: 20 20 20; /* #141414 */
   --muted: 82 82 82; /* #525252 */
-  --hairline: 229 229 229; /* #E5E5E5 */
-  --inverse: 10 10 10; /* #0A0A0A — button fill; text on it is --bg */
+  --hairline: 230 230 230; /* #E6E6E6 */
+  --inverse: 20 20 20; /* #141414 — primary buttons */
+
+  --accent: 51 51 204; /* #3333CC */
+  --accent-soft: 236 238 255; /* #ECEEFF — active-item tint */
 
   --ok: 21 128 61; /* #15803D */
   --danger: 185 28 28; /* #B91C1C */
@@ -36,13 +42,16 @@
 }
 
 .dark {
-  /* ---- dark mode ---- */
-  --bg: 10 10 10; /* #0A0A0A */
-  --surface: 18 18 18; /* #121212 */
-  --ink: 250 250 250; /* #FAFAFA */
-  --muted: 163 163 163; /* #A3A3A3 */
-  --hairline: 38 38 38; /* #262626 */
-  --inverse: 250 250 250; /* #FAFAFA */
+  /* ---- dark mode: the same surface, inverted with care ---- */
+  --bg: 15 16 20; /* #0F1014 page */
+  --surface: 23 24 29; /* #17181D cards */
+  --ink: 242 242 244; /* #F2F2F4 */
+  --muted: 160 163 173; /* #A0A3AD */
+  --hairline: 42 44 51; /* #2A2C33 */
+  --inverse: 242 242 244;
+
+  --accent: 139 148 255; /* #8B94FF */
+  --accent-soft: 30 33 64; /* #1E2140 */
 
   --ok: 74 222 128; /* #4ADE80 */
   --danger: 248 113 113; /* #F87171 */
@@ -72,6 +81,8 @@
   --earth: 166 106 52; /* #A66A34 ochre */
   --earth-deep: 104 64 30; /* #68401E */
   --earth-soft: 205 178 145; /* #CDB291 */
+  --accent: 166 106 52;
+  --accent-soft: 244 236 224;
 
   color-scheme: light;
 }
@@ -87,6 +98,8 @@
   --earth: 214 152 92; /* #D6985C */
   --earth-deep: 240 197 148; /* #F0C594 */
   --earth-soft: 108 84 60; /* #6C543C */
+  --accent: 214 152 92;
+  --accent-soft: 31 26 21;
 
   color-scheme: dark;
 }

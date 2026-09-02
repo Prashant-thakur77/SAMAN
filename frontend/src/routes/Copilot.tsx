@@ -91,7 +91,7 @@ export default function Copilot() {
                 key={prompt}
                 type="button"
                 onClick={() => void ask(prompt)}
-                className="border border-hairline px-3 py-1.5 text-xs text-muted hover:text-ink"
+                className="card px-3 py-1.5 text-xs text-muted hover:text-ink"
               >
                 {prompt}
               </button>
@@ -166,7 +166,7 @@ function AnswerBlock({ answer }: { answer: CopilotAnswer }) {
             <Link
               key={`${citation.cluster_id}-${i}`}
               to={citation.cluster_id ? `/clusters/${citation.cluster_id}` : '#'}
-              className="max-w-full truncate border border-hairline px-2 py-1 font-mono text-[11px] text-muted hover:text-ink"
+              className="max-w-full truncate card px-2 py-1 font-mono text-[11px] text-muted hover:text-ink"
               title={citation.label}
             >
               {citation.cnmc ? `${citation.cnmc} · ` : ''}
@@ -198,7 +198,7 @@ function AnswerBlock({ answer }: { answer: CopilotAnswer }) {
       </div>
 
       {showQuery && answer.sql && (
-        <div className="space-y-3 border border-hairline p-4">
+        <div className="space-y-3 card p-4">
           <p className="micro-label">Reviewed query</p>
           <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-muted">
             {answer.sql}

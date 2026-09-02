@@ -106,7 +106,7 @@ export default function DashOpportunity() {
 
       {tab === 'tenders' && (
         <section className="space-y-5">
-          <div className="grid gap-6 border border-hairline p-6 lg:grid-cols-[1fr_20rem]">
+          <div className="grid gap-6 card p-6 lg:grid-cols-[1fr_20rem]">
             <div className="space-y-2">
               <p className="micro-label">Savings identified</p>
               <p className="font-mono text-2xl text-ink">{formatRupees(scaled.total)}</p>
@@ -214,7 +214,7 @@ export default function DashOpportunity() {
 
       {tab === 'inventory' && (
         <section className="space-y-8">
-          <div className="grid gap-px border border-hairline bg-hairline md:grid-cols-3">
+          <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3">
             {[
               {
                 label: 'Avoidable purchases',
@@ -226,7 +226,7 @@ export default function DashOpportunity() {
               },
               { label: 'Total inventory', value: formatRupees(inventory.totals.total_value) },
             ].map((tile) => (
-              <div key={tile.label} className="space-y-2 bg-bg p-5">
+              <div key={tile.label} className="space-y-2 bg-surface p-5">
                 <p className="micro-label">{tile.label}</p>
                 <p className="font-mono text-lg">{tile.value}</p>
               </div>
@@ -237,7 +237,7 @@ export default function DashOpportunity() {
             <h2 className="micro-label">Transfer suggestions</h2>
             <p className="max-w-prose text-xs text-muted">{inventory.transfers.note}</p>
             {inventory.transfers.suggestions.length === 0 ? (
-              <p className="border border-hairline px-4 py-6 text-sm text-muted">
+              <p className="card px-4 py-6 text-sm text-muted">
                 No CPSE is holding idle surplus of a material another is short of.
               </p>
             ) : (

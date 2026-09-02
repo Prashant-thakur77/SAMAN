@@ -58,7 +58,7 @@ export default function Item() {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <ItemPanel item={detail} side="This record" />
-        <div className="space-y-3 border border-hairline p-4">
+        <div className="space-y-3 card p-4">
           <p className="micro-label">Golden record</p>
           {detail.golden ? (
             <>
@@ -85,21 +85,21 @@ export default function Item() {
       {detail.consolidated_stock && detail.consolidated_stock.positions.length > 0 && (
         <section className="space-y-4">
           <h2 className="micro-label">Consolidated stock across CPSEs</h2>
-          <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-3">
-            <div className="space-y-1 bg-bg p-4">
+          <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-3">
+            <div className="space-y-1 bg-surface p-4">
               <p className="micro-label">Total on hand</p>
               <p className="font-mono text-lg">
                 {detail.consolidated_stock.total_qty.toLocaleString('en-IN')}
               </p>
             </div>
-            <div className="space-y-1 bg-bg p-4">
+            <div className="space-y-1 bg-surface p-4">
               <p className="micro-label">Held across</p>
               <p className="font-mono text-lg">
                 {detail.consolidated_stock.cpse_count} CPSEs ·{' '}
                 {detail.consolidated_stock.plant_count} plants
               </p>
             </div>
-            <div className="space-y-1 bg-bg p-4">
+            <div className="space-y-1 bg-surface p-4">
               <p className="micro-label">Tied-up value</p>
               <p className="font-mono text-lg">
                 {formatRupees(detail.consolidated_stock.total_value)}
@@ -144,7 +144,7 @@ export default function Item() {
         <section className="space-y-3">
           <h2 className="micro-label">Purchase history</h2>
           {detail.purchase_history.last ? (
-            <div className="flex flex-wrap items-baseline gap-6 border border-hairline p-4">
+            <div className="flex flex-wrap items-baseline gap-6 card p-4">
               <div>
                 <p className="micro-label">Last purchase</p>
                 <p className="font-mono text-lg">
@@ -179,7 +179,7 @@ export default function Item() {
               )}
             </div>
           ) : (
-            <p className="border border-hairline px-4 py-3 text-sm text-muted">
+            <p className="card px-4 py-3 text-sm text-muted">
               {detail.purchase_history.price_band?.label ??
                 'Prices for this CPSE are outside your visibility scope.'}
             </p>
@@ -210,7 +210,7 @@ export default function Item() {
             {detail.equivalents.map((entry) => (
               <li
                 key={entry.counterpart.item_id}
-                className="flex flex-wrap items-start gap-4 border border-hairline p-4"
+                className="flex flex-wrap items-start gap-4 card p-4"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-ink">{entry.counterpart.description}</p>

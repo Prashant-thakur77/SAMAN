@@ -926,40 +926,26 @@ a frontend type-check and production build, and the licence gate, which both
 refuses GPL/AGPL in the required set and fails if `THIRD_PARTY_LICENSES.md` is
 stale.
 
-### Design assets
+### Design
 
-Every drawing on the front page (colonnade, materials frieze, skyline, racking,
-ornament, jali, the closing card's rings and grain, the wordmark textures) is
-generated in the page. The one thing that is not is the map: the India
-silhouette behind the hero is DataMeet's composite country boundary,
-[India boundaries](https://github.com/datameet/maps/blob/master/Country/india-composite.geojson)
-by the [DataMeet India community](http://datameet.org/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)),
-which follows the Survey of India depiction; its extent, 68.17–97.40 E and
-6.75–37.10 N, is how that was checked. It was simplified offline from 252,604
-points to 1,765 for a 21 KB asset and is applied as a CSS mask so it takes a
-palette colour in either theme.
+Two surfaces, one family.
 
-### What is original to SAMAN
+**The application** is a product surface in the manner of Sarvam's Indus
+console: a soft grey page (`#F5F5F7`), white cards with one quiet border
+(`#E6E6E6`) and a soft shadow, near-black text and pill buttons, IBM Plex Sans
+and Mono. One accent, blue-indigo (`#3333CC`, `#8B94FF` in dark), marks what is
+active, linked or focused; status chips sit on a 10% tint of their own tone.
+Nothing is ever a large colour fill. Dark mode inverts the same tokens with the
+accent lifted, not the page simply negated.
 
-The CNMC registry and its check-digit scheme; the tiered routing logic and its
-hard-constraint veto layer; the directed functional-equivalence model (kept
-deliberately separate from duplicate detection); the evidence cards; the review
-workbench and its separation-of-duties model; the guarded Copilot; Smart-Create
-duplicate prevention at source; the opportunity and inventory-sharing engines;
-the two-way ERP migration with rollback; and the PPRL restricted mode. The
-libraries above are engines used inside that architecture; no existing
-application was forked or adapted as a base.
+**The front page** runs its own warm palette on the same tokens, scoped to one
+class: paper, a light-brown wash, ochre and its shades, black. Everything drawn
+on it is generated in the page except the India silhouette, which is credited
+above.
 
----
-
-## Design
-
-Monochrome, typography-first, built to read as a government instrument rather
-than a SaaS product. IBM Plex Sans and Plex Mono, self-hosted. Two semantic
-colours only, one for confirmation and one for refusal, used as text and dots,
-never as fills. Dark and light modes. No component library: every primitive in
-`frontend/src/components/primitives/` is hand-built. Motion follows a single
-easing curve and collapses to opacity-only under `prefers-reduced-motion`.
+Motion follows §1.5 throughout: route slides, 20 ms list staggers, a 4 px shake
+on a failed sign-in, and every animation collapses to opacity under
+`prefers-reduced-motion`.
 
 ## License
 

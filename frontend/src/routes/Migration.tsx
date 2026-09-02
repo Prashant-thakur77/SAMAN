@@ -126,14 +126,14 @@ export default function Migration() {
       {erp && (
         <section className="space-y-3">
           <h2 className="micro-label">Target system</h2>
-          <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-4">
+          <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-4">
             {[
               { label: 'Materials', value: erp.counts.mara },
               { label: 'Open PO lines', value: erp.counts.ekpo },
               { label: 'Cross-referenced', value: erp.materials_cross_referenced },
               { label: 'Blocked', value: erp.materials_blocked },
             ].map((tile) => (
-              <div key={tile.label} className="space-y-1 bg-bg p-4">
+              <div key={tile.label} className="space-y-1 bg-surface p-4">
                 <p className="micro-label">{tile.label}</p>
                 <p className="font-mono text-lg">{(tile.value ?? 0).toLocaleString('en-IN')}</p>
               </div>
@@ -173,7 +173,7 @@ export default function Migration() {
             ) : null}
           </div>
 
-          <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-3">
+          <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-3">
             {[
               { label: 'Safe to apply', value: plan.summary.safe, tone: 'ok' as const },
               {
@@ -187,7 +187,7 @@ export default function Migration() {
                 tone: 'danger' as const,
               },
             ].map((tile) => (
-              <div key={tile.label} className="space-y-2 bg-bg p-4">
+              <div key={tile.label} className="space-y-2 bg-surface p-4">
                 <p className="micro-label">{tile.label}</p>
                 <p className="font-mono text-lg">{tile.value}</p>
                 <StatusChip tone={tile.tone}>{tile.value === 0 ? 'none' : 'see below'}</StatusChip>
@@ -207,7 +207,7 @@ export default function Migration() {
           <PlanTable plan={plan} />
 
           {(plan.truncated || (plan.offset ?? 0) > 0) && (
-            <div className="flex flex-wrap items-center justify-between gap-4 border border-hairline px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-4 card px-4 py-3">
               <p className="font-mono text-xs text-muted">
                 showing {(plan.offset ?? 0) + 1}–
                 {(plan.offset ?? 0) + plan.changes.length} of{' '}
@@ -299,7 +299,7 @@ export default function Migration() {
       </section>
 
       {detail && (
-        <section className="space-y-3 border border-hairline p-6">
+        <section className="space-y-3 card p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="micro-label">Batch #{detail.id} journal</h2>
             <div className="flex items-center gap-3">

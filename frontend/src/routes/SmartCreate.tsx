@@ -136,7 +136,7 @@ export default function SmartCreate() {
       />
 
       {stats && (
-        <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-4">
+        <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-4">
           {[
             { label: 'Duplicates prevented', value: stats.prevented.toLocaleString('en-IN') },
             { label: 'Created anyway', value: stats.created_anyway.toLocaleString('en-IN') },
@@ -149,7 +149,7 @@ export default function SmartCreate() {
                   : `${Math.round(stats.prevention_rate * 100)}%`,
             },
           ].map((tile) => (
-            <div key={tile.label} className="space-y-1 bg-bg p-4">
+            <div key={tile.label} className="space-y-1 bg-surface p-4">
               <p className="micro-label">{tile.label}</p>
               <p className="font-mono text-lg">{tile.value}</p>
             </div>
@@ -157,7 +157,7 @@ export default function SmartCreate() {
         </div>
       )}
 
-      <section className="space-y-4 border border-hairline p-6">
+      <section className="space-y-4 card p-6">
         <div className="grid gap-4 md:grid-cols-[1fr_180px_120px]">
           <Field label="Material description" htmlFor="sc-description">
             <Input
@@ -241,7 +241,7 @@ export default function SmartCreate() {
       )}
 
       {result?.ocr && (
-        <section className="space-y-3 border border-hairline p-6">
+        <section className="space-y-3 card p-6">
           <div className="flex flex-wrap items-center gap-3">
             <p className="micro-label">What the reader saw</p>
             <StatusChip tone={result.retake ? 'danger' : 'ok'}>
@@ -276,7 +276,7 @@ export default function SmartCreate() {
 
       {result && action && (
         <>
-          <section className="space-y-3 border border-hairline p-6">
+          <section className="space-y-3 card p-6">
             <div className="flex flex-wrap items-center gap-3">
               <StatusChip tone={ACTION_TONE[action]}>{action}</StatusChip>
               <h2 className="text-lg">{ACTION_HEADLINE[action]}</h2>
@@ -327,13 +327,13 @@ export default function SmartCreate() {
           />
 
           {nothingFound && (
-            <p className="border border-hairline px-4 py-3 text-sm text-muted">
+            <p className="card px-4 py-3 text-sm text-muted">
               Nothing in the catalogue resembles this description closely enough to compare.
             </p>
           )}
 
           {!resolved && (
-            <section className="space-y-4 border border-hairline p-6">
+            <section className="space-y-4 card p-6">
               <h2 className="micro-label">Create it anyway</h2>
               <p className="max-w-prose text-sm text-muted">
                 {result.recommendation.override_requires_reason
@@ -398,7 +398,7 @@ function MatchList({
         <h2 className="micro-label">{title}</h2>
         <p className="max-w-prose pt-1 text-xs text-muted">{caption}</p>
       </div>
-      <ul className="divide-y divide-hairline border border-hairline">
+      <ul className="card divide-y divide-hairline overflow-hidden">
         {matches.map((match) => (
           <li key={match.item_id} className="flex flex-wrap items-start gap-4 p-4">
             <div className="min-w-0 flex-1 space-y-2">

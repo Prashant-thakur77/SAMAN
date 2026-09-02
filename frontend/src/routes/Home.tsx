@@ -71,7 +71,7 @@ export default function Home() {
       ) : (
         <>
           {isReviewer && pending !== null && (
-            <div className="flex flex-wrap items-center justify-between gap-4 border border-hairline p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 card p-6">
               <div>
                 <p className="micro-label">Your queue</p>
                 <p className="font-mono text-2xl">
@@ -84,9 +84,9 @@ export default function Home() {
             </div>
           )}
 
-          <dl className="grid grid-cols-2 gap-px border border-hairline bg-hairline md:grid-cols-3">
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3">
             {(headline ?? []).map((kpi) => (
-              <div key={kpi.key} className="space-y-2 bg-bg p-5">
+              <div key={kpi.key} className="space-y-2 bg-surface p-5">
                 <dt className="micro-label">{kpi.label}</dt>
                 <dd className="font-mono text-xl">
                   <CountUp value={kpi.value} format={kpi.format} />
@@ -98,7 +98,7 @@ export default function Home() {
           <section className="grid gap-4 md:grid-cols-2">
             <Link
               to="/dashboard/executive"
-              className="space-y-2 border border-hairline p-5 hover:bg-surface"
+              className="space-y-2 card p-5 hover:bg-surface"
             >
               <p className="micro-label">Executive dashboard</p>
               <p className="text-sm text-ink">
@@ -107,7 +107,7 @@ export default function Home() {
             </Link>
             <Link
               to="/dashboard/opportunity"
-              className="space-y-2 border border-hairline p-5 hover:bg-surface"
+              className="space-y-2 card p-5 hover:bg-surface"
             >
               <p className="micro-label">Opportunity</p>
               <p className="text-sm text-ink">

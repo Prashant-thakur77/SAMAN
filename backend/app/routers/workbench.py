@@ -91,7 +91,7 @@ def _item_card(db: Session, item_id: int) -> dict:
     }
 
 
-def _task_card(db: Session, task: ReviewTask) -> dict:
+def _task_card(db: Session, task: ReviewTask, rephrase: bool = True) -> dict:
     """One workbench card: two items, their diff, the tier strip, the veto."""
     pair = db.get(Pair, task.pair_id) if task.pair_id else None
     card: dict = {
@@ -150,6 +150,10 @@ def _task_card(db: Session, task: ReviewTask) -> dict:
                 pair.confidence,
                 pair.verdict,
                 veto,
+                # Fifty cards times one model call is a page that never loads.
+                # The first card is the one on screen; the rest read the
+                # deterministic sentence, which says the same thing.
+                rephrase=rephrase,
             ).as_dict()
             if task.band == "grey"
             else None,
@@ -200,7 +204,7 @@ def queues(
         "counts": {b: counts.get(b, 0) for b in BANDS},
         "total": total,
         "offset": offset,
-        "tasks": [_task_card(db, task) for task in tasks],
+        "tasks": [_task_card(db, task, rephrase=i == 0) for i, task in enumerate(tasks)],
     }
 
 

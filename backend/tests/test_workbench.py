@@ -246,7 +246,25 @@ class TestClusterSurgery:
             .having(func.count() >= 3)
             .limit(1)
         ).scalar()
-        assert cluster_id
+        if cluster_id is None:
+            # The small test profile does not always produce a three-member
+            # cluster on its own; earlier this fixture relied on another
+            # file's merge test having made one, which is an order dependency.
+            # Build the precondition here instead: move one member across.
+            pairs = db.execute(
+                select(ClusterMember.cluster_id)
+                .group_by(ClusterMember.cluster_id)
+                .having(func.count() >= 2)
+                .limit(2)
+            ).scalars().all()
+            assert len(pairs) == 2, "need two clusters to build a three-member one"
+            target, donor = pairs
+            member = db.execute(
+                select(ClusterMember).where(ClusterMember.cluster_id == donor).limit(1)
+            ).scalar_one()
+            member.cluster_id = target
+            db.commit()
+            cluster_id = target
         return cluster_id
 
     def test_splitting_moves_the_member_into_its_own_cluster(

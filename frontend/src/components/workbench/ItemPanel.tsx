@@ -6,7 +6,7 @@ import { CodeChip, StatusChip } from '../primitives/Chip'
 /** One side of a workbench comparison, or one member of a cluster. */
 export function ItemPanel({ item, side }: { item: ItemCard; side?: string }) {
   return (
-    <div className="min-w-0 space-y-3 border border-hairline p-4">
+    <div className="min-w-0 space-y-3 card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {side && <p className="micro-label">{side}</p>}

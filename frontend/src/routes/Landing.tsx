@@ -160,105 +160,94 @@ function Colonnade() {
 }
 
 /**
- * The Taj Mahal in elevation: plinth, four minarets with three balconies each,
- * the central iwan, two tiers of side arches, four chhatris and the bulbous
- * dome with its finial. Symmetric, so one half is drawn and mirrored.
+ * A filled city skyline, the way the SIH site sets its sections over one: pale
+ * silhouette, full width, no outline. Indian civic architecture rather than a
+ * generic downtown: a triumphal arch at the centre, domes on drums, a clock
+ * tower, chhatris on the corners of the larger blocks, and office towers
+ * towards the edges. Deterministic, so every load draws the same city.
  */
-function TajMahal() {
-  const cx = 600
-  const balcony = (x: number, y: number) => <path key={`${x}-${y}`} d={`M${x - 11} ${y} h22`} />
-  const minaret = (x: number) => (
-    <g key={x}>
-      <path d={`M${x - 7} 236 L${x - 5} 92 Q${x} 86 ${x + 5} 92 L${x + 7} 236 Z`} />
-      {[130, 170, 210].map((y) => balcony(x, y))}
-      <path d={`M${x - 8} 92 A8 6 0 0 1 ${x + 8} 92`} />
-      <path d={`M${x} 86 v-8`} />
+function CitySkyline() {
+  const ground = 300
+  const block = (x: number, w: number, h: number, windows = true) => (
+    <g key={`b${x}`}>
+      <rect x={x} y={ground - h} width={w} height={h} />
+      {windows &&
+        Array.from({ length: Math.max(0, Math.floor((h - 24) / 26)) }, (_, r) =>
+          Array.from({ length: Math.max(0, Math.floor((w - 12) / 20)) }, (_, c) => (
+            <rect
+              key={`${r}-${c}`}
+              x={x + 10 + c * 20}
+              y={ground - h + 14 + r * 26}
+              width="8"
+              height="12"
+              fill="rgb(var(--bg))"
+              opacity="0.55"
+            />
+          )),
+        )}
     </g>
   )
-  const arch = (x: number, y: number, w: number, h: number) => (
-    <path
-      key={`${x}-${y}-${w}`}
-      d={`M${x - w / 2} ${y} v${-(h - w / 2)} Q${x - w / 2} ${y - h} ${x} ${y - h - w * 0.18} Q${x + w / 2} ${y - h} ${x + w / 2} ${y - (h - w / 2)} v${h - w / 2} Z`}
-    />
+  const dome = (x: number, r: number, drum: number, base: number) => (
+    <g key={`d${x}`}>
+      <rect x={x - r * 0.72} y={ground - base} width={r * 1.44} height={base} />
+      <rect x={x - r * 0.6} y={ground - base - drum} width={r * 1.2} height={drum} />
+      <path d={`M${x - r} ${ground - base - drum} A${r} ${r * 0.95} 0 0 1 ${x + r} ${ground - base - drum} Z`} />
+      <rect x={x - 2} y={ground - base - drum - r * 0.95 - 16} width="4" height="18" />
+    </g>
   )
   const chhatri = (x: number, y: number) => (
-    <g key={`c${x}`}>
-      <path d={`M${x - 16} ${y} A16 14 0 0 1 ${x + 16} ${y}`} />
-      <path d={`M${x} ${y - 14} v-6`} />
-      <path d={`M${x - 20} ${y} h40`} />
-      <path d={`M${x - 14} ${y} v18 M${x + 14} ${y} v18 M${x - 20} ${y + 18} h40`} />
+    <g key={`c${x}-${y}`}>
+      <path d={`M${x - 12} ${y} A12 10 0 0 1 ${x + 12} ${y} Z`} />
+      <rect x={x - 14} y={y} width="28" height="3" />
+      <rect x={x - 11} y={y + 3} width="3" height="16" />
+      <rect x={x + 8} y={y + 3} width="3" height="16" />
     </g>
   )
-  const half = (
-    <g>
-      {/* side facade, two tiers of arches */}
-      {arch(cx - 118, 236, 34, 46)}
-      {arch(cx - 118, 176, 34, 46)}
-      {arch(cx - 168, 236, 30, 40)}
-      {arch(cx - 168, 176, 30, 40)}
-      <path d={`M${cx - 196} 236 v-118 l12 -10 h84`} />
-      {chhatri(cx - 98, 108)}
-      {minaret(cx - 290)}
+  const archGate = (x: number) => (
+    <g key="gate">
+      <rect x={x - 70} y={ground - 190} width="140" height="190" />
+      <rect x={x - 54} y={ground - 214} width="108" height="24" />
+      <rect x={x - 24} y={ground - 230} width="48" height="16" />
+      <path d={`M${x - 34} ${ground} v-96 A34 34 0 0 1 ${x + 34} ${ground - 96} v96 Z`} fill="rgb(var(--bg))" />
+      {chhatri(x - 52, ground - 232)}
+      {chhatri(x + 52, ground - 232)}
     </g>
   )
-  return (
-    <Drawing viewBox="0 0 1200 250">
-      {/* plinth */}
-      <path d="M180 236 h840 M200 244 h800 M220 250 h760" />
-      <path d="M290 236 v-8 h620 v8" />
-      {/* central block and iwan */}
-      <path d={`M${cx - 110} 236 v-136 l12 -10 h196 l12 10 v136`} />
-      {arch(cx, 236, 72, 112)}
-      <path d={`M${cx - 48} 236 v-88 Q${cx - 48} 130 ${cx} 118 Q${cx + 48} 130 ${cx + 48} 148 v88`} />
-      {/* drum and dome */}
-      <path d={`M${cx - 40} 100 v-16 h80 v16`} />
-      <path d={`M${cx - 52} 84 C ${cx - 62} 40, ${cx - 28} 10, ${cx} 8 C ${cx + 28} 10, ${cx + 62} 40, ${cx + 52} 84`} />
-      <path d={`M${cx} 8 v-6 m-6 0 h12 M${cx} -2 a3 3 0 1 1 0.01 0`} />
-      {half}
-      <g transform={`translate(${cx * 2} 0) scale(-1 1)`}>{half}</g>
-    </Drawing>
-  )
-}
-
-/**
- * The Red Fort's ramparts as a filled band: crenellated sandstone wall with
- * the Lahori gate, its two octagonal towers and their chhatris. A silhouette,
- * for the same job the skyline did.
- */
-function RedFort() {
-  const merlons = (x0: number, x1: number, y: number) =>
-    Array.from({ length: Math.floor((x1 - x0) / 22) }, (_, i) => (
-      <rect key={i} x={x0 + i * 22} y={y - 10} width="12" height="10" />
-    ))
-  const tower = (x: number) => (
-    <g key={x}>
-      <rect x={x - 26} y="36" width="52" height="124" />
-      {merlons(x - 26, x + 30, 36)}
-      <path d={`M${x - 18} 36 v-8 h36 v8 Z`} />
-      <path d={`M${x - 14} 28 A14 12 0 0 1 ${x + 14} 28 L${x + 14} 30 L${x - 14} 30 Z`} />
+  const clockTower = (x: number) => (
+    <g key="clock">
+      <rect x={x - 16} y={ground - 236} width="32" height="236" />
+      <rect x={x - 22} y={ground - 244} width="44" height="10" />
+      <path d={`M${x - 16} ${ground - 244} L${x} ${ground - 284} L${x + 16} ${ground - 244} Z`} />
+      <circle cx={x} cy={ground - 206} r="9" fill="rgb(var(--bg))" opacity="0.7" />
     </g>
   )
   return (
     <svg
       aria-hidden
-      viewBox="0 0 1200 160"
+      viewBox="0 0 1440 300"
       preserveAspectRatio="xMidYMax slice"
       fill="currentColor"
       className="h-full w-full"
     >
-      <rect x="0" y="80" width="1200" height="80" />
-      {merlons(0, 1200, 80)}
-      <rect x="520" y="52" width="160" height="108" />
-      {merlons(520, 684, 52)}
-      <path d="M560 160 v-58 Q600 66 640 102 v58 Z" fill="rgb(var(--surface))" />
-      {tower(500)}
-      {tower(700)}
-      {[300, 900].map((x) => (
-        <g key={x}>
-          <rect x={x - 16} y="60" width="32" height="100" />
-          {merlons(x - 16, x + 20, 60)}
-        </g>
-      ))}
+      {block(0, 70, 120)}
+      {block(78, 54, 168)}
+      {block(140, 90, 96)}
+      {dome(292, 42, 14, 110)}
+      {block(352, 68, 140)}
+      {chhatri(386, ground - 156)}
+      {block(430, 110, 88)}
+      {clockTower(590)}
+      {block(620, 80, 124)}
+      {archGate(720)}
+      {block(820, 80, 124)}
+      {dome(940, 56, 18, 128)}
+      {block(1010, 96, 92)}
+      {block(1116, 60, 176)}
+      {chhatri(1146, ground - 192)}
+      {block(1184, 100, 104)}
+      {block(1292, 64, 150)}
+      {block(1364, 76, 112)}
+      <rect x="0" y={ground - 6} width="1440" height="6" />
     </svg>
   )
 }
@@ -673,54 +662,56 @@ export default function Landing() {
       </header>
 
       <main id="main-content" tabIndex={-1} className="relative focus-visible:outline-none">
-        {/* ---- hero ---- */}
-        <motion.div variants={listVariants(reduce)} initial="initial" animate="animate" className="relative">
-          {/* Bharat, behind the headline and to its right. Tinted, never solid,
-              and absent on narrow screens where it would sit under the text. */}
+        {/* ---- hero: centred, one screen tall, the city along its foot ---- */}
+        <motion.div
+          variants={listVariants(reduce)}
+          initial="initial"
+          animate="animate"
+          className="relative flex min-h-[calc(100vh-4rem)] flex-col overflow-hidden"
+        >
           <motion.div
             aria-hidden
-            initial={{ opacity: 0, x: reduce ? 0 : 32 }}
-            animate={{ opacity: 1, x: 0, transition: { duration: 0.9, ease: EASE, delay: 0.2 } }}
-            className="absolute right-[3%] top-6 hidden h-[34rem] w-[46%] lg:block xl:h-[38rem]"
+            initial={{ opacity: 0, scale: reduce ? 1 : 0.98 }}
+            animate={{ opacity: 1, scale: 1, transition: { duration: 1.1, ease: EASE, delay: 0.15 } }}
+            className="pointer-events-none absolute left-1/2 top-1/2 hidden h-[30rem] w-[40rem] -translate-x-1/2 -translate-y-[56%] md:block"
           >
-            <BharatSilhouette className="h-full w-full opacity-[0.13]" />
+            <BharatSilhouette className="h-full w-full opacity-[0.10]" />
           </motion.div>
-          <Band className="relative py-20 md:py-24">
+
+          <Band className="relative flex flex-1 flex-col items-center justify-center py-16 text-center md:py-20">
             <Item>
-              <Ornament className="h-6 w-48 text-earth" />
+              <Ornament className="mx-auto h-6 w-48 text-earth" />
             </Item>
             <Item className="pt-4">
               <Eyebrow>Standardised Asset &amp; Material Analysis Network</Eyebrow>
             </Item>
             <Item>
-              <h1 className="max-w-[20ch] pt-8 text-display font-medium">
+              <h1 className="mx-auto max-w-[16ch] pt-7 text-display font-medium">
                 One Nation, One Material Code
               </h1>
             </Item>
             <Item>
-              <div aria-hidden className="mt-8 h-1 w-24 bg-earth" />
+              <div aria-hidden className="mx-auto mt-8 h-1 w-24 bg-earth" />
             </Item>
-            <div className="grid gap-8 pt-10 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-16">
-              <Item>
-                <p className="max-w-[44ch] text-lead text-muted">
-                  Every public sector undertaking codes the same part differently. SAMAN
-                  works out which rows are one material, and gives it one code.
-                </p>
-              </Item>
-              <Item className="flex flex-wrap items-center gap-4">
-                <a href="#how">
-                  <Button variant="primary">See how it decides</Button>
-                </a>
-                <Link to="/login">
-                  <Button variant="secondary">Open the demo</Button>
-                </Link>
-              </Item>
-            </div>
+            <Item>
+              <p className="mx-auto max-w-[44ch] pt-8 text-lead text-muted">
+                Every public sector undertaking codes the same part differently. SAMAN works
+                out which rows are one material, and gives it one code.
+              </p>
+            </Item>
+            <Item className="flex flex-wrap items-center justify-center gap-4 pt-10">
+              <a href="#how">
+                <Button variant="primary">See how it decides</Button>
+              </a>
+              <Link to="/login">
+                <Button variant="secondary">Open the demo</Button>
+              </Link>
+            </Item>
           </Band>
 
-          {/* A horizon under the headline rather than a picture behind it. */}
-          <Backdrop className="relative -mt-4 h-32 text-earth/30 md:h-44 lg:h-56">
-            <TajMahal />
+          {/* The city, pale and whole, inside the first screen. */}
+          <Backdrop className="relative h-40 w-full shrink-0 text-earth-soft/50 md:h-52 lg:h-60">
+            <CitySkyline />
           </Backdrop>
         </motion.div>
 
@@ -809,8 +800,8 @@ export default function Landing() {
 
         {/* ---- how it works ---- */}
         <Reveal id="how" className="relative overflow-hidden border-t border-hairline">
-          <Backdrop className="absolute inset-x-0 bottom-0 h-32 text-earth-soft/40 md:h-44">
-            <RedFort />
+          <Backdrop className="absolute inset-x-0 bottom-0 h-32 text-earth-soft/35 md:h-44">
+            <CitySkyline />
           </Backdrop>
           {/* The list ends above the skyline, never on top of it. */}
           <Band className="relative pb-44 pt-20 md:pb-60 md:pt-24">

@@ -123,7 +123,7 @@ export default function Cluster() {
       )}
 
       {detail.status === 'conflict' && (
-        <div className="border border-hairline px-4 py-3">
+        <div className="card px-4 py-3">
           <p className="micro-label mb-2 text-danger">Blocked from approval</p>
           <ul className="space-y-1 text-sm">
             {detail.conflicts
@@ -143,7 +143,7 @@ export default function Cluster() {
       )}
 
       {/* Golden record (§2D) */}
-      <section className="space-y-4 border border-hairline p-6">
+      <section className="space-y-4 card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="micro-label">Golden record</h2>
           <StatusChip tone={approved ? 'ok' : detail.status === 'conflict' ? 'danger' : 'neutral'}>
@@ -248,7 +248,7 @@ export default function Cluster() {
 
       {/* Merge */}
       {!locked && (
-        <section className="space-y-3 border border-hairline p-6">
+        <section className="space-y-3 card p-6">
           <h2 className="micro-label">Merge another cluster into this one</h2>
           <div className="flex flex-wrap items-center gap-3">
             <Input

@@ -103,7 +103,7 @@ export function ItemDrawer({ itemId, onClose }: { itemId: number | null; onClose
                 <>
                   <ItemPanel item={detail} side="This record" />
                   {detail.golden && (
-                    <section className="space-y-2 border border-hairline p-4">
+                    <section className="space-y-2 card p-4">
                       <p className="micro-label">Golden record</p>
                       <p className="break-words font-mono text-sm">
                         {detail.golden.std_description}

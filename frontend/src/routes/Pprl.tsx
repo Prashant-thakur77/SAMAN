@@ -100,12 +100,12 @@ export default function Pprl() {
       />
 
       {message && (
-        <p role="status" className="border border-hairline px-4 py-3 text-sm text-danger">
+        <p role="status" className="card px-4 py-3 text-sm text-danger">
           {message.text}
         </p>
       )}
 
-      <section className="space-y-4 border border-hairline p-6">
+      <section className="space-y-4 card p-6">
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="This catalogue" htmlFor="pprl-left">
             <Select id="pprl-left" value={left} onChange={setLeft} options={cpses} />
@@ -157,7 +157,7 @@ export default function Pprl() {
         <>
           <section className="space-y-3">
             <h2 className="micro-label">Overlap</h2>
-            <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-4">
+            <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-4">
               {[
                 {
                   label: `${payloads.left.cpse} matched`,
@@ -180,7 +180,7 @@ export default function Pprl() {
                   sub: `below the ${report.threshold} threshold`,
                 },
               ].map((tile) => (
-                <div key={tile.label} className="space-y-1 bg-bg p-4">
+                <div key={tile.label} className="space-y-1 bg-surface p-4">
                   <p className="micro-label">{tile.label}</p>
                   <p className="font-mono text-lg">{tile.value}</p>
                   <p className="text-xs text-muted">{tile.sub}</p>
@@ -198,14 +198,14 @@ export default function Pprl() {
                 trade-off is a number rather than an impression. The full matcher reads
                 attributes, units and a veto layer; restricted mode reads hashes.
               </p>
-              <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-4">
+              <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-4">
                 {[
                   ['Precision', cost.precision],
                   ['Recall', cost.recall],
                   ['F1', cost.f1],
                   ['Threshold', cost.threshold],
                 ].map(([label, value]) => (
-                  <div key={String(label)} className="space-y-1 bg-bg p-4">
+                  <div key={String(label)} className="space-y-1 bg-surface p-4">
                     <p className="micro-label">{label}</p>
                     <p className="font-mono text-lg">{Number(value).toFixed(3)}</p>
                   </div>
@@ -222,7 +222,7 @@ export default function Pprl() {
               per feature. There is no description, legacy code, attribute value or price in
               it, and the reference is a pseudonym only {payloads.left.cpse} can resolve.
             </p>
-            <div className="space-y-1 overflow-x-auto border border-hairline p-4 font-mono text-[11px] text-muted">
+            <div className="space-y-1 overflow-x-auto card p-4 font-mono text-[11px] text-muted">
               {payloads.left.encodings.slice(0, 4).map((encoding) => (
                 <p key={encoding.ref} className="whitespace-nowrap">
                   {encoding.ref} · {encoding.bloom.slice(0, 96)}…
@@ -256,7 +256,7 @@ export default function Pprl() {
               </TBody>
             </Table>
             {report.matches.length === 0 && (
-              <p className="border border-hairline px-4 py-3 text-sm text-muted">
+              <p className="card px-4 py-3 text-sm text-muted">
                 Nothing scored above {report.report_threshold}. If that is a surprise, check
                 that both sides encoded under the same key: a mismatched key produces
                 silence rather than a wrong answer.
@@ -266,7 +266,7 @@ export default function Pprl() {
         </>
       )}
 
-      <section className="space-y-2 border border-hairline p-6">
+      <section className="space-y-2 card p-6">
         <h2 className="micro-label">What this protects, and what it does not</h2>
         <p className="max-w-prose text-sm text-muted">
           Restricted mode removes plaintext from the exchange, which is the requirement. It is

@@ -20,6 +20,9 @@ export default {
       inverse: withAlpha('--inverse'),
       ok: withAlpha('--ok'),
       danger: withAlpha('--danger'),
+      // The one accent (spec §1.1 amended): active, linked, focused. Never a fill.
+      accent: withAlpha('--accent'),
+      'accent-soft': withAlpha('--accent-soft'),
       // Front page only (see .landing in tokens.css). Outside it these
       // resolve to muted, so a stray use is dull rather than broken.
       earth: withAlpha('--earth'),
@@ -60,7 +63,10 @@ export default {
       letterSpacing: { wordmark: '0.18em' },
       transitionTimingFunction: { saman: 'cubic-bezier(0.22, 1, 0.36, 1)' },
       // Only overlays get elevation (spec §1.1).
-      boxShadow: { sm: '0 1px 2px 0 rgb(0 0 0 / 0.06)' },
+      boxShadow: {
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 1px -1px rgb(0 0 0 / 0.04)',
+        card: '0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px -8px rgb(0 0 0 / 0.08)',
+      },
     },
   },
   plugins: [],

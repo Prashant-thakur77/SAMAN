@@ -157,7 +157,7 @@ export default function Onboard() {
       </ol>
 
       {error && (
-        <p role="alert" className="border border-hairline px-4 py-3 text-sm text-danger">
+        <p role="alert" className="card px-4 py-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -229,7 +229,7 @@ export default function Onboard() {
               </div>
 
               {canEdit && (
-                <div className="space-y-3 border border-hairline p-4">
+                <div className="space-y-3 card p-4">
                   <p className="micro-label">Or register a new one</p>
                   <div className="flex flex-wrap gap-3">
                     <Input
@@ -322,14 +322,14 @@ export default function Onboard() {
 
           {step === 2 && report && (
             <>
-              <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-4">
+              <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card sm:grid-cols-4">
                 {[
                   { label: 'Rows read', value: report.rows_read },
                   { label: 'Will be ingested', value: report.rows_accepted },
                   { label: 'Rejected', value: report.rows_rejected },
                   { label: 'Already present', value: report.already_present },
                 ].map((tile) => (
-                  <div key={tile.label} className="space-y-1 bg-bg p-4">
+                  <div key={tile.label} className="space-y-1 bg-surface p-4">
                     <p className="micro-label">{tile.label}</p>
                     <p className="font-mono text-lg">{tile.value.toLocaleString('en-IN')}</p>
                   </div>
@@ -372,7 +372,7 @@ export default function Onboard() {
               )}
 
               {status ? (
-                <div className="space-y-3 border border-hairline p-6">
+                <div className="space-y-3 card p-6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="micro-label">
                       pipeline · {status.stage ?? status.state}

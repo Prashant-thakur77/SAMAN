@@ -151,6 +151,18 @@ class TestItNeverDecides:
         assert first == second
 
 
+@pytest.fixture(autouse=True)
+def _fresh_model_cache():
+    """The rephrase call is cached per prompt so a card is never rephrased
+    twice. Each test here patches the model to answer differently for the same
+    prompt, so the cache must start empty every time."""
+    from app import adjudicate as module
+
+    module._generate.cache_clear()
+    yield
+    module._generate.cache_clear()
+
+
 class TestOllamaGuard:
     """The model rephrases; it never decides, and it never adds a fact."""
 

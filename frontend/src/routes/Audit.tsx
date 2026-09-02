@@ -78,7 +78,7 @@ export default function Audit() {
       />
 
       {verification && (
-        <div className="border border-hairline p-6">
+        <div className="card p-6">
           <div className="flex flex-wrap items-center gap-4">
             <StatusChip tone={verification.valid ? 'ok' : 'danger'}>
               {verification.valid ? 'Chain intact' : 'Chain broken'}

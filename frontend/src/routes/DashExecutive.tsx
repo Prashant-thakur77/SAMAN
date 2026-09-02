@@ -71,13 +71,13 @@ export default function DashExecutive() {
             variants={listVariants(reduce)}
             initial="initial"
             animate="animate"
-            className="grid grid-cols-2 gap-px border border-hairline bg-hairline md:grid-cols-3"
+            className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3"
           >
             {data.kpis.map((kpi) => (
               <motion.div
                 key={kpi.key}
                 variants={listItemVariants(reduce)}
-                className="space-y-2 bg-bg p-5"
+                className="space-y-2 bg-surface p-5"
               >
                 <dt className="micro-label">{kpi.label}</dt>
                 <dd className="font-mono text-xl text-ink">
@@ -91,7 +91,7 @@ export default function DashExecutive() {
                 rendering fault rather than as empty space. Seven KPIs in three
                 columns left two of them. */}
             {Array.from({ length: (3 - (data.kpis.length % 3)) % 3 }).map((_, index) => (
-              <div key={`filler-${index}`} aria-hidden className="hidden bg-bg md:block" />
+              <div key={`filler-${index}`} aria-hidden className="hidden bg-surface md:block" />
             ))}
           </motion.dl>
 
@@ -169,12 +169,12 @@ export default function DashExecutive() {
           <section className="space-y-4">
             <h2 className="micro-label">Codes issued over time</h2>
             {data.trend.length === 0 ? (
-              <p className="border border-hairline px-4 py-6 text-sm text-muted">
+              <p className="card px-4 py-6 text-sm text-muted">
                 No CNMC has been issued yet, so there is nothing to plot. Issue one from a
                 cluster page and it appears here.
               </p>
             ) : (
-              <div className="h-56 w-full border border-hairline p-4">
+              <div className="h-56 w-full card p-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.trend} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
                     <CartesianGrid {...GRID_PROPS} />
@@ -196,7 +196,7 @@ export default function DashExecutive() {
             )}
           </section>
 
-          <section className="grid gap-px border border-hairline bg-hairline md:grid-cols-3">
+          <section className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3">
             {[
               { label: 'Stock positions', value: data.inventory.positions.toLocaleString('en-IN') },
               { label: 'Inventory value', value: formatRupees(data.inventory.total_value) },
@@ -205,7 +205,7 @@ export default function DashExecutive() {
                 value: formatRupees(data.inventory.dead_stock_value),
               },
             ].map((tile) => (
-              <div key={tile.label} className="space-y-2 bg-bg p-5">
+              <div key={tile.label} className="space-y-2 bg-surface p-5">
                 <p className="micro-label">{tile.label}</p>
                 <p className="font-mono text-lg">{tile.value}</p>
               </div>
