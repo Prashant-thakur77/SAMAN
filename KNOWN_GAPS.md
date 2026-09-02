@@ -17,7 +17,7 @@ pass on the held-out split of the demo profile.
 | No Ollama model is installed on this machine | Both LLM paths — Copilot prose and Tier-3 rephrasing — are implemented and unit-tested against a stubbed model, including their rejection guards, but neither has run against a real one | Nothing in the demo depends on it; `/api/health` reports the deterministic path honestly |
 | The ERP is a mock | `ErpAdapter` is a named contract and `MockErpAdapter` implements it over the five SAP tables a consolidation touches. No real SAP system has been connected | A prototype cannot ship a certified SAP connector; the contract is the deliverable |
 | Blocking recall is 0.897 at 150k rows | The bucket caps are tuned for the demo profile. Sub-blocking was measured and rejected (see README "Data"); scaling the caps with corpus size is the honest next step | Reported rather than hidden — the gate is met on the profile everything else is measured on |
-| Equivalence recall is 0.885 | Up from 0.607. Candidate coverage is 0.915 and the engine finds 0.967 of what reaches it, so both halves of the old loss are largely closed. Still reported with its ceiling rather than as a bare number | The residue is spread thinly rather than concentrated in one cause, which is the point at which further tuning stops paying |
+| Equivalence recall is 0.946 | Up from 0.607 this session. Candidate coverage 0.976, and the engine finds 0.969 of what reaches it — both halves of the old loss are closed. Still reported with its ceiling rather than as a bare number | The residue is spread thinly rather than concentrated in one cause, which is where further tuning stops paying |
 | An LLM never *proposes* equivalences | §2B names it as source 4, the lowest-trust one. The basis and its 0.50 weight exist; nothing emits it | Would need a model installed, and it can only ever add review-queue suggestions |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale | Worth batching if the queue view is ever paged deeply |
 | Restricted mode is quadratic | 300 x 300 records is 90,000 comparisons, and there is no plaintext to block on | A real cost of the privacy guarantee, which is why it is a periodic overlap report and not the live matching path |
@@ -434,8 +434,16 @@ that could not be true:
   the duplicates in a skipped bucket — their text is nearly identical — but not
   a substitute, whose text differs on the rating that makes it one. An
   identity-signature pass (class plus every identity-critical value, ratings
-  deliberately excluded from the key) cost 5,695 candidate pairs and moved
-  candidate coverage 0.796 → 0.915. Duplicate blocking recall rose as well.
+  deliberately excluded from the key) costs 6,809 candidate pairs — about 1% —
+  and moved candidate coverage 0.796 → 0.976. Duplicate blocking recall rose as
+  well, 0.984 → 0.990.
+- **Numbers compared as strings, for the third time.** The first identity
+  signature reached only 0.915 coverage because a bore read from `65MM BORE` is
+  the float `65.0` while the same bore from designation `6313` is the int `65` —
+  two different keys for one bearing, 172 pairs. The same failure as the
+  fit-class comparison in M3 and Smart-Create's retrieval key in M8. It is now a
+  named `_canonical()` with a comment saying so, rather than an inline `str()`
+  waiting to be got wrong a fourth time.
 - **`block_on` was allowed to name a performance attribute.** `chemical.reagent`
   blocked on `concentration_pct`, so a 20% xylene and a 50% one were bucketed
   apart — the pair that substitutes for the other. An invariant test now asserts

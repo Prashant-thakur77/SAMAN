@@ -191,7 +191,7 @@ against these numbers.
 |---|---|---|
 | Duplicate precision | **0.994** | ≥ 0.92 |
 | Duplicate recall | **0.940** | ≥ 0.80 |
-| Blocking recall | **0.988** | ≥ 0.97 |
+| Blocking recall | **0.990** | ≥ 0.97 |
 | Veto precision on planted traps | **1.000** | ≥ 0.98 |
 
 A single averaged number would hide more than it shows, so the full report at
@@ -279,11 +279,11 @@ class schema itself declares, and an LLM that may only *propose*:
 
 | | Held-out |
 |---|---|
-| Precision | 0.929 |
-| Recall | 0.885 |
+| Precision | 0.931 |
+| Recall | 0.946 |
 | **Direction accuracy** | **0.989** |
-| Candidate coverage | 0.915 |
-| Recall of reachable pairs | 0.967 |
+| Candidate coverage | 0.976 |
+| Recall of reachable pairs | 0.969 |
 
 Recall is reported with its ceiling rather than on its own, and reporting it
 that way is what fixed it. It used to be **0.607**, and the ceiling said exactly
@@ -322,9 +322,18 @@ rating that makes it one.
 So there is now an **identity-signature pass**: bucket on the class plus every
 identity-critical value, with the ratings deliberately left out of the key. Two
 items that agree on what they *are* meet regardless of how they are rated. The
-key is far more selective than the class band, so it cost 5,695 candidate pairs
-— under 1% of the total, no measurable wall clock — and moved candidate coverage
-from 0.796 to 0.915. Duplicate blocking recall rose too, 0.984 → 0.988.
+key is far more selective than the class band, so it costs 6,809 candidate pairs
+— about 1% of the total, no measurable wall clock — and moved candidate coverage
+from 0.796 to **0.976**. Duplicate blocking recall rose too, 0.984 → 0.990.
+
+The first version of that pass only got coverage to 0.915, and the residue was
+one bug: a bore read from `65MM BORE` is the float `65.0`, and the same bore
+derived from designation `6313` is the int `65`. Rendered into a key those are
+two different strings, so the same bearing never met itself — 172 pairs. It is
+the third time numbers-compared-as-strings has cost something here (the
+fit-class comparison, then Smart-Create's retrieval key), which is why the
+canonicalisation is now a named function with a comment rather than an inline
+`str()` for the next person to get wrong.
 
 A related invariant was being violated and is now asserted in a test:
 `chemical.reagent` blocked on `concentration_pct`, a *performance* rating with a
@@ -579,7 +588,7 @@ are kept honest — partial is marked partial.
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.929 / R 0.885, direction accuracy 0.989 |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.931 / R 0.946, direction accuracy 0.989 |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |

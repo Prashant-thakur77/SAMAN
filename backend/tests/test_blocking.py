@@ -174,6 +174,29 @@ class TestIdentitySignature:
 
         assert _identity_signature("unclassified", {"anything": 1}) is None
 
+    def test_a_number_renders_the_same_however_it_was_read(self):
+        """A bore read from "65MM BORE" is the float 65.0; the same bore from
+        designation 6313 is the int 65. Rendered naively those are two
+        different keys, so the same bearing never met itself — 172 of the pairs
+        this pass exists to catch."""
+        from app.pipeline import _canonical, _identity_signature
+
+        assert _canonical(65.0) == _canonical(65) == "65"
+        assert _canonical("65.0") == _canonical(" 65 ") == "65"
+        assert _canonical(4.6) == _canonical("4.60") == "4.6"
+        assert _canonical("H7") == "H7"
+        assert _canonical("ss316") == "SS316"
+
+        explicit = _identity_signature(
+            "bearing.ball.deep_groove",
+            {"bore_mm": 65.0, "outer_dia_mm": 140.0, "width_mm": 33.0, "seal_type": "OPEN"},
+        )
+        derived = _identity_signature(
+            "bearing.ball.deep_groove",
+            {"bore_mm": 65, "outer_dia_mm": 140, "width_mm": 33, "seal_type": "OPEN"},
+        )
+        assert explicit == derived
+
     def test_the_signature_is_case_and_whitespace_insensitive(self):
         from app.pipeline import _identity_signature
 

@@ -289,8 +289,34 @@ def _identity_signature(class_code: str, attrs: dict) -> str | None:
         value = attrs.get(spec.name)
         if value is None:
             return None
-        values.append(str(value).strip().upper())
+        values.append(_canonical(value))
     return class_code + "|" + "|".join(values)
+
+
+def _canonical(value) -> str:
+    """One rendering per value, whatever type it arrived as.
+
+    A bore read from "65MM BORE" is the float 65.0; the same bore derived from
+    designation 6313 is the int 65. Formatted naively those are "65.0" and
+    "65", so the same bearing produced two different signatures and never met
+    itself — 172 of the equivalence pairs the pass was built to catch.
+
+    This is the third time numbers-as-strings has cost something in this
+    codebase (the fit-class comparison, then Smart-Create's blocking key), which
+    is why the canonicalisation is a named function rather than an inline
+    `str()` for the next person to get wrong.
+    """
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, int | float):
+        number = float(value)
+        return str(int(number)) if number.is_integer() else repr(round(number, 6))
+    text = str(value).strip().upper()
+    try:
+        number = float(text)
+    except ValueError:
+        return text
+    return str(int(number)) if number.is_integer() else repr(round(number, 6))
 
 
 def _block_value(class_code: str, attrs: dict) -> str | None:
