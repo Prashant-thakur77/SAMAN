@@ -52,8 +52,13 @@ _REFUSAL_PATTERNS: tuple[tuple[re.Pattern, str], ...] = (
     ),
     (
         re.compile(
-            r"(ignore\s+(all\s+)?(previous|prior|above|the)\s+(instructions?|rules?|prompts?)"
-            r"|disregard\s+(your|the)\s+(rules?|instructions?)"
+            # Up to three words may sit between the verb and the noun:
+            # "ignore the visibility rules" escaped a pattern that demanded
+            # they be adjacent. The noun list is what keeps this from refusing
+            # "ignore the small differences".
+            r"((?:ignore|disregard|bypass|override|forget)\s+(?:\w+\s+){0,3}"
+            r"(?:instructions?|rules?|prompts?|guardrails?|restrictions?|"
+            r"permissions?|visibility)"
             r"|you\s+are\s+now\s+|system\s+prompt|jailbreak|act\s+as\s+(?:an?\s+)?admin)",
             re.IGNORECASE,
         ),
@@ -61,7 +66,14 @@ _REFUSAL_PATTERNS: tuple[tuple[re.Pattern, str], ...] = (
         "instructions in a prompt — they are the only queries it can run.",
     ),
     (
-        re.compile(r"(--\s|;\s*\w|/\*|\bunion\s+select\b|\bor\s+1\s*=\s*1\b)", re.IGNORECASE),
+        # `--` must also match at end of input: "SELECT * FROM users; --" ended
+        # the string with the comment marker and slipped through a pattern that
+        # required trailing whitespace.
+        re.compile(
+            r"(--(\s|$)|;\s*\S|/\*|\bunion\s+select\b|\bor\s+1\s*=\s*1\b"
+            r"|\bselect\b.{0,40}\bfrom\b)",
+            re.IGNORECASE,
+        ),
         "That looks like an attempt to inject SQL. Questions never become SQL "
         "here; they select a reviewed query and its parameters.",
     ),
