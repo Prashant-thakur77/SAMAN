@@ -122,7 +122,12 @@ classes:
                isopropyl, acetone, sodium, potassium, calcium, toluene, xylene,
                hexane, ammonium, sulphate, permanganate, peroxide, citric,
                oxalic, boric]
-    block_on: concentration_pct
+    # The substance, not the concentration. `block_on` is the class's most
+    # discriminating *identity* field, and concentration is a performance
+    # rating with a declared direction — so blocking on it put a 20% xylene and
+    # a 50% xylene in different buckets, which is precisely the pair that
+    # substitutes for the other. They never met.
+    block_on: substance
     template: '{noun}, {substance}, {grade} GRADE, {concentration_pct}PCT, {brand} {mpn}'
     casing: upper
     max_len: 120

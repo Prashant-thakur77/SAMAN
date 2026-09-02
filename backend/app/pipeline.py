@@ -270,6 +270,29 @@ def _stage_embed(db: Session, status: PipelineStatus) -> None:
 # --------------------------------------------------------------------------
 
 
+def _identity_signature(class_code: str, attrs: dict) -> str | None:
+    """Every identity-critical value in schema order, or None if any is missing.
+
+    Missing means missing: a signature built from three attributes out of four
+    would collide two items that differ on the fourth, which is the opposite of
+    what this key is for.
+    """
+    from .taxonomy import UNCLASSIFIED, get_schema
+
+    if class_code == UNCLASSIFIED:
+        return None
+    specs = get_schema(class_code).identity_critical
+    if not specs:
+        return None
+    values = []
+    for spec in specs:
+        value = attrs.get(spec.name)
+        if value is None:
+            return None
+        values.append(str(value).strip().upper())
+    return class_code + "|" + "|".join(values)
+
+
 def _block_value(class_code: str, attrs: dict) -> str | None:
     from .taxonomy import get_schema
 
@@ -319,6 +342,7 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
             mpn_norm=c.mpn_norm,
             gtin=c.gtin,
             block_value=_block_value(c.class_code, c.attrs),
+            identity_signature=_identity_signature(c.class_code, c.attrs),
         )
         for c in candidates.values()
     ]

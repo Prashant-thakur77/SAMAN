@@ -190,8 +190,8 @@ against these numbers.
 | M3 gate (spec §8) | Result | Target |
 |---|---|---|
 | Duplicate precision | **0.994** | ≥ 0.92 |
-| Duplicate recall | **0.939** | ≥ 0.80 |
-| Blocking recall | **0.984** | ≥ 0.97 |
+| Duplicate recall | **0.940** | ≥ 0.80 |
+| Blocking recall | **0.988** | ≥ 0.97 |
 | Veto precision on planted traps | **1.000** | ≥ 0.98 |
 
 A single averaged number would hide more than it shows, so the full report at
@@ -199,8 +199,8 @@ A single averaged number would hide more than it shows, so the full report at
 
 | | Precision | Recall | F1 |
 |---|---|---|---|
-| Pairwise | 0.994 | 0.939 | 0.966 |
-| **B-cubed (cluster level)** | 0.998 | 0.974 | 0.986 |
+| Pairwise | 0.994 | 0.940 | 0.966 |
+| **B-cubed (cluster level)** | 0.998 | 0.975 | 0.986 |
 | Naive baseline: exact text match | 1.000 | 0.032 | 0.061 |
 
 Pairwise scores can look excellent while clusters are catastrophically
@@ -279,18 +279,19 @@ class schema itself declares, and an LLM that may only *propose*:
 
 | | Held-out |
 |---|---|
-| Precision | 0.919 |
-| Recall | 0.766 |
-| **Direction accuracy** | **0.990** |
-| Candidate coverage | 0.796 |
-| Recall of reachable pairs | 0.962 |
+| Precision | 0.929 |
+| Recall | 0.885 |
+| **Direction accuracy** | **0.989** |
+| Candidate coverage | 0.915 |
+| Recall of reachable pairs | 0.967 |
 
-Recall is reported with its ceiling rather than on its own. It used to be 0.607,
-and the ceiling explained where that went: 20% of true pairs never reach the
-engine because blocking is tuned for duplicates, and of the 80% that do, the
-engine was finding only 76%.
+Recall is reported with its ceiling rather than on its own, and reporting it
+that way is what fixed it. It used to be **0.607**, and the ceiling said exactly
+where that went: 20% of true pairs never reached the engine at all, and of the
+80% that did, the engine found only 76%. Two separate losses, each with its own
+cause.
 
-That second number was a missing source, not a hard problem. When two items
+**The engine's half was a missing source.** When two items
 agree on every identity-critical attribute and differ only on a performance
 attribute the schema marks `direction: higher_ok`, the higher-rated one
 substitutes the lower — `classes.yaml` said so when it declared the direction,
@@ -308,6 +309,28 @@ claim — "you may use B where A was specified" — and a looser guard proposed 
 across a valve whose body material had not extracted (`SS361`, a typo for
 SS316) and a cable whose voltage had not (`330V0`). Tightening it raised
 precision from 0.860 to 0.919 and cost 0.012 of recall.
+
+**The blocker's half was a pass that did not exist.** The remaining 20% turned
+out not to be spread thinly at all: 565 of the 602 unreachable pairs were in
+three dense classes, and they were pairs like two 80NB class-150 WCB buttweld
+gate valves differing only in temperature rating. Those share a class-band
+bucket — so when the bucket overflows its cap, they go with it. The ANN pass
+rescues the *duplicates* in a skipped bucket, because their text is nearly
+identical; it does not rescue a substitute, whose text differs on the very
+rating that makes it one.
+
+So there is now an **identity-signature pass**: bucket on the class plus every
+identity-critical value, with the ratings deliberately left out of the key. Two
+items that agree on what they *are* meet regardless of how they are rated. The
+key is far more selective than the class band, so it cost 5,695 candidate pairs
+— under 1% of the total, no measurable wall clock — and moved candidate coverage
+from 0.796 to 0.915. Duplicate blocking recall rose too, 0.984 → 0.988.
+
+A related invariant was being violated and is now asserted in a test:
+`chemical.reagent` blocked on `concentration_pct`, a *performance* rating with a
+declared direction, so a 20% xylene and a 50% one were bucketed apart —
+precisely the pair that substitutes for the other. `block_on` must name an
+identity attribute.
 
 Direction accuracy is the number that matters most — a substitution proposed
 the wrong way round is unsafe, not merely wrong.
@@ -406,8 +429,8 @@ assert the break is found at the right sequence.
 Per class, the weakest is named rather than averaged away:
 `bearing.ball.deep_groove` at F1 0.933 — precise at 0.989 but recalling 0.884,
 because a designation that fails to parse takes the bore, outer diameter and
-width with it. Every class is above 0.93. Automation rate is 0.995, leaving
-3,712 pairs for human review.
+width with it. Every class is above 0.93. Automation rate is 0.994, leaving
+3,687 pairs for human review.
 
 Naming the worst class is not a formality. It was `chemical.reagent` at recall
 0.847 until an audit asked *why*, and the answer was not "reagents are hard": a
@@ -556,7 +579,7 @@ are kept honest — partial is marked partial.
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.919 / R 0.766, direction accuracy 0.990 |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.929 / R 0.885, direction accuracy 0.989 |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |

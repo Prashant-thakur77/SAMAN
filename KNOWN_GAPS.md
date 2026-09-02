@@ -17,7 +17,7 @@ pass on the held-out split of the demo profile.
 | No Ollama model is installed on this machine | Both LLM paths — Copilot prose and Tier-3 rephrasing — are implemented and unit-tested against a stubbed model, including their rejection guards, but neither has run against a real one | Nothing in the demo depends on it; `/api/health` reports the deterministic path honestly |
 | The ERP is a mock | `ErpAdapter` is a named contract and `MockErpAdapter` implements it over the five SAP tables a consolidation touches. No real SAP system has been connected | A prototype cannot ship a certified SAP connector; the contract is the deliverable |
 | Blocking recall is 0.897 at 150k rows | The bucket caps are tuned for the demo profile. Sub-blocking was measured and rejected (see README "Data"); scaling the caps with corpus size is the honest next step | Reported rather than hidden — the gate is met on the profile everything else is measured on |
-| Equivalence recall is 0.77 | 20% of true pairs never reach the engine, because blocking is tuned for duplicates. Of the pairs that do reach it the engine now finds 0.962, so the remaining loss is almost entirely the blocker. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | A blocking pass aimed at substitutes rather than duplicates is the next step, and is not done |
+| Equivalence recall is 0.885 | Up from 0.607. Candidate coverage is 0.915 and the engine finds 0.967 of what reaches it, so both halves of the old loss are largely closed. Still reported with its ceiling rather than as a bare number | The residue is spread thinly rather than concentrated in one cause, which is the point at which further tuning stops paying |
 | An LLM never *proposes* equivalences | §2B names it as source 4, the lowest-trust one. The basis and its 0.50 weight exist; nothing emits it | Would need a model installed, and it can only ever add review-queue suggestions |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale | Worth batching if the queue view is ever paged deeply |
 | Restricted mode is quadratic | 300 x 300 records is 90,000 comparisons, and there is no plaintext to block on | A real cost of the privacy guarantee, which is why it is a periodic overlap report and not the live matching path |
@@ -425,6 +425,21 @@ that could not be true:
   requires every identity-critical attribute to have been readable on both
   sides. Precision 0.860 → 0.919 for 0.012 of recall — better than the original
   on both axes.
+
+- **The other half of the equivalence loss was a blocking pass that did not
+  exist.** 602 of 2,393 held-out equivalence pairs never reached the engine, and
+  565 of them sat in three dense classes: two 80NB class-150 WCB buttweld gate
+  valves differing only in temperature rating share a class-band bucket, so when
+  that bucket overflows its cap they are skipped with it. The ANN pass rescues
+  the duplicates in a skipped bucket — their text is nearly identical — but not
+  a substitute, whose text differs on the rating that makes it one. An
+  identity-signature pass (class plus every identity-critical value, ratings
+  deliberately excluded from the key) cost 5,695 candidate pairs and moved
+  candidate coverage 0.796 → 0.915. Duplicate blocking recall rose as well.
+- **`block_on` was allowed to name a performance attribute.** `chemical.reagent`
+  blocked on `concentration_pct`, so a 20% xylene and a 50% one were bucketed
+  apart — the pair that substitutes for the other. An invariant test now asserts
+  that every `block_on` names an identity-critical attribute.
 
 ### Measurement honesty
 

@@ -33,6 +33,10 @@ import numpy as np
 MAX_BUCKET = 300  # default for exact-key passes
 BAND_MAX_BUCKET = 150  # class + coarse attribute band
 TOKEN_MAX_BUCKET = 100  # inverted token index — common tokens are useless keys
+#: The identity-signature key is the most selective of all — every
+#: identity-critical attribute must agree — so the cap only guards against a
+#: class whose identity attributes all failed to extract.
+IDENTITY_MAX_BUCKET = 200
 
 #: Neighbours per item in the embedding pass. The most recall per candidate
 #: pair of any pass, so it is worth running wide.
@@ -98,6 +102,9 @@ class ItemKey:
     mpn_norm: str | None
     gtin: str | None
     block_value: str | None  # value of the class's block_on attribute
+    #: Every identity-critical attribute's value, in schema order, or None when
+    #: any of them could not be read. See the `identity` pass below.
+    identity_signature: str | None = None
 
 
 def _ordered(a: int, b: int) -> tuple[int, int]:
@@ -195,7 +202,26 @@ def generate_candidates(
             by_token[(item.class_code, token)].append(item.id)
     _pairs_from_buckets(by_token, out, stats, "token", cap=TOKEN_MAX_BUCKET)
 
-    # --- pass 5: embedding neighbours, within class ---
+    # --- pass 5: identical identity, whatever the ratings ---
+    #
+    # This is the substitutes pass. Two items agreeing on every identity-critical
+    # attribute and differing on a rated one are exactly a §2B directed
+    # substitute -- and exactly what the other passes lose. They sit in the same
+    # class-band bucket, so when that bucket overflows its cap they go with it;
+    # the ANN pass rescues the duplicates in a skipped bucket because their text
+    # is nearly identical, but a substitute's text differs on the rating that
+    # makes it a substitute. Measured: 602 of 2,393 held-out equivalence pairs
+    # never reached the engine, 565 of them in three dense classes.
+    #
+    # The key is far more selective than the class band, so its buckets stay
+    # small and it needs no cap of its own.
+    by_identity: dict[str, list[int]] = defaultdict(list)
+    for item in items:
+        if item.identity_signature:
+            by_identity[item.identity_signature].append(item.id)
+    _pairs_from_buckets(by_identity, out, stats, "identity", cap=IDENTITY_MAX_BUCKET)
+
+    # --- pass 6: embedding neighbours, within class ---
     if vectors is not None and index_by_id and len(items) > 1:
         _ann_pass(items, vectors, index_by_id, out, stats)
 

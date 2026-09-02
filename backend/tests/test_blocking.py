@@ -128,3 +128,86 @@ class TestOversizedBuckets:
         cap that skipped it."""
         _, stats = self._stats({"k": list(range(500))}, cap=10)
         assert stats.largest_bucket == 500
+
+
+class TestIdentitySignature:
+    """The substitutes pass (§2B).
+
+    Two items agreeing on every identity-critical attribute and differing on a
+    rated one are exactly a directed substitute — and exactly what the other
+    passes lose. They share a class-band bucket, so when that bucket overflows
+    they go with it; the ANN pass rescues the duplicates in a skipped bucket
+    because their text is nearly identical, but a substitute's text differs on
+    the rating that makes it one. It was 602 of 2,393 held-out equivalence
+    pairs never reaching the engine.
+    """
+
+    def test_agreeing_identities_share_a_signature(self):
+        from app.pipeline import _identity_signature
+
+        a = _identity_signature(
+            "chemical.reagent",
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+        )
+        b = _identity_signature(
+            "chemical.reagent",
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 90.0},
+        )
+        assert a is not None and a == b, "the rating must not enter the key"
+
+    def test_a_differing_identity_does_not(self):
+        from app.pipeline import _identity_signature
+
+        a = _identity_signature("chemical.reagent", {"substance": "XYLENE", "grade": "TECH"})
+        b = _identity_signature("chemical.reagent", {"substance": "TOLUENE", "grade": "TECH"})
+        assert a != b
+
+    def test_a_missing_attribute_produces_no_signature(self):
+        """A signature built from three attributes out of four would collide
+        two items that differ on the fourth — the opposite of the point."""
+        from app.pipeline import _identity_signature
+
+        assert _identity_signature("chemical.reagent", {"substance": "XYLENE"}) is None
+
+    def test_an_unclassified_item_has_no_signature(self):
+        from app.pipeline import _identity_signature
+
+        assert _identity_signature("unclassified", {"anything": 1}) is None
+
+    def test_the_signature_is_case_and_whitespace_insensitive(self):
+        from app.pipeline import _identity_signature
+
+        a = _identity_signature("chemical.reagent", {"substance": "xylene ", "grade": "tech"})
+        b = _identity_signature("chemical.reagent", {"substance": "XYLENE", "grade": "TECH"})
+        assert a == b
+
+    def test_the_pass_emits_pairs_for_a_shared_signature(self):
+        keys = [
+            blocking.ItemKey(1, "c", "a", "h1", None, None, "5", identity_signature="sig"),
+            blocking.ItemKey(2, "c", "b", "h2", None, None, "9", identity_signature="sig"),
+            blocking.ItemKey(3, "c", "c", "h3", None, None, "5", identity_signature="other"),
+        ]
+        pairs, stats = blocking.generate_candidates(keys)
+        assert (1, 2) in pairs
+        assert stats.per_pass.get("identity", 0) >= 1
+
+
+class TestSchemaInvariants:
+    def test_every_block_on_is_an_identity_attribute(self):
+        """`block_on` is the class's most discriminating *identity* field.
+
+        `chemical.reagent` blocked on `concentration_pct` — a performance
+        rating with a declared direction — so a 20% xylene and a 50% xylene
+        landed in different buckets, which is precisely the pair that
+        substitutes for the other.
+        """
+        from app.taxonomy import real_classes
+
+        for schema in real_classes():
+            if schema.block_on is None:
+                continue
+            identity = {spec.name for spec in schema.identity_critical}
+            assert schema.block_on in identity, (
+                f"{schema.code} blocks on {schema.block_on}, which is not "
+                "identity-critical"
+            )
