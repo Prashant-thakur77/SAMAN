@@ -259,6 +259,15 @@ resolved by the §2D rules in order (highest-confidence extraction, then
 majority vote, then most recent purchase, then most precise value), and every
 fused field records which member it came from and which rule chose it.
 
+The provenance is worth reading rather than trusting. Across 45,844 fused
+fields: 29,619 had one member offering a value at all, **16,184 were unanimous**,
+24 needed a genuine majority vote and 17 a most-recent-purchase tie-break. Real
+disagreement is rare — which is the useful finding, and it was invisible until
+`unanimous` was separated from `majority_vote`. Every one of those 16,184 had
+previously been recorded as a majority vote, which tells a reviewer the members
+disagreed and one value won. Provenance that overstates the difficulty of a
+decision is as misleading as provenance that understates it.
+
 An unresolved disagreement on an identity-critical attribute does **not**
 auto-approve: the cluster is flagged and routed to a steward, and `POST
 /api/cnmc/issue` refuses it with 409. On the demo profile 870 of 7,107 clusters

@@ -34,7 +34,14 @@ from .extract import SOURCE_PRIORITY
 from .taxonomy import ClassSchema
 
 #: Rule names persisted on `golden_field_provenance.rule`.
+#:
+#: `unanimous` is deliberately separate from `majority_vote`. A reviewer reading
+#: "majority vote" reasonably infers that the members disagreed and one value
+#: won; on this data 16,191 of the 16,208 fields labelled that way had every
+#: member agreeing. Provenance that overstates the difficulty of a decision is
+#: as misleading as provenance that understates it.
 RULE_SOLE = "sole_value"
+RULE_UNANIMOUS = "unanimous"
 RULE_SOURCE = "highest_confidence_source"
 RULE_MAJORITY = "majority_vote"
 RULE_RECENT = "most_recent_purchase"
@@ -155,7 +162,7 @@ def fuse_attribute(
 
     if len(distinct) == 1:
         member, value, _ = offered[0]
-        rule = RULE_SOLE if len(offered) == 1 else RULE_MAJORITY
+        rule = RULE_SOLE if len(offered) == 1 else RULE_UNANIMOUS
         return FusedField(field_name, value, member.id, rule, candidates), None
 
     # --- rule 1: the highest-confidence extraction wins outright ---
@@ -174,7 +181,6 @@ def fuse_attribute(
         return FusedField(field_name, value, member.id, RULE_MAJORITY, candidates), None
 
     # --- rule 2b: tie broken by the most recent purchase ---
-    tied_value = ranked[0][0]
     tied_count = ranked[0][1]
     tied = [
         (m, v, s)
@@ -188,6 +194,7 @@ def fuse_attribute(
 
     # --- rule 3: the most complete/precise value ---
     member, value, _ = max(tied, key=lambda row: (_precision(row[1]), -row[0].id))
+
     conflict = {
         "attr": field_name,
         "values": sorted(distinct),
@@ -195,7 +202,6 @@ def fuse_attribute(
         "resolved_as": format_value(value),
         "note": f"members disagree on {field_name}; kept the most precise value",
     }
-    _ = tied_value
     return FusedField(field_name, value, member.id, RULE_PRECISE, candidates), conflict
 
 

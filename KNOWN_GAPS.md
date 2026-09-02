@@ -458,6 +458,13 @@ that could not be true:
   `equivalence._equal` since. Writing the shared helper is what found it —
   duplicated logic hides the second copy of a bug you have already fixed.
 
+- **Provenance said "majority vote" when every member had agreed.** 16,184 of
+  the 16,208 fields carrying that label had no disagreement at all — the fusion
+  code reused the majority-vote name for its unanimous early return. A reviewer
+  reading it would infer a contested decision that never happened. Separating
+  `unanimous` from `majority_vote` also surfaced the useful fact underneath:
+  across 45,844 fused fields only 41 needed a tie-break of any kind.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

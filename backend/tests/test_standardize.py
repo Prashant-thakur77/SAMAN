@@ -16,6 +16,7 @@ from app.standardize import (
     RULE_RECENT,
     RULE_SOLE,
     RULE_SOURCE,
+    RULE_UNANIMOUS,
     Member,
     format_value,
     fuse_attribute,
@@ -90,10 +91,21 @@ class TestFusionRules:
         fused, conflict = fuse_attribute("bore_mm", [member(1, {"bore_mm": 25})])
         assert fused.value == 25 and fused.rule == RULE_SOLE and conflict is None
 
-    def test_agreement_across_members_is_a_majority(self):
+    def test_agreement_across_members_is_recorded_as_unanimous(self):
+        """Not as a majority vote. A reviewer reading "majority vote"
+        reasonably infers the members disagreed and one value won."""
         members = [member(1, {"bore_mm": 25}), member(2, {"bore_mm": 25.0})]
         fused, conflict = fuse_attribute("bore_mm", members)
-        assert fused.rule == RULE_MAJORITY and conflict is None
+        assert fused.rule == RULE_UNANIMOUS and conflict is None
+
+    def test_a_majority_vote_means_a_real_disagreement(self):
+        members = [
+            member(1, {"seal_type": "ZZ"}),
+            member(2, {"seal_type": "ZZ"}),
+            member(3, {"seal_type": "2RS"}),
+        ]
+        fused, conflict = fuse_attribute("seal_type", members)
+        assert fused.rule == RULE_MAJORITY and fused.value == "ZZ"
 
     def test_rule_1_the_higher_confidence_source_wins(self):
         """A parsed designation outranks a value scraped from free text."""
