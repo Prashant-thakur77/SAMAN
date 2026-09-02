@@ -7,6 +7,7 @@ failure §2B exists to prevent.
 
 import pytest
 
+from app import equivalence
 from app.equivalence import (
     BASIS_CONFIDENCE,
     Candidate,
@@ -224,3 +225,90 @@ class TestRowNormalisation:
     def test_a_symmetric_relation_is_unaffected_by_ordering(self):
         verdict = evaluate(bearing(9, mpn="A1"), bearing(2, mpn="A1"), BEARING, BEARING_RULES, {})
         assert verdict.as_row(9, 2)["direction"] == "bidirectional"
+
+
+class TestRatingBasis:
+    """§2B source 3, derived from the class schema rather than a written rule.
+
+    When two items agree on every identity-critical attribute they state and
+    differ only on a performance attribute the schema marks `higher_ok`, the
+    higher-rated one substitutes the lower. `classes.yaml` said so when it
+    declared the direction; nobody had to write a rule.
+    """
+
+    def _compare(self, a: dict, b: dict, class_code="chemical.reagent"):
+        from app.compare import compare_attrs
+        from app.taxonomy import get_schema
+
+        schema = get_schema(class_code)
+        return compare_attrs(a, b, schema), schema
+
+    def test_a_higher_concentration_supersedes_a_lower_one(self):
+        comparison, schema = self._compare(
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 50.0},
+        )
+        verdict = equivalence.by_rating(comparison, schema)
+        assert verdict is not None
+        assert verdict.rel_type == "supersedes"
+        assert verdict.direction == "a_to_b", "B is the stronger one"
+        assert verdict.basis == "rating"
+
+    def test_the_direction_is_never_implied_backwards(self):
+        """The unsafe direction is the whole reason §2B stores one."""
+        comparison, schema = self._compare(
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 50.0},
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+        )
+        assert equivalence.by_rating(comparison, schema).direction == "b_to_a"
+
+    def test_an_identity_difference_produces_nothing(self):
+        comparison, schema = self._compare(
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+            {"substance": "TOLUENE", "grade": "TECH", "concentration_pct": 50.0},
+        )
+        assert equivalence.by_rating(comparison, schema) is None
+
+    def test_an_unreadable_identity_attribute_produces_nothing(self):
+        """A substitution is a safety claim. "We could not read the grade" is
+        not a basis for telling a buyer the parts interchange."""
+        comparison, schema = self._compare(
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+            {"substance": "XYLENE", "concentration_pct": 50.0},
+        )
+        assert equivalence.by_rating(comparison, schema) is None
+
+    def test_agreement_alone_is_not_a_substitution(self):
+        """Identical ratings are a duplicate question, not a substitution one."""
+        comparison, schema = self._compare(
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+        )
+        assert equivalence.by_rating(comparison, schema) is None
+
+    def test_a_difference_inside_the_tolerance_band_is_not_a_substitution(self):
+        comparison, schema = self._compare(
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.2},
+        )
+        assert equivalence.by_rating(comparison, schema) is None
+
+    def test_it_is_the_last_source_consulted(self):
+        """A crossref, a designation or a steward's rule all outrank a
+        direction inferred from the schema."""
+        assert equivalence.BASIS_PRIORITY.index("rating") > equivalence.BASIS_PRIORITY.index(
+            "rule"
+        )
+        assert (
+            equivalence.BASIS_CONFIDENCE["rating"] < equivalence.BASIS_CONFIDENCE["rule"]
+        )
+
+    def test_the_evidence_names_what_agreed_and_what_differed(self):
+        comparison, schema = self._compare(
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 20.0},
+            {"substance": "XYLENE", "grade": "TECH", "concentration_pct": 50.0},
+        )
+        evidence = equivalence.by_rating(comparison, schema).evidence
+        assert "substance" in evidence["agreed_on"]
+        assert evidence["rating_difference"]
+        assert "schema" in evidence["source"]

@@ -36,14 +36,27 @@ from .numeric import parse_number
 from .taxonomy import ClassSchema
 
 #: Highest trust first. Also the order the engine tries them in.
-BASIS_PRIORITY = ("crossref", "designation", "rule", "llm")
+BASIS_PRIORITY = ("crossref", "designation", "rule", "rating", "llm")
 
 BASIS_CONFIDENCE = {
     "crossref": 0.98,   # a published interchange is as good as it gets
     "designation": 0.95,  # the item states its own specification
     "rule": 0.85,       # a steward's rule, applied to extracted attributes
+    "rating": 0.80,     # the class schema's own `direction: higher_ok`
     "llm": 0.50,        # a suggestion for a human, never more
 }
+
+#: Every identity-critical attribute must have been readable on both sides
+#: before a rating difference may imply a substitution — not most of them.
+#:
+#: A substitution is a safety claim: "you may use B where A was specified". A
+#: partial guard let it through on a valve whose body material had not
+#: extracted (SS361, a typo for SS316) and on a cable whose voltage had not
+#: (330V0). Both agreed on everything that *was* readable and differed on a
+#: rated attribute, so both were proposed — across an unknown body material
+#: and an unknown voltage rating. "We could not read it" is not a basis for
+#: telling a buyer the parts interchange.
+REQUIRE_FULL_IDENTITY = True
 
 REL_EQUIVALENT = "equivalent"
 REL_SUPERSEDES = "supersedes"
@@ -324,6 +337,47 @@ def by_rule(
 # --------------------------------------------------------------------------
 
 
+def by_rating(comparison, schema: ClassSchema) -> EquivalenceVerdict | None:
+    """A directed substitute the class schema already implies (§2B source 3).
+
+    When two items agree on every identity-critical attribute they state, and
+    differ only on a performance attribute the schema marks `higher_ok`, the
+    higher-rated one can stand in for the lower. That is a substitution, and
+    nobody had to write a rule for it — `classes.yaml` said so when it declared
+    the direction.
+
+    §2A computes exactly this and calls it `equivalence_candidate`; until now
+    only `_apply_direction` read it, and only to *correct* a verdict some other
+    source had already produced. So a 50% technical-grade xylene and a 20% one
+    from another manufacturer — same substance, same grade, no crossref, no
+    designation to parse, no hand-written rule — produced nothing at all. That
+    single gap was 395 of the 560 reachable equivalence pairs the engine missed.
+    """
+    if not (comparison.equivalence_candidate and comparison.direction):
+        return None
+
+    total = len(schema.identity_critical)
+    compared = sum(
+        1
+        for entry in comparison.per_attr
+        if entry.role == "identity_critical" and entry.result != "unknown"
+    )
+    if REQUIRE_FULL_IDENTITY and compared < total:
+        return None
+
+    return EquivalenceVerdict(
+        rel_type=REL_SUPERSEDES,
+        direction=comparison.direction,
+        basis="rating",
+        confidence=BASIS_CONFIDENCE["rating"],
+        evidence={
+            "source": "the class schema declares this rating may be exceeded",
+            "agreed_on": sorted(comparison.matched_attrs),
+            "rating_difference": comparison.vetoed_by,
+        },
+    )
+
+
 def evaluate(
     a: Candidate,
     b: Candidate,
@@ -361,7 +415,12 @@ def evaluate(
         if identity_blocked and verdict.rel_type == REL_EQUIVALENT:
             return None
         return verdict
-    return None
+
+    # Last, and only when identity agrees: the direction the schema itself
+    # declares. A rating difference cannot span an identity difference.
+    if identity_blocked:
+        return None
+    return by_rating(comparison, schema)
 
 
 def _apply_direction(

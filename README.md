@@ -273,23 +273,44 @@ requirement, and the reverse is unsafe. Collapsing the two would erase a
 distinction CPSE material masters genuinely carry, so they are separate
 relations with separate metrics.
 
-Four evidence sources, in precision order — a published OEM interchange, a
-parsed standard designation, a per-class substitution rule, and (from M6) an
-LLM that may only *propose*:
+Five evidence sources, in precision order — a published OEM interchange, a
+parsed standard designation, a per-class substitution rule, the direction the
+class schema itself declares, and an LLM that may only *propose*:
 
 | | Held-out |
 |---|---|
-| Precision | 0.902 |
-| Recall | 0.607 |
-| **Direction accuracy** | **0.987** |
+| Precision | 0.919 |
+| Recall | 0.766 |
+| **Direction accuracy** | **0.990** |
 | Candidate coverage | 0.796 |
-| Recall of reachable pairs | 0.762 |
+| Recall of reachable pairs | 0.962 |
 
-Recall is reported with its ceiling rather than on its own: 20% of true
-equivalence pairs never reach the engine because blocking is tuned for
-duplicates, and of those that do, some lack the extracted attributes to decide.
-Direction accuracy is the number that matters most — a substitution proposed the
-wrong way round is unsafe, not merely wrong.
+Recall is reported with its ceiling rather than on its own. It used to be 0.607,
+and the ceiling explained where that went: 20% of true pairs never reach the
+engine because blocking is tuned for duplicates, and of the 80% that do, the
+engine was finding only 76%.
+
+That second number was a missing source, not a hard problem. When two items
+agree on every identity-critical attribute and differ only on a performance
+attribute the schema marks `direction: higher_ok`, the higher-rated one
+substitutes the lower — `classes.yaml` said so when it declared the direction,
+and §2A already computed it and called it an `equivalence_candidate`. Nothing
+read it except to *correct* a verdict some other source had produced. So a 50%
+technical-grade xylene and a 20% one from another manufacturer — same
+substance, same grade, no OEM crossref, no designation to parse, no
+hand-written rule — produced nothing at all. That single gap was 395 of the 560
+reachable pairs the engine missed. **Reachable recall went 0.762 → 0.962 and
+overall recall 0.607 → 0.766, with precision rising too.**
+
+The guard on it is deliberately strict: *every* identity-critical attribute must
+have been readable on both sides, not most of them. A substitution is a safety
+claim — "you may use B where A was specified" — and a looser guard proposed one
+across a valve whose body material had not extracted (`SS361`, a typo for
+SS316) and a cable whose voltage had not (`330V0`). Tightening it raised
+precision from 0.860 to 0.919 and cost 0.012 of recall.
+
+Direction accuracy is the number that matters most — a substitution proposed
+the wrong way round is unsafe, not merely wrong.
 
 Rules are data, not code. A steward reads and edits them through `GET/POST
 /api/rules`:
@@ -535,7 +556,7 @@ are kept honest — partial is marked partial.
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done** — Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.902 / R 0.607, direction accuracy 0.987 |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done** — duplicates P 0.994 / R 0.933; directed equivalence P 0.919 / R 0.766, direction accuracy 0.990 |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done** — deterministic rendering, 4-rule fusion, per-field provenance |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done** — 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done** — `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |

@@ -17,7 +17,7 @@ pass on the held-out split of the demo profile.
 | No Ollama model is installed on this machine | Both LLM paths — Copilot prose and Tier-3 rephrasing — are implemented and unit-tested against a stubbed model, including their rejection guards, but neither has run against a real one | Nothing in the demo depends on it; `/api/health` reports the deterministic path honestly |
 | The ERP is a mock | `ErpAdapter` is a named contract and `MockErpAdapter` implements it over the five SAP tables a consolidation touches. No real SAP system has been connected | A prototype cannot ship a certified SAP connector; the contract is the deliverable |
 | Blocking recall is 0.897 at 150k rows | The bucket caps are tuned for the demo profile. Sub-blocking was measured and rejected (see README "Data"); scaling the caps with corpus size is the honest next step | Reported rather than hidden — the gate is met on the profile everything else is measured on |
-| Equivalence recall is 0.61 | 20% of true pairs never reach the engine (blocking is tuned for duplicates) and some that do lack the attributes to decide. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | Honest ceiling beats a flattering number |
+| Equivalence recall is 0.77 | 20% of true pairs never reach the engine, because blocking is tuned for duplicates. Of the pairs that do reach it the engine now finds 0.962, so the remaining loss is almost entirely the blocker. Reported with its ceiling — `candidate_coverage` and `recall_of_reachable` — rather than as a bare number | A blocking pass aimed at substitutes rather than duplicates is the next step, and is not done |
 | An LLM never *proposes* equivalences | §2B names it as source 4, the lowest-trust one. The basis and its 0.50 weight exist; nothing emits it | Would need a model installed, and it can only ever add review-queue suggestions |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries. Fine at demo scale | Worth batching if the queue view is ever paged deeply |
 | Restricted mode is quadratic | 300 x 300 records is 90,000 comparisons, and there is no plaintext to block on | A real cost of the privacy guarantee, which is why it is a periodic overlap report and not the live matching path |
@@ -410,6 +410,21 @@ that could not be true:
   listed the frontend test runner, table virtualization, screenshots and
   `make licenses` as unbuilt. A gaps file that understates what exists is as
   misleading as one that overstates it, in the other direction.
+
+- **A whole evidence source was missing, and §2A had already computed it.** The
+  veto layer marks a pair `equivalence_candidate` when the only difference is a
+  performance attribute the schema declares `direction: higher_ok` — a directed
+  substitute by construction. Nothing in the equivalence engine read that flag
+  except to *correct* a verdict another source had produced, so a xylene at 50%
+  and one at 20% from another manufacturer produced nothing: no crossref, no
+  designation parser for chemicals, no hand-written rule. 395 of the 560
+  reachable misses were that one gap. Reachable recall 0.762 → 0.962.
+- **The first guard on it was too loose.** Requiring 60% identity coverage let a
+  substitution through across a valve whose body material had not extracted and
+  a cable whose voltage had not. A substitution is a safety claim, so it now
+  requires every identity-critical attribute to have been readable on both
+  sides. Precision 0.860 → 0.919 for 0.012 of recall — better than the original
+  on both axes.
 
 ### Measurement honesty
 
