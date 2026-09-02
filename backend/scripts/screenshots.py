@@ -161,6 +161,14 @@ def capture(base_url: str, role: str, password: str) -> int:
         # /login is a picker over the seeded accounts, not an email field:
         # choose the role, then sign in.
         page.goto(f"{base_url}/login", wait_until="networkidle")
+        # The sign-in screen is the first thing anyone sees, so it is captured
+        # before the sign-in rather than left out of the gallery.
+        page.wait_for_selector("text=One Nation", timeout=15_000)
+        page.wait_for_timeout(2_000)
+        page.screenshot(path=str(OUTPUT / "login.png"), full_page=False)
+        written.append("login.png")
+        print(f"  {(OUTPUT / 'login.png').relative_to(REPO)}  (light)")
+
         page.click(f"li:has-text('{role}') button")
         page.fill("input[type=password]", password)
         page.click("button[type=submit]")

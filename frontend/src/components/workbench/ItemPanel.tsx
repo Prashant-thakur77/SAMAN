@@ -49,7 +49,7 @@ export function ItemPanel({ item, side }: { item: ItemCard; side?: string }) {
 
       <div className="flex flex-wrap items-center gap-3 pt-1">
         {item.class_uncertain ? (
-          <StatusChip tone="danger">Class uncertain — anchor keys only</StatusChip>
+          <StatusChip tone="danger">Class uncertain: anchor keys only</StatusChip>
         ) : (
           <StatusChip tone="neutral">{item.class_code}</StatusChip>
         )}

@@ -238,9 +238,9 @@ def match_pair(
             evidence={
                 "route": "anchor_only",
                 "reason": (
-                    "class uncertain — only an exact anchor key may match here"
+                    "class uncertain: only an exact anchor key may match here"
                     if not (a.is_classified and b.is_classified)
-                    else "different classes — only an exact anchor key may match here"
+                    else "different classes: only an exact anchor key may match here"
                 ),
                 "class_a": a.class_code,
                 "class_b": b.class_code,
@@ -303,7 +303,7 @@ def match_pair(
                         "a": f"{a.brand} {a.mpn_norm or ''}".strip(),
                         "b": f"{b.brand} {b.mpn_norm or ''}".strip(),
                         "evidence": manufacturer_evidence,
-                        "reason": "different manufacturers — interchangeable, not identical",
+                        "reason": "different manufacturers: interchangeable, not identical",
                     }
                 ],
             },
@@ -370,7 +370,7 @@ def match_pair(
                         else f"only {identity_compared} of {identity_total} "
                         "identity-critical attributes could be compared"
                     )
-                    + " — too little of what defines this item to merge on"
+                    + ": too little of what defines this item to merge on"
                 }
                 if thin_evidence and anchor_kind not in ("mpn", "gtin")
                 else {}

@@ -136,7 +136,7 @@ export default function Pprl() {
         <Field
           label="Exchange key"
           htmlFor="pprl-key"
-          hint="Shared out of band between the two CPSEs. Encodings made under different keys cannot be compared — and the key is the only thing keeping them from being inverted."
+          hint="Shared out of band between the two CPSEs. Encodings made under different keys cannot be compared, and the key is the only thing keeping them from being inverted."
         >
           <Input id="pprl-key" value={key} onChange={(e) => setKey(e.target.value)} />
         </Field>
@@ -220,7 +220,7 @@ export default function Pprl() {
               The first rows of {payloads.left.cpse}&rsquo;s payload, exactly as sent:{' '}
               {payloads.left.filter_bits}-bit filters, {payloads.left.hashes_per_feature} bits
               per feature. There is no description, legacy code, attribute value or price in
-              it — and the reference is a pseudonym only {payloads.left.cpse} can resolve.
+              it, and the reference is a pseudonym only {payloads.left.cpse} can resolve.
             </p>
             <div className="space-y-1 overflow-x-auto border border-hairline p-4 font-mono text-[11px] text-muted">
               {payloads.left.encodings.slice(0, 4).map((encoding) => (
@@ -258,7 +258,7 @@ export default function Pprl() {
             {report.matches.length === 0 && (
               <p className="border border-hairline px-4 py-3 text-sm text-muted">
                 Nothing scored above {report.report_threshold}. If that is a surprise, check
-                that both sides encoded under the same key — a mismatched key produces
+                that both sides encoded under the same key: a mismatched key produces
                 silence rather than a wrong answer.
               </p>
             )}
@@ -300,7 +300,7 @@ function Select({
     >
       {options.map((option) => (
         <option key={option.code} value={option.code}>
-          {option.code} — {option.name}
+          {option.code} · {option.name}
         </option>
       ))}
     </select>

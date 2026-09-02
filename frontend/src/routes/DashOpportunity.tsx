@@ -114,7 +114,7 @@ export default function DashOpportunity() {
                 Across {joint_tenders.candidates_found.toLocaleString('en-IN')} materials bought by
                 two or more CPSEs in the last {joint_tenders.window_months} months. Assumes{' '}
                 <strong className="text-ink">{Math.round(capture * 100)}%</strong> of the observed
-                price spread is capturable at combined volume — an assumption, not a measurement.
+                price spread is capturable at combined volume. An assumption, not a measurement.
               </p>
             </div>
             <div className="space-y-3">

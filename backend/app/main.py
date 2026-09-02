@@ -34,7 +34,7 @@ settings = get_settings()
 app = FastAPI(
     title="SAMAN API",
     description=(
-        "Standardised Asset & Material Analysis Network — harmonizes material codes "
+        "Standardised Asset & Material Analysis Network. Harmonizes material codes "
         "across Indian CPSEs and issues the Common National Material Code (CNMC)."
     ),
     version=__version__,

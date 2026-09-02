@@ -58,9 +58,15 @@ export default function App() {
   const location = useLocation()
 
   // /login stands outside the shell: no sidebar, no command bar.
+  //
+  // `initial={false}` for the same reason the shell routes use it: a route
+  // transition needs two routes, and there is no outgoing one on a cold load.
+  // Without it the first screen anybody sees fades up from nothing, which on a
+  // cold bundle takes long enough to look like a slow application rather than a
+  // deliberate animation.
   if (location.pathname === '/login') {
     return (
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait" initial={false}>
         <RouteTransition key="login">
           <ErrorBoundary>
             <Login />

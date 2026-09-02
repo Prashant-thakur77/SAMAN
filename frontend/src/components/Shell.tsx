@@ -76,7 +76,7 @@ export function Shell({ children }: { children: ReactNode }) {
             {unreachable ? (
               <EmptyState
                 title="SAMAN cannot reach its API"
-                description="Every screen needs the backend on :8000. Start it with `make dev`, or `docker compose up` for both services, then reload. Nothing has been lost — the database is on disk."
+                description="Every screen needs the backend on :8000. Start it with `make dev`, or `docker compose up` for both services, then reload. Nothing has been lost; the database is on disk."
                 action={
                   <Button variant="primary" onClick={() => window.location.reload()}>
                     Reload
@@ -90,7 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </main>
         <footer className="border-t border-hairline px-6 py-4">
           <p className="mx-auto max-w-content text-xs text-muted">
-            SAMAN · Standardised Asset &amp; Material Analysis Network — issues the CNMC.
+            SAMAN · Standardised Asset &amp; Material Analysis Network · issues the CNMC
           </p>
         </footer>
       </div>

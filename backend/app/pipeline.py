@@ -762,7 +762,7 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     # were refused anyway — that is where the veto layer did the work.
     tasks += [
         _task(pair_id, item_a, "low", "distinct", "steward",
-              "confirm an automatic refusal — a close match the veto layer declined")
+              "confirm an automatic refusal: a close match the veto layer declined")
         for pair_id, item_a in db.execute(
             select(Pair.id, Pair.item_a)
             .where(Pair.band == "low", Pair.veto_json.is_not(None))

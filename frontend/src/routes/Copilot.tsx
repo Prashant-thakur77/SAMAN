@@ -192,7 +192,7 @@ function AnswerBlock({ answer }: { answer: CopilotAnswer }) {
         </span>
         {answer.llm_rejected && (
           <span className="micro-label text-danger" title={answer.llm_rejected}>
-            model output rejected — showing the computed answer
+            model output rejected; showing the computed answer
           </span>
         )}
       </div>

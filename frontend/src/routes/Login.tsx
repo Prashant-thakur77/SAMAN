@@ -161,8 +161,8 @@ export default function Login() {
               ) : (
                 <div className="space-y-3 border border-hairline px-3 py-4">
                   <p className="text-sm text-muted">
-                    This database is empty. Load the demo estate — four CPSEs, about 12,000
-                    catalogue rows — or run{' '}
+                    This database is empty. Load the demo estate (four CPSEs, about 12,000
+                    catalogue rows), or run{' '}
                     <span className="font-mono text-xs">make demo</span> from the repository.
                   </p>
                   {seeding && seeding.state !== 'done' ? (

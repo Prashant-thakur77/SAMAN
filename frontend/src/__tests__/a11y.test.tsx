@@ -108,7 +108,7 @@ describe('the command palette', () => {
 })
 
 describe('the route announcer', () => {
-  it('says nothing on first load — the browser already did', () => {
+  it('says nothing on first load, since the browser already did', () => {
     render(
       <MemoryRouter future={ROUTER_FUTURE} initialEntries={['/search']}>
         <RouteAnnouncer />

@@ -439,13 +439,13 @@ def _veto_reason(veto: dict) -> str:
             if c.get("result") == "conflict" and c.get("role") == "identity_critical"
         ]
     if not blocking:
-        return "Close, but a defining specification differs — this is a different item."
+        return "Close, but a defining specification differs. This is a different item."
     first = blocking[0]
     label = str(first.get("attr", "")).replace("_", " ")
     a, b = first.get("a"), first.get("b")
     if a is not None and b is not None:
-        return f"Close, but {label} is {b}, not {a} — this is a different item."
-    return f"Close, but {label} differs — this is a different item."
+        return f"Close, but {label} is {b}, not {a}. This is a different item."
+    return f"Close, but {label} differs. This is a different item."
 
 
 def _similarity(result) -> float:
@@ -543,7 +543,7 @@ def verify_token(token: str, norm_hash: str | None = None) -> int:
         raise ValueError("token signature does not match")
     check_id, token_hash, issued = int(parts[0]), parts[1], int(parts[2])
     if time.time() - issued > TOKEN_TTL_SECONDS:
-        raise ValueError("token expired — run the check again")
+        raise ValueError("token expired; run the check again")
     if norm_hash is not None and token_hash != norm_hash:
         raise ValueError("the description changed after the check")
     return check_id

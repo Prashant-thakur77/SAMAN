@@ -121,7 +121,7 @@ def adjudicate(
     if not evidence.get("defining_attribute_compared", True):
         reasons.append(
             f"{_pretty(evidence.get('defining_attribute'))} could not be read from "
-            "one of the two rows — the attribute that most decides identity here."
+            "one of the two rows: the attribute that most decides identity here."
         )
         if agreed:
             reasons.append(
@@ -184,7 +184,7 @@ HEADLINE = {
 def _finish(
     recommendation: str, confidence: float, reasons: list[str], evidence: dict
 ) -> Adjudication:
-    summary = f"{HEADLINE[recommendation]} — {reasons[0]}" if reasons else HEADLINE[
+    summary = f"{HEADLINE[recommendation]}. {reasons[0]}" if reasons else HEADLINE[
         recommendation
     ]
     result = Adjudication(recommendation, confidence, reasons, summary)

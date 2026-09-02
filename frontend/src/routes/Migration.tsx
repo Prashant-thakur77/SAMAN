@@ -26,8 +26,8 @@ import { useSession } from '../lib/session'
 
 const IMPACT_LABEL: Record<string, string> = {
   safe: 'safe to apply',
-  open_transactions: 'held — open purchase order',
-  valuation_conflict: 'review — stranded value',
+  open_transactions: 'held: open purchase order',
+  valuation_conflict: 'review: stranded value',
 }
 
 /**
@@ -177,12 +177,12 @@ export default function Migration() {
             {[
               { label: 'Safe to apply', value: plan.summary.safe, tone: 'ok' as const },
               {
-                label: 'Held — open POs',
+                label: 'Held: open POs',
                 value: plan.summary.held_open_transactions,
                 tone: 'neutral' as const,
               },
               {
-                label: 'Review — stranded value',
+                label: 'Review: stranded value',
                 value: plan.summary.valuation_conflict,
                 tone: 'danger' as const,
               },

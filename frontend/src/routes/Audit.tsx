@@ -91,7 +91,7 @@ export default function Audit() {
           {verification.first_break ? (
             <p className="mt-3 text-sm text-danger">
               First break at sequence{' '}
-              <span className="font-mono">{verification.first_break.seq}</span> —{' '}
+              <span className="font-mono">{verification.first_break.seq}</span>:{' '}
               {verification.first_break.reason}
             </p>
           ) : (

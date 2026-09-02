@@ -254,7 +254,7 @@ def read(payload: bytes) -> OcrResult:
     if not available():
         raise OcrUnavailable(
             "The reader is not installed. Run `make deps-ocr`, or type the "
-            "description instead — the check itself is the same either way."
+            "description instead; the check itself is the same either way."
         )
 
     import numpy as np

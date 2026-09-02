@@ -324,7 +324,7 @@ def _equivalence_metrics(db: Session, snap: Snapshot) -> dict:
         return {
             "status": "no_predictions",
             "note": (
-                "No equivalence relations have been produced yet — run the "
+                "No equivalence relations have been produced yet. Run the "
                 "pipeline's `relations` stage. The truth table is seeded and "
                 "ready, so this measures as soon as there is something to score."
             ),

@@ -85,7 +85,7 @@ def restore() -> SnapshotResult:
     """Put every database back to the snapshot. Raises if there is none."""
     if not exists():
         raise FileNotFoundError(
-            f"no snapshot in {snapshot_dir()} — run `make demo-snapshot` first"
+            f"no snapshot in {snapshot_dir()}; run `make demo-snapshot` first"
         )
 
     started = time.perf_counter()

@@ -16,7 +16,7 @@ export function AttributeDiff({ diff }: { diff: AttrDiff[] }) {
   if (comparable.length === 0) {
     return (
       <p className="text-xs text-muted">
-        No attribute could be compared on both sides — the decision rests on text
+        No attribute could be compared on both sides; the decision rests on text
         similarity alone.
       </p>
     )

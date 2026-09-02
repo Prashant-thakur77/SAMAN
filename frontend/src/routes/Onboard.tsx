@@ -209,7 +209,7 @@ export default function Onboard() {
                   <option value="">Choose…</option>
                   {cpses.map((entry) => (
                     <option key={entry.code} value={entry.code}>
-                      {entry.code} — {entry.name} ({entry.items.toLocaleString('en-IN')} rows)
+                      {entry.code} · {entry.name} ({entry.items.toLocaleString('en-IN')} rows)
                     </option>
                   ))}
                 </select>
@@ -257,7 +257,7 @@ export default function Onboard() {
               )}
 
               <Button variant="primary" disabled={!file || !cpse} onClick={() => go(1)}>
-                Next — map the columns
+                Next: map the columns
               </Button>
             </>
           )}

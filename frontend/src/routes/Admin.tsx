@@ -121,7 +121,7 @@ export default function Admin() {
               <p className="micro-label">Sovereign mode</p>
               <p className="text-sm text-muted">
                 When on, any configured local model is ignored and the copilot answers from its
-                reviewed queries alone. Nothing leaves the machine either way — this makes that
+                reviewed queries alone. Nothing leaves the machine either way; this makes that
                 guarantee explicit and visible.
               </p>
             </div>

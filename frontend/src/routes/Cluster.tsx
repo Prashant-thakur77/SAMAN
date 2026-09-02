@@ -207,7 +207,7 @@ export default function Cluster() {
           <h2 className="micro-label">Members</h2>
           {locked && (
             <p className="text-xs text-muted">
-              An issued code is immutable — membership can no longer change.
+              An issued code is immutable; membership can no longer change.
             </p>
           )}
         </div>

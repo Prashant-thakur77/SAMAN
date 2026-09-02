@@ -28,7 +28,7 @@ const ACTION_TONE = {
 const ACTION_HEADLINE = {
   reuse: 'This material already exists',
   review: 'A possible match needs a decision',
-  create: 'No match — safe to create',
+  create: 'No match, safe to create',
 } as const
 
 /**
@@ -132,7 +132,7 @@ export default function SmartCreate() {
       <PageHeader
         section="Tools"
         title="Smart-Create"
-        description="Check a description against the national catalogue before raising a new material code. The same matcher, veto layer and evidence the pipeline uses — applied one record early."
+        description="Check a description against the national catalogue before raising a new material code. The same matcher, veto layer and evidence the pipeline uses, applied one record early."
       />
 
       {stats && (
@@ -215,14 +215,14 @@ export default function SmartCreate() {
                 Photograph the marking
               </Button>
               <span className="max-w-sm text-xs text-muted">
-                Point at the stamped marking or the nameplate, not the part — the
+                Point at the stamped marking or the nameplate, not the part. The
                 reader reads text, and a photograph cannot tell a 25 mm bore from a
                 30 mm one.
               </span>
             </>
           ) : (
             <span className="text-xs text-muted">
-              Camera input needs the OCR reader — <span className="font-mono">make deps-ocr</span>.
+              Camera input needs the OCR reader: <span className="font-mono">make deps-ocr</span>.
               Typing the description does the same check.
             </span>
           )}
@@ -315,7 +315,7 @@ export default function SmartCreate() {
           />
           <MatchList
             title="Interchangeable parts"
-            caption="A different manufacturer's equivalent. Not the same record — but worth knowing before you buy."
+            caption="A different manufacturer's equivalent. Not the same record, but worth knowing before you buy."
             matches={result.equivalents}
             busy={busy}
           />

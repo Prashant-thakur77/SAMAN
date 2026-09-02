@@ -189,7 +189,7 @@ export default function Item() {
 
       {/* §2B: two separate blocks, deliberately */}
       <section className="space-y-4">
-        <h2 className="micro-label">Duplicates — merged into this CNMC</h2>
+        <h2 className="micro-label">Duplicates: merged into this CNMC</h2>
         {detail.duplicates.length === 0 ? (
           <p className="text-sm text-muted">No other CPSE catalogues this item.</p>
         ) : (
@@ -202,7 +202,7 @@ export default function Item() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="micro-label">Equivalents — separate CNMC, interchangeable</h2>
+        <h2 className="micro-label">Equivalents: separate CNMC, interchangeable</h2>
         {detail.equivalents.length === 0 ? (
           <p className="text-sm text-muted">No interchangeable item has been identified.</p>
         ) : (

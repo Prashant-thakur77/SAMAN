@@ -162,7 +162,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 }
                 if (e.key === 'Enter' && options[cursor]) go(options[cursor].path)
               }}
-              placeholder="Search SAMAN — pages, items, CNMC codes"
+              placeholder="Search SAMAN: pages, items, CNMC codes"
               aria-label="Search SAMAN"
               role="combobox"
               aria-expanded

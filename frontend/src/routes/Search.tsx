@@ -80,7 +80,7 @@ export default function Search() {
       <PageHeader
         section="Overview"
         title="Search"
-        description="Every CPSE catalogue, searched on the normalized text — so an abbreviated row is findable by its spelled-out form and the other way round."
+        description="Every CPSE catalogue, searched on the normalized text, so an abbreviated row is findable by its spelled-out form and the other way round."
       />
 
       <form

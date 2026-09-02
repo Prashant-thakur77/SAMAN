@@ -35,7 +35,7 @@ def cmd_seed(args: argparse.Namespace) -> int:
             {f"erp_{k}": v for k, v in seed_from_catalogue(db).items()}
         )
     summary["seconds"] = round(time.time() - started, 1)
-    _print_table(f"SAMAN seed — {args.profile} profile", summary)
+    _print_table(f"SAMAN seed · {args.profile} profile", summary)
     print("\nSeeded users all use password 'demo'.")
     return 0
 
@@ -63,7 +63,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
         from .erp import seed_from_catalogue
 
         summary.update({f"erp_{k}": v for k, v in seed_from_catalogue(db).items()})
-        _print_table(f"SAMAN seed — {args.profile} profile", summary)
+        _print_table(f"SAMAN seed · {args.profile} profile", summary)
 
         print("\nRunning pipeline ...")
         status = run_pipeline(db)

@@ -28,7 +28,7 @@ export function RouteAnnouncer() {
     const match =
       NAV.find((item) => item.path !== '/' && pathname.startsWith(item.path)) ??
       NAV.find((item) => item.path === pathname)
-    setMessage(`${match?.label ?? document.title} — page loaded`)
+    setMessage(`${match?.label ?? document.title}, page loaded`)
 
     const main = document.getElementById('main-content')
     main?.focus({ preventScroll: true })

@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <p className="micro-label">Something on this screen failed</p>
           <h1 className="text-2xl">This page could not render</h1>
           <p className="max-w-prose text-sm text-muted">
-            The rest of SAMAN is still running — the sidebar and every other screen work.
+            The rest of SAMAN is still running; the sidebar and every other screen work.
             Nothing has been written or lost.
           </p>
         </div>
