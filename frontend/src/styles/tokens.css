@@ -54,56 +54,56 @@
  *
  * The application is monochrome and stays that way: it is an instrument people
  * work in all day, and §1.1 rations colour for a reason. The front page has a
- * different job, so it runs a warmer palette of its own.
+ * different job, so it runs a warmer palette of its own — brown, its shades,
+ * and black on paper.
  *
- * Scoped to `.landing` rather than declared globally, which means every
- * existing utility class keeps working inside it — `bg-bg` and `text-ink`
- * simply resolve to the warm values — and neither palette can drift into the
- * other by accident.
+ * Scoped to `.landing` rather than declared globally, so every existing utility
+ * keeps working inside it (`bg-bg` and `text-ink` simply resolve warm) and
+ * neither palette can drift into the other by accident.
  */
 .landing {
   --bg: 252 249 244; /* #FCF9F4 warm paper */
-  --surface: 245 238 228; /* #F5EEE4 light brown wash */
-  --ink: 26 20 16; /* #1A1410 */
-  --muted: 107 93 79; /* #6B5D4F warm grey-brown */
-  --hairline: 226 215 200; /* #E2D7C8 */
-  --inverse: 27 100 64; /* #1B6440 — the primary button fills green */
+  --surface: 244 236 224; /* #F4ECE0 light brown wash */
+  --ink: 24 18 13; /* #18120D */
+  --muted: 112 96 78; /* #70604E */
+  --hairline: 226 213 195; /* #E2D5C3 */
+  --inverse: 24 18 13; /* buttons stay black on paper */
 
-  --earth: 168 100 42; /* #A8642A ochre */
-  --forest: 27 100 64; /* #1B6440 */
+  --earth: 166 106 52; /* #A66A34 ochre */
+  --earth-deep: 104 64 30; /* #68401E */
+  --earth-soft: 205 178 145; /* #CDB291 */
 
   color-scheme: light;
 }
 
 .dark .landing {
-  --bg: 18 16 13; /* #12100D */
-  --surface: 28 24 19; /* #1C1813 */
-  --ink: 245 240 232; /* #F5F0E8 */
-  --muted: 168 155 138; /* #A89B8A */
-  --hairline: 48 41 34; /* #302922 */
-  --inverse: 92 186 132; /* #5CBA84 */
+  --bg: 20 17 14; /* #14110E */
+  --surface: 31 26 21; /* #1F1A15 */
+  --ink: 246 240 231; /* #F6F0E7 */
+  --muted: 172 157 138; /* #AC9D8A */
+  --hairline: 51 43 35; /* #332B23 */
+  --inverse: 246 240 231;
 
-  --earth: 224 156 88; /* #E09C58 */
-  --forest: 92 186 132; /* #5CBA84 */
+  --earth: 214 152 92; /* #D6985C */
+  --earth-deep: 240 197 148; /* #F0C594 */
+  --earth-soft: 108 84 60; /* #6C543C */
 
   color-scheme: dark;
 }
 
-/* Defined so the Tailwind colours resolve to something sane if either name is
-   ever used outside the front page. */
 :root {
   --earth: 82 82 82;
-  --forest: 82 82 82;
+  --earth-deep: 82 82 82;
+  --earth-soft: 200 200 200;
 }
 
-/* The wash behind the front page. Two earth pools and a green one, kept far
-   enough below the text that contrast is unaffected, over a faint dot grid
-   that fades out before the content gets dense. */
+/* The wash behind the front page: brown pools over a faint dot grid that fades
+   out before the content gets dense. */
 .landing-field {
   background-image:
-    radial-gradient(58rem 40rem at 10% -10%, rgb(var(--earth) / 0.18), transparent 62%),
-    radial-gradient(52rem 38rem at 94% 4%, rgb(var(--forest) / 0.16), transparent 60%),
-    radial-gradient(44rem 32rem at 72% 92%, rgb(var(--earth) / 0.12), transparent 58%);
+    radial-gradient(58rem 40rem at 8% -12%, rgb(var(--earth) / 0.20), transparent 62%),
+    radial-gradient(50rem 36rem at 96% 2%, rgb(var(--earth-soft) / 0.30), transparent 60%),
+    radial-gradient(44rem 32rem at 66% 94%, rgb(var(--earth) / 0.12), transparent 58%);
 }
 
 .landing-grid {

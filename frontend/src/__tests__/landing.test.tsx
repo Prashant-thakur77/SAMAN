@@ -64,7 +64,7 @@ describe('the landing page', () => {
         'BEARING, BALL DEEP GROOVE, 85MM BORE, 150MM OD, 28MM W, ZZ, FAG 6217-2ZR',
       ),
     ).toBeInTheDocument()
-    expect(screen.getByText(/every one of these is the same 85 mm/i)).toBeInTheDocument()
+    expect(screen.getByText(/one 85 mm bearing/i)).toBeInTheDocument()
   })
 
   it('shows a code in the issued format, check digit and all', () => {
@@ -82,8 +82,10 @@ describe('the landing page', () => {
     const rows = within(fixes).getAllByRole('listitem')
     expect(rows).toHaveLength(12)
     for (const row of rows) {
-      expect(within(row).getByRole('heading', { level: 3 })).toBeInTheDocument()
-      expect(row.textContent?.length ?? 0).toBeGreaterThan(120)
+      // index, problem, mechanism: three cells, none of them empty.
+      const cells = Array.from(row.querySelectorAll('span')).map((el) => el.textContent?.trim())
+      expect(cells).toHaveLength(3)
+      expect(cells.every(Boolean)).toBe(true)
     }
     expect(rows[0]).toHaveTextContent(/one material, many codes/i)
     expect(rows[11]).toHaveTextContent(/no network call at runtime/i)
@@ -94,8 +96,8 @@ describe('the landing page', () => {
     const steps = screen.getByRole('list', { name: /cheap certainty first/i })
     const items = within(steps).getAllByRole('listitem')
     expect(items).toHaveLength(5)
-    expect(items[0]).toHaveTextContent(/start with what is certain/i)
-    expect(items[4]).toHaveTextContent(/hand the rest to a person/i)
+    expect(items[0]).toHaveTextContent(/exact anchors/i)
+    expect(items[4]).toHaveTextContent(/a person, with the evidence/i)
   })
 
   it('states the rule the veto layer exists for', () => {
