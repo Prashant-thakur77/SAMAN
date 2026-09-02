@@ -11,6 +11,7 @@ from .config import get_settings
 from .db import SessionLocal, init_db
 from .routers import (
     admin,
+    assistant,
     auth,
     bootstrap,
     clusters,
@@ -67,6 +68,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(migration.router, prefix="/api")
 app.include_router(smart_create.router, prefix="/api")
 app.include_router(pprl.router, prefix="/api")
+app.include_router(assistant.router, prefix="/api")
 
 
 @app.on_event("startup")

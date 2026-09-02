@@ -89,6 +89,15 @@ def _restricted_mode(page) -> None:
     page.wait_for_selector("text=What actually crossed the wire", timeout=90_000)
 
 
+def _assistant(page) -> None:
+    """Open the floating assistant and ask it something it explains rather
+    than performs, so the panel is photographed with an answer in it."""
+    page.click("button[aria-label='Ask SAMAN']")
+    page.fill("input[aria-label='Ask the assistant']", "What is a CNMC?")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("text=Damm check digit", timeout=20_000)
+
+
 def _copilot(page) -> None:
     # Typed rather than filled: `fill` sets the DOM value directly, which leaves
     # a React-controlled input showing text the component has already cleared.
@@ -133,6 +142,7 @@ SHOTS: list[Shot] = [
         settle_ms=4_000,
     ),
     Shot("copilot", "/copilot", "text=Copilot", theme="dark", setup=_copilot),
+    Shot("assistant", "/workbench", "text=Review", setup=_assistant, settle_ms=900),
     Shot("onboard", "/onboard", "text=Onboard a CPSE"),
     Shot("audit", "/audit", "text=Governance"),
     Shot("admin", "/admin", "text=Engine health"),

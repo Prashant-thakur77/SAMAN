@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
+import { Assistant } from '../components/Assistant'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { cn } from '../lib/cn'
@@ -241,6 +242,52 @@ function Racking() {
   )
 }
 
+/** A scroll ornament: two mirrored volutes over a rule, the flourish a title
+ *  sits under on a letterhead. Generated from one quarter, mirrored. */
+function Ornament({ className }: { className?: string }) {
+  const volute = 'M0 14 C 10 14, 18 8, 22 2 C 25 -2, 31 0, 30 5 C 29 9, 24 10, 22 7'
+  return (
+    <svg
+      viewBox="-96 -8 192 26"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      className={className}
+    >
+      <line x1="-92" y1="14" x2="-34" y2="14" />
+      <line x1="34" y1="14" x2="92" y2="14" />
+      <g transform="translate(-30 0)">
+        <path d={volute} />
+      </g>
+      <g transform="translate(30 0) scale(-1 1)">
+        <path d={volute} />
+      </g>
+      <circle cx="0" cy="8" r="2.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+/** A jali: the pierced lattice of a Mughal or Rajput stone screen, as one
+ *  eight-point star tile that SVG repeats. */
+function Jali({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden className={className} width="100%" height="100%">
+      <defs>
+        <pattern id="jali" width="48" height="48" patternUnits="userSpaceOnUse">
+          <g fill="none" stroke="currentColor" strokeWidth="1">
+            <path d="M24 4 L28 16 L40 12 L32 24 L40 36 L28 32 L24 44 L20 32 L8 36 L16 24 L8 12 L20 16 Z" />
+            <circle cx="24" cy="24" r="5" />
+            <path d="M0 0 L8 8 M48 0 L40 8 M0 48 L8 40 M48 48 L40 40" />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#jali)" />
+    </svg>
+  )
+}
+
 /** A drawing laid behind the page, never in front of the reading. Position
  *  and tone come from the caller: two position utilities on one element
  *  resolve by stylesheet order, not by intent. */
@@ -387,6 +434,9 @@ export default function Landing() {
         <motion.div variants={listVariants(reduce)} initial="initial" animate="animate">
           <Band className="py-20 md:py-24">
             <Item>
+              <Ornament className="h-6 w-48 text-earth" />
+            </Item>
+            <Item className="pt-4">
               <Eyebrow>Standardised Asset &amp; Material Analysis Network</Eyebrow>
             </Item>
             <Item>
@@ -538,8 +588,11 @@ export default function Landing() {
         </Reveal>
 
         {/* ---- the veto, given the room it deserves ---- */}
-        <Reveal className="border-t border-hairline bg-surface">
-          <Band className="grid gap-10 py-20 md:py-24 lg:grid-cols-[auto_1fr] lg:gap-20">
+        <Reveal className="relative overflow-hidden border-t border-hairline bg-surface">
+          <Backdrop className="absolute inset-y-0 right-0 w-1/3 text-earth/[0.14]">
+            <Jali />
+          </Backdrop>
+          <Band className="relative grid gap-10 py-20 md:py-24 lg:grid-cols-[auto_1fr] lg:gap-20">
             <div>
               <Item>
                 <Eyebrow>Why it can be trusted</Eyebrow>
@@ -655,6 +708,10 @@ export default function Landing() {
           </p>
         </Band>
       </footer>
+
+      {/* Inside `.landing`, so the widget takes the warm palette here and the
+          monochrome one everywhere else. */}
+      <Assistant />
     </div>
   )
 }

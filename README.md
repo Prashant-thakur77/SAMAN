@@ -135,8 +135,8 @@ actually renders.
 | **Restricted mode.** two CPSEs find their common materials without either handing over a catalogue. | **Item.** the raw row beside the golden record it belongs to, every CPSE's stock of it, and its price history as a sparkline. |
 | ![Cluster](docs/screenshots/cluster.png) | ![Onboard](docs/screenshots/onboard.png) |
 | **Cluster.** the golden record, the template that rendered it, and which member and rule produced every fused field. | **Onboard.** upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. |
-| ![Camera input](docs/screenshots/scan.png) |  |
-| **Camera input.** photograph a material's marking and the same duplicate check runs on what the reader saw. |  |
+| ![Camera input](docs/screenshots/scan.png) | ![Ask SAMAN](docs/screenshots/assistant.png) |
+| **Camera input.** photograph a material's marking and the same duplicate check runs on what the reader saw. | **Ask SAMAN.** the floating assistant on every screen: say where to go and it takes you there, ask what something means and it explains, ask about the data and the Copilot answers with citations. Voice in and out where the browser allows. |
 ---
 
 ## Demo script
@@ -554,6 +554,31 @@ Visibility follows the same functions the dashboards use, so the Copilot cannot
 become a way around §0.9b, and not only in the rows. Asked the same question, a
 CPCL steward is told their own price and the anonymised range, and the sentence
 never names another CPSE's figure.
+
+### Ask SAMAN: the assistant on every screen
+
+A floating assistant, docked bottom-right on the front page and every
+application screen. It does three things and hands off the rest:
+
+- **Navigate.** "Take me to the workbench", "open cluster 268", "search 6205",
+  "वर्कबेंच खोलो". Matched against a route catalogue with English and Hindi
+  aliases, run through the same transliterator the matcher uses, and answered
+  by *going there* rather than by describing where to click.
+- **Explain.** What a CNMC is, why 25 mm is not 30 mm, which password to use,
+  whether any of this is machine learning. A short knowledge base, each entry
+  with the screen that shows it.
+- **Query.** Anything about the data goes to the Copilot, guards, row-level
+  visibility and citations intact. The assistant adds nothing to that path and
+  cannot get around it; a steward asking it about another CPSE's price gets
+  the same anonymised band the Copilot gives.
+
+Voice in and voice out ride on the browser's own speech engines
+(`SpeechRecognition`, `speechSynthesis`) and the controls appear only where
+those exist. Note that Chrome's recognition reaches Google's servers; an
+air-gapped deployment should type. The conversation survives moving between
+the front page and the application in the same tab.
+
+`POST /api/assistant/query` is public and scoped like every other endpoint.
 
 ### Commercial and inventory analytics
 

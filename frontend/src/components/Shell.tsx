@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useHealth } from '../lib/useHealth'
 
 import { CommandBar } from './CommandBar'
+import { Assistant } from './Assistant'
 import { CommandPalette } from './CommandPalette'
 import { RouteAnnouncer } from './RouteAnnouncer'
 import { Sidebar } from './Sidebar'
@@ -95,6 +96,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </footer>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <Assistant />
     </div>
   )
 }

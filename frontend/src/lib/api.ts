@@ -878,3 +878,25 @@ export type BootstrapStatus = {
 export const getBootstrapStatus = () => api.get<BootstrapStatus>('/bootstrap/status')
 export const loadDemoData = () =>
   api.post<{ started: boolean; profile: string; note: string }>('/bootstrap/demo-data', {})
+
+// ---- the floating assistant ----
+export type AssistantAction = { type: 'navigate'; to: string; label: string }
+export type AssistantCitation = {
+  item_id?: number
+  cluster_id?: number
+  cnmc?: string | null
+  legacy_code?: string
+  label?: string
+}
+export type AssistantReply = {
+  kind: 'navigate' | 'answer' | 'copilot' | 'refusal' | 'unknown'
+  answer: string
+  action: AssistantAction | null
+  citations: AssistantCitation[]
+  sql?: string | null
+  suggestions: string[]
+  mode: string
+  matched?: Record<string, unknown> | null
+}
+export const askAssistant = (question: string, path?: string) =>
+  api.post<AssistantReply>('/assistant/query', { question, path })
