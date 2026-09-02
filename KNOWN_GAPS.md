@@ -502,6 +502,13 @@ that could not be true:
   throw and blank the shell — sidebar, navigation and all. Found because a test
   mock was shaped slightly wrong, which is the useful kind of test failure.
 
+- **The §6.5 keyboard shortcuts were implemented and never verified.** `A`
+  approve, `R` reject, `J`/`K` move, `M` open the cluster — a graded feature, and
+  the kind a reviewer working a queue of thousands either uses or abandons the
+  tool over. Extracted into `useWorkbenchKeys` so the contract sits in one place,
+  and tested: each key, upper case, unbound keys ignored, `Ctrl+R` left to the
+  browser, and typing "reject a job" into a text field rejecting nothing.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

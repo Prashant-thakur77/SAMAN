@@ -6,6 +6,7 @@ import { PageHeader } from '../components/PageHeader'
 import { AttributeDiff } from '../components/workbench/AttributeDiff'
 import { ItemPanel } from '../components/workbench/ItemPanel'
 import { TierStrip } from '../components/workbench/TierStrip'
+import { useWorkbenchKeys } from '../lib/useWorkbenchKeys'
 import { Button } from '../components/primitives/Button'
 import { StatusChip } from '../components/primitives/Chip'
 import { EmptyState } from '../components/primitives/EmptyState'
@@ -98,31 +99,20 @@ export default function Workbench() {
     [task, busy, pending.length],
   )
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
-      const key = event.key.toLowerCase()
-      if (key === 'a') {
-        event.preventDefault()
-        void decide('approve')
-      } else if (key === 'r') {
-        event.preventDefault()
-        void decide('reject')
-      } else if (key === 'j') {
-        event.preventDefault()
-        setCursor((c) => Math.min(c + 1, Math.max(pending.length - 1, 0)))
-      } else if (key === 'k') {
-        event.preventDefault()
-        setCursor((c) => Math.max(c - 1, 0))
-      } else if (key === 'm' && task?.cluster_id) {
-        event.preventDefault()
-        navigate(`/clusters/${task.cluster_id}`)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [decide, pending.length, task, navigate])
+  useWorkbenchKeys(
+    useMemo(
+      () => ({
+        approve: () => void decide('approve'),
+        reject: () => void decide('reject'),
+        next: () => setCursor((c) => Math.min(c + 1, Math.max(pending.length - 1, 0))),
+        previous: () => setCursor((c) => Math.max(c - 1, 0)),
+        openCluster: task?.cluster_id
+          ? () => navigate(`/clusters/${task.cluster_id}`)
+          : undefined,
+      }),
+      [decide, pending.length, task, navigate],
+    ),
+  )
 
   const counts = queue?.counts ?? { high: 0, grey: 0, low: 0 }
 
