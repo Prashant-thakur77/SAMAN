@@ -16,7 +16,7 @@ pass on the held-out split of the demo profile.
 |---|---|---|
 | No Ollama model is installed on this machine | Both LLM paths — Copilot prose and Tier-3 rephrasing — are implemented and unit-tested against a stubbed model, including their rejection guards, but neither has run against a real one | Nothing in the demo depends on it; `/api/health` reports the deterministic path honestly |
 | The ERP is a mock | `ErpAdapter` is a named contract and `MockErpAdapter` implements it over the five SAP tables a consolidation touches. No real SAP system has been connected | A prototype cannot ship a certified SAP connector; the contract is the deliverable |
-| Blocking recall is 0.897 at 150k rows | The bucket caps are tuned for the demo profile. Sub-blocking was measured and rejected (see README "Data"); scaling the caps with corpus size is the honest next step | Reported rather than hidden — the gate is met on the profile everything else is measured on |
+| ~~Blocking recall is 0.897 at 150k rows~~ **closed** | The identity-signature pass took it to 0.983 and all four §8 gates now pass on the benchmark profile as well as the demo one. Sub-blocking was tried first and reverted — the measurement is in `blocking.py` | Kept in the list because the fix is worth the record: the winning idea came from asking which *pairs* were being lost, not which bucket was overflowing |
 | Equivalence recall is 0.946 | Up from 0.607 this session. Candidate coverage 0.976, and the engine finds 0.969 of what reaches it — both halves of the old loss are closed. Still reported with its ceiling rather than as a bare number | The residue is spread thinly rather than concentrated in one cause, which is where further tuning stops paying |
 | An LLM never *proposes* equivalences | §2B names it as source 4, the lowest-trust one. The basis and its 0.50 weight exist; nothing emits it | Would need a model installed, and it can only ever add review-queue suggestions |
 | Workbench cards issue a query per item | 25 cards cost ~50 small queries — measured at **22 ms** for a full page of the grey queue, so it is a real N+1 and not a real problem yet | Worth batching if the queue view is ever paged deeply; measured rather than assumed either way |
@@ -508,6 +508,15 @@ that could not be true:
   tool over. Extracted into `useWorkbenchKeys` so the contract sits in one place,
   and tested: each key, upper case, unbound keys ignored, `Ctrl+R` left to the
   browser, and typing "reject a job" into a text field rejecting nothing.
+
+- **The scale gap is closed, and the first fix for it was the wrong one.**
+  Blocking recall at 150,000 rows was 0.897 — a gate failure. Sub-blocking the
+  oversized buckets was the obvious fix and bought 0.004 for 10% more wall clock
+  and memory; it was reverted. The identity-signature pass, found by asking
+  which *pairs* were being lost rather than which bucket was overflowing, took it
+  to **0.983**, and all four gates now pass at 150k as well as at 12k. The cost
+  of scale is stated rather than smoothed: 19 minutes and 8.1 GB against 61
+  seconds and 0.6 GB.
 
 ### Measurement honesty
 

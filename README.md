@@ -143,11 +143,12 @@ metrics do.
 | Planted near-miss traps | 400 products / 1,020 pairs | same |
 | Purchase-history rows | ~21,300 | ~279,500 |
 | Seed + normalize + extract | **2.4 s** | **29.5 s** (~5,300 rows/s) |
-| Full pipeline | **61 s** (`make demo`) | **15 min 21 s** (`make seed-large`) |
-| Peak resident memory | **0.6 GB** | **7.0 GB** |
-| Database on disk | **159 MB** | 5.29M candidate pairs scored |
-| Duplicate precision / recall | 0.994 / 0.939 | 0.995 / 0.946 |
-| Blocking recall | 0.984 | **0.897** — see below |
+| Full pipeline | **61 s** (`make demo`) | **19 min 14 s** (`make seed-large`) |
+| Peak resident memory | **0.6 GB** | **8.1 GB** |
+| Database on disk | **161 MB** | 5.9 GB |
+| Duplicate precision / recall | 0.997 / 0.960 | 0.995 / 0.953 |
+| Blocking recall | 0.994 | 0.983 |
+| **All four §8 gates** | pass | **pass** |
 
 Measured on a laptop CPU, single process, no GPU. The demo profile is what every
 screenshot, demo flow and metric gate uses; the benchmark profile exists only
@@ -158,21 +159,33 @@ audit stream 4 ms, executive dashboard 227 ms, opportunity dashboard 325 ms, and
 `/api/metrics` 767 ms — the last recomputes the whole evaluation and is not on
 any page's critical path.
 
-**At 150,000 rows, blocking recall falls to 0.897 and the gate would not pass.**
-The per-pass bucket caps are tuned for the demo profile's density; at six times
-the volume every (class, defining-attribute) bucket exceeds its cap — the
-largest holds 46,911 members — so that pass contributes 2,207 candidate pairs
-instead of hundreds of thousands, and the ANN pass carries 4.35M of the 5.29M
-on its own. Duplicate precision and recall are, if anything, *better* at scale;
-it is the blocker that thins out.
+**The gate holds at six times the volume**, which it did not at first. Blocking
+recall was **0.897** at 150,000 rows — a clear fail — because the per-pass bucket
+caps are tuned for the demo profile's density. At that scale every
+(class, defining-attribute) bucket exceeds its cap; the largest holds 46,911
+members, so that pass contributed 2,207 candidate pairs instead of hundreds of
+thousands and the ANN pass carried 4.35M of the 5.29M on its own.
 
-Sub-blocking those oversized buckets was built and measured rather than
-assumed: sorting each by normalized text and comparing within a window moved
-blocking recall from 0.8965 to 0.9005, for 10% more wall clock and 10% more
-memory — and 0.0003 on the demo profile. It was reverted, with the numbers
-recorded in `blocking.py` so the next person to have the idea inherits the
-measurement instead of the work. Scaling the caps with corpus size is the
-honest next step and is not done.
+Two fixes were tried, and only the second one is in the code.
+
+*Sub-blocking the oversized buckets* — sort each by normalized text and compare
+within a window — was the obvious idea. Measured back to back on the same
+machine it moved blocking recall from 0.8965 to 0.9005 for 10% more wall clock
+and 10% more memory, and 0.0003 on the demo profile. Four thousandths is not
+worth a tenth of the run. It was reverted, with the numbers recorded in
+`blocking.py` so the next person to have the idea inherits the measurement
+rather than the work.
+
+*The identity-signature pass* was the one that worked, and it was found by
+asking which pairs were being lost rather than which bucket was overflowing.
+Bucketing on the class plus every identity-critical value — ratings deliberately
+excluded from the key — took blocking recall to **0.983 at 150k** and 0.994 on
+the demo profile, and every gate now passes on both. It costs about 1% more
+candidate pairs.
+
+The remaining cost of scale is honest: 19 minutes and 8.1 GB for 156,000 rows on
+one laptop core, against 61 seconds and 0.6 GB for 11,800. Both are single
+process, and neither is the demo.
 
 Each of ~7,000 real products is rendered into 1–4 CPSE-specific descriptions
 through per-CPSE style profiles: different abbreviation sets, attribute
