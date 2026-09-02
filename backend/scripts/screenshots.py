@@ -85,6 +85,9 @@ SHOTS: list[Shot] = [
     # golden record, CNMC, every CPSE's legacy code, evidence, price trend.
     Shot("item", "/items/6", "text=Golden record", settle_ms=1_600),
     Shot("workbench", "/workbench", "text=Review", theme="dark"),
+    # A five-member cluster that already carries a code, so the page shows the
+    # golden record, every member and the split/merge controls together.
+    Shot("cluster", "/clusters/268", "text=Field provenance", theme="dark"),
     Shot("executive", "/dashboard/executive", "text=Analytics"),
     Shot("opportunity", "/dashboard/opportunity", "text=Analytics", theme="dark"),
     Shot("smart-create", "/smart-create", "text=Smart-Create", setup=_smart_create),
@@ -99,6 +102,7 @@ SHOTS: list[Shot] = [
         settle_ms=4_000,
     ),
     Shot("copilot", "/copilot", "text=Copilot", theme="dark", setup=_copilot),
+    Shot("onboard", "/onboard", "text=Onboard a CPSE"),
     Shot("audit", "/audit", "text=Governance"),
     Shot("admin", "/admin", "text=Engine health"),
 ]
