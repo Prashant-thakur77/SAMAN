@@ -48,6 +48,14 @@ class Shot:
 SMART_CREATE_PROBE = "वाल्व GATE 32NB CL 300 CS FLGD 51.1 BAR KITZ"
 
 
+def _open_drawer(page) -> None:
+    """Open the item drawer over the results — the §6.3 behaviour a still image
+    of a table cannot otherwise show."""
+    # The first cell holds a link that stops propagation, so click a plain cell.
+    page.click("tbody tr:first-child td:nth-child(2)")
+    page.wait_for_selector("[role=dialog]", timeout=15_000)
+
+
 def _smart_create(page) -> None:
     page.fill("#sc-description", SMART_CREATE_PROBE)
     page.fill("#sc-uom", "NOS")
@@ -80,7 +88,7 @@ def _copilot(page) -> None:
 #: Ordered as the README tells the story, not as the router lists them.
 SHOTS: list[Shot] = [
     Shot("home", "/", "text=Overview"),
-    Shot("search", "/search?q=6205", "text=Search"),
+    Shot("search", "/search?q=6205", "text=Search", setup=_open_drawer, settle_ms=900),
     # A coded item with purchase history, so the page shows the whole story:
     # golden record, CNMC, every CPSE's legacy code, evidence, price trend.
     Shot("item", "/items/6", "text=Golden record", settle_ms=1_600),

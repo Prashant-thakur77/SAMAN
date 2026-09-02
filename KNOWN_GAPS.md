@@ -537,6 +537,17 @@ that could not be true:
   Admin screen *from the module that enforces it*, so the two cannot drift — with
   a test asserting that every role the code exempts is named in the statement.
 
+- **Two §6 acceptance criteria were quietly unbuilt, and `motion.ts` said so.**
+  §6.3 wants a search row to open an item *drawer* and §6.4 wants a price-history
+  *sparkline*; neither existed. The tell was `drawerVariants` — a motion variant
+  written in M1 to the §1.5 spec and never imported by anything. An unused export
+  in a hand-written file usually means a feature that was specified, scaffolded
+  and then forgotten.
+- **The sparkline's axis is not zero-based, on purpose.** A price moving ₹20,838
+  → ₹22,934 is a 10% move a zero-based axis renders as a flat line. The shape is
+  the point, so the axis is scaled to the data and the labels state the range —
+  a chart that exaggerates without saying so is worse than no chart.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

@@ -120,13 +120,13 @@ of them from the running application.
 | ![Review workbench](docs/screenshots/workbench.png) | ![ERP migration](docs/screenshots/migration.png) |
 | **Workbench** — two records side by side, tier scores, attribute comparison with identity-critical fields marked. Keyboard-first: `A` approve, `R` reject, `J`/`K` move. | **Migration** — plan, dry run, a safe/held/conflict traffic light, apply, and a journal that can roll the batch back. |
 | ![Search](docs/screenshots/search.png) | ![Copilot](docs/screenshots/copilot.png) |
-| **Search** — one field across every CPSE's catalogue; `⌘K` opens the same search anywhere. | **Copilot** — answers with citations and the query behind them. Never free-form SQL, and it cannot see what its viewer may not. |
+| **Search** — one field across every CPSE's catalogue; a row opens the item in a drawer beside the results, and `⌘K` opens the same search anywhere. | **Copilot** — answers with citations and the query behind them. Never free-form SQL, and it cannot see what its viewer may not. |
 | ![Audit](docs/screenshots/audit.png) | ![Admin](docs/screenshots/admin.png) |
 | **Audit** — the hash-chained event stream, verifiable from the page. | **Admin** — which engine is live in each tier, sovereign-mode toggle, prevented-duplicate counter. |
 | ![Smart-Create](docs/screenshots/smart-create.png) | ![Restricted mode](docs/screenshots/restricted-mode.png) |
 | **Smart-Create** — the duplicate check before a code is raised. | **Restricted mode** — two CPSEs find their common materials without either handing over a catalogue. |
 | ![Item](docs/screenshots/item.png) | ![Cluster](docs/screenshots/cluster.png) |
-| **Item** — the raw row beside the golden record it belongs to, every CPSE's stock of it, and what it last cost. | **Cluster** — the golden record, the template that rendered it, and which member and rule produced every fused field. |
+| **Item** — the raw row beside the golden record it belongs to, every CPSE's stock of it, and its price history as a sparkline. | **Cluster** — the golden record, the template that rendered it, and which member and rule produced every fused field. |
 | ![Onboard](docs/screenshots/onboard.png) | |
 | **Onboard** — upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. | |
 

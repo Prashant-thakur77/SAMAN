@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { ItemPanel } from '../components/workbench/ItemPanel'
 import { formatRupees } from '../components/charts/CountUp'
+import { Sparkline } from '../components/charts/Sparkline'
 import { CodeChip, StatusChip } from '../components/primitives/Chip'
 import { EmptyState } from '../components/primitives/EmptyState'
 import { TBody, TD, TH, THead, TR, Table } from '../components/primitives/Table'
@@ -153,6 +154,12 @@ export default function Item() {
                   {detail.purchase_history.last.po_date} · {detail.purchase_history.last.vendor}
                 </p>
               </div>
+              {detail.purchase_history.history.length > 1 && (
+                <div className="ml-auto">
+                  <p className="micro-label mb-1">Price per base unit</p>
+                  <Sparkline points={detail.purchase_history.history} />
+                </div>
+              )}
               {detail.purchase_history.trend && (
                 <div>
                   <p className="micro-label">Trend</p>

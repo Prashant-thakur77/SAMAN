@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
+import { ItemDrawer } from '../components/ItemDrawer'
 import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/primitives/Button'
 import { CodeChip } from '../components/primitives/Chip'
@@ -30,7 +31,8 @@ export default function Search() {
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [term, setTerm] = useState(params.get('q') ?? '')
-  const navigate = useNavigate()
+  //  A row opens the item beside the results rather than navigating away (§6.3).
+  const [drawerItem, setDrawerItem] = useState<number | null>(null)
 
   const cpse = params.get('cpse') ?? ''
   const klass = params.get('class') ?? ''
@@ -181,7 +183,7 @@ export default function Search() {
             </THead>
             <TBody>
               {(results?.items ?? []).map((hit) => (
-                <TR key={hit.item_id} onClick={() => navigate(`/items/${hit.item_id}`)}>
+                <TR key={hit.item_id} onClick={() => setDrawerItem(hit.item_id)}>
                   <TD>
                     <Link
                       to={`/items/${hit.item_id}`}
@@ -232,6 +234,8 @@ export default function Search() {
           )}
         </>
       )}
+
+      <ItemDrawer itemId={drawerItem} onClose={() => setDrawerItem(null)} />
     </div>
   )
 }
