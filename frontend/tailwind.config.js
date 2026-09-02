@@ -30,6 +30,14 @@ export default {
       lg: ['1.25rem', { lineHeight: '1.75rem' }],
       xl: ['1.75rem', { lineHeight: '2.125rem' }],
       '2xl': ['2.5rem', { lineHeight: '2.875rem' }],
+      // Editorial sizes for the public front page only. The fixed scale above
+      // is what every application screen uses and is deliberately small; a
+      // landing page is read at arm's length by somebody who has not decided
+      // to care yet, and needs the room. They fluid-scale so the same page
+      // holds together from a phone to a projector.
+      lead: ['clamp(1.0625rem, 1.4vw, 1.375rem)', { lineHeight: '1.65' }],
+      headline: ['clamp(1.75rem, 3.4vw, 2.75rem)', { lineHeight: '1.12', letterSpacing: '-0.02em' }],
+      display: ['clamp(2.75rem, 7vw, 5.5rem)', { lineHeight: '0.98', letterSpacing: '-0.035em' }],
     },
     extend: {
       fontFamily: {

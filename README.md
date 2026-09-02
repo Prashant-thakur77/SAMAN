@@ -117,7 +117,7 @@ actually renders.
 | | |
 |---|---|
 | ![Front page](docs/screenshots/landing.png) | ![Sign in](docs/screenshots/login.png) |
-| **Front page.** what the system is, how it decides and what it scores, with the engine modes and the held-out metrics read live from the API rather than written into the page. | **Sign in.** pick a seeded account and its role. Every one uses the password `demo`. |
+| **Front page.** the same bearing as four catalogues write it, then the five questions asked in order to decide they are one material. It carries no metrics and fetches nothing: the measurements are behind sign-in and at `/api/metrics`, where they can be checked. | **Sign in.** pick a seeded account and its role. Every one uses the password `demo`. |
 | ![Home](docs/screenshots/home.png) | ![Executive](docs/screenshots/executive.png) |
 | **Home.** role-aware: a registrar gets the national KPIs, a steward gets their queue. | **Executive.** KPIs that reconcile with `/api/metrics`, per-CPSE progress, a class × CPSE heatmap in grayscale. |
 | ![Opportunity](docs/screenshots/opportunity.png) | ![Workbench](docs/screenshots/workbench.png) |
