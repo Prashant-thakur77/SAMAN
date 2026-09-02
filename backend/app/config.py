@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # Optional Tier-3 LLM. Unset => deterministic adjudicator + templated Copilot.
     ollama_url: str | None = None
-    ollama_model: str = "qwen2.5:7b"
+    ollama_model: str = "qwen2.5:3b"
 
     cors_origins: list[str] = [
         "http://localhost:5173",
@@ -71,6 +71,27 @@ class Settings(BaseSettings):
     def llm_enabled(self) -> bool:
         """Sovereign mode wins over OLLAMA_URL (spec 6.13)."""
         return bool(self.ollama_url) and not sovereign_mode()
+
+    def model_post_init(self, _context) -> None:
+        # OLLAMA_URL unset means "whatever is on this machine": a local Ollama
+        # answering on its default port is used, and nothing else is ever
+        # tried. Set SAMAN_OLLAMA_AUTODETECT=false to keep the deterministic
+        # path even when one is present.
+        if self.ollama_url is None and self.saman_ollama_autodetect:
+            self.ollama_url = _local_ollama()
+
+    saman_ollama_autodetect: bool = True
+
+
+def _local_ollama() -> str | None:
+    """http://localhost:11434 if something is listening there, else None."""
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", 11434), timeout=0.3):
+            return "http://127.0.0.1:11434"
+    except OSError:
+        return None
 
 
 @lru_cache

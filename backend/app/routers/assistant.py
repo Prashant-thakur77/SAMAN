@@ -8,9 +8,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import assistant, stt
+from .. import assistant, knowledge, stt
 from ..auth import current_user_optional
 from ..capabilities import detect
+from ..config import get_settings
 from ..db import get_db
 from ..models import User
 from ..visibility import scope_for
@@ -31,6 +32,11 @@ def suggestions() -> dict:
         "prompts": list(assistant.SUGGESTIONS),
         "routes": [{"path": r.path, "label": r.label, "blurb": r.blurb} for r in assistant.ROUTES],
         "engine": detect().llm_mode,
+        "model": {
+            "available": knowledge.available(),
+            "name": get_settings().ollama_model if knowledge.available() else None,
+            "grounded_on": [label for label, _ in knowledge.SOURCES],
+        },
     }
 
 

@@ -53,8 +53,14 @@ const STATE_KEY = 'saman.assistant.state'
 const QUIET_MS = 1_300
 /** …or after this long regardless, so a forgotten microphone is not left open. */
 const MAX_RECORD_MS = 15_000
-/** Root-mean-square above which a frame counts as speech. */
-const SPEECH_RMS = 0.015
+/** Floor for the speech threshold; the real one adapts to the room. */
+const SPEECH_RMS_FLOOR = 0.006
+/** Speech must exceed the measured ambient level by this factor. */
+const SPEECH_OVER_AMBIENT = 3
+/** How long the room is measured before speech is expected. */
+const CALIBRATE_MS = 350
+/** A running transcript is refreshed this often while you speak. */
+const INTERIM_MS = 900
 const TARGET_RATE = 16_000
 
 type Persisted = { open: boolean; turns: Turn[] }
@@ -135,6 +141,10 @@ type Capture = {
   lastLoud: number
   startedAt: number
   timer: number | null
+  ambient: number
+  ambientFrames: number
+  interimTimer: number | null
+  interimBusy: boolean
 }
 
 export function downsample(chunks: Float32Array[], from: number, to: number): Float32Array {
@@ -240,6 +250,14 @@ export function Assistant() {
   const [busy, setBusy] = useState(false)
   const [listening, setListening] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
+  /** Microphone level 0..1, for the meter. */
+  const [level, setLevel] = useState(0)
+  /** What the recogniser has caught so far, shown while you are still talking. */
+  const [interim, setInterim] = useState('')
+  /** Talk mode: listen, answer, speak, listen again, until switched off. */
+  const [handsFree, setHandsFree] = useState(false)
+  const handsFreeRef = useRef(false)
+  const startCaptureRef = useRef<() => Promise<void>>(async () => {})
   const [speaking, setSpeaking] = useState(false)
   const [speak, setSpeak] = useState(() => {
     try {
@@ -330,8 +348,11 @@ export function Assistant() {
     setSpeaking(false)
   }, [])
 
-  const say = useCallback((text: string) => {
-    if (!canSpeak() || !text) return
+  const say = useCallback((text: string, onDone?: () => void) => {
+    if (!canSpeak() || !text) {
+      onDone?.()
+      return
+    }
     try {
       window.speechSynthesis.cancel()
       const utterance = new SpeechSynthesisUtterance(text)
@@ -346,11 +367,18 @@ export function Assistant() {
       utterance.lang = preferred?.lang ?? 'en-IN'
       utterance.rate = 1
       utterance.onstart = () => setSpeaking(true)
-      utterance.onend = () => setSpeaking(false)
-      utterance.onerror = () => setSpeaking(false)
+      utterance.onend = () => {
+        setSpeaking(false)
+        onDone?.()
+      }
+      utterance.onerror = () => {
+        setSpeaking(false)
+        onDone?.()
+      }
       window.speechSynthesis.speak(utterance)
     } catch {
       setSpeaking(false)
+      onDone?.()
     }
   }, [])
 
@@ -378,7 +406,15 @@ export function Assistant() {
           ...prev,
           { id: ++counter.current, role: 'assistant', text: reply.answer, reply },
         ])
-        if (speak) say(reply.answer)
+        // A spoken question is answered aloud whatever the toggle says: that
+        // is what a conversation is. In talk mode the microphone reopens once
+        // the reply has been read.
+        const spoken = Boolean(heard)
+        if (speak || spoken) {
+          say(reply.answer, () => {
+            if (handsFreeRef.current) void startCaptureRef.current()
+          })
+        }
         // A navigation answer is performed, not described. The card stays so
         // the person can see what happened and come back.
         if (reply.kind === 'navigate' && reply.action?.type === 'navigate') {
@@ -404,6 +440,8 @@ export function Assistant() {
     if (!cap) return
     capture.current = null
     if (cap.timer) window.clearInterval(cap.timer)
+    if (cap.interimTimer) window.clearInterval(cap.interimTimer)
+    setLevel(0)
     try {
       cap.processor.disconnect()
       cap.source.disconnect()
@@ -414,7 +452,9 @@ export function Assistant() {
     }
     setListening(false)
     if (!cap.heardSpeech) {
+      setInterim('')
       pushError('I did not hear anything. Try again, a little closer to the microphone.')
+      if (handsFreeRef.current) setHandsFree(false)
       return
     }
     setTranscribing(true)
@@ -422,8 +462,10 @@ export function Assistant() {
       const wav = encodeWav(downsample(cap.chunks, cap.rate, TARGET_RATE), TARGET_RATE)
       const result = await transcribeAudio(wav)
       const text = (result.text ?? '').trim()
+      setInterim('')
       if (!text) {
         pushError('I could not make out any words. Try again.')
+        if (handsFreeRef.current) void startCaptureRef.current()
         return
       }
       await ask(text, `heard · ${result.engine ?? 'local'}`)
@@ -463,13 +505,29 @@ export function Assistant() {
         lastLoud: performance.now(),
         startedAt: performance.now(),
         timer: null,
+        ambient: 0,
+        ambientFrames: 0,
+        interimTimer: null,
+        interimBusy: false,
       }
       processor.onaudioprocess = (event) => {
         const data = event.inputBuffer.getChannelData(0)
         cap.chunks.push(new Float32Array(data))
         let sum = 0
         for (let i = 0; i < data.length; i++) sum += data[i] * data[i]
-        if (Math.sqrt(sum / data.length) > SPEECH_RMS) {
+        const rms = Math.sqrt(sum / data.length)
+        const elapsed = performance.now() - cap.startedAt
+        // The room's noise floor is the quietest the signal has been, drifting
+        // up slowly so a floor measured in a silent moment does not stay there
+        // forever. Tracking the minimum rather than the opening average means
+        // somebody who starts talking the instant they press the button does
+        // not teach the meter that speech is silence.
+        cap.ambientFrames += 1
+        if (cap.ambientFrames === 1 || rms < cap.ambient) cap.ambient = rms
+        else cap.ambient += (rms - cap.ambient) * 0.01
+        const threshold = Math.max(SPEECH_RMS_FLOOR, cap.ambient * SPEECH_OVER_AMBIENT)
+        setLevel(Math.min(1, rms / Math.max(threshold * 4, 0.05)))
+        if (elapsed >= CALIBRATE_MS / 3 && rms > threshold) {
           cap.heardSpeech = true
           cap.lastLoud = performance.now()
         }
@@ -477,7 +535,28 @@ export function Assistant() {
       source.connect(processor)
       processor.connect(ctx.destination)
       capture.current = cap
+      setInterim('')
       setListening(true)
+      // A running transcript: every INTERIM_MS, everything heard so far goes to
+      // the server and the words come back into the box while you are still
+      // talking, so you can see what is being caught.
+      cap.interimTimer = window.setInterval(() => {
+        // Only once there is speech to transcribe, and never two in flight.
+        if (!cap.heardSpeech || cap.interimBusy || capture.current !== cap) return
+        if (performance.now() - cap.lastLoud > QUIET_MS) return
+        cap.interimBusy = true
+        const wav = encodeWav(downsample(cap.chunks, cap.rate, TARGET_RATE), TARGET_RATE)
+        transcribeAudio(wav)
+          .then((r) => {
+            if (capture.current === cap && r.text) setInterim(r.text.trim())
+          })
+          .catch(() => {
+            /* an interim miss costs nothing; the final pass still runs */
+          })
+          .finally(() => {
+            cap.interimBusy = false
+          })
+      }, INTERIM_MS)
       // End-pointing: stop after a pause that follows speech, or at the cap.
       cap.timer = window.setInterval(() => {
         const now = performance.now()
@@ -493,6 +572,28 @@ export function Assistant() {
       pushError('The microphone could not be opened. Check the browser permission.')
     }
   }, [finishCapture, pushError])
+
+  useEffect(() => {
+    startCaptureRef.current = startCapture
+  }, [startCapture])
+  useEffect(() => {
+    handsFreeRef.current = handsFree
+  }, [handsFree])
+
+  function toggleHandsFree() {
+    if (voiceMode !== 'server') return
+    setHandsFree((current) => {
+      const next = !current
+      handsFreeRef.current = next
+      if (next) {
+        stopSpeaking()
+        if (!listening && !transcribing) void startCapture()
+      } else if (listening) {
+        void finishCapture()
+      }
+      return next
+    })
+  }
 
   /* ---------- browser recognition ---------- */
 
@@ -570,8 +671,12 @@ export function Assistant() {
     : transcribing
       ? 'Transcribing'
       : listening
-        ? 'Listening'
-        : 'Navigate · explain · query'
+        ? handsFree
+          ? 'Listening · talk mode'
+          : 'Listening'
+        : handsFree
+          ? 'Talk mode · waiting'
+          : 'Navigate · explain · query'
 
   return (
     <>
@@ -624,6 +729,21 @@ export function Assistant() {
                   {status}
                 </p>
               </div>
+              {voiceMode === 'server' && (
+                <button
+                  type="button"
+                  onClick={toggleHandsFree}
+                  aria-pressed={handsFree}
+                  aria-label={handsFree ? 'Stop talk mode' : 'Talk mode: listen, answer, listen again'}
+                  title={handsFree ? 'Talk mode on' : 'Talk mode'}
+                  className={cn(
+                    'flex h-8 items-center gap-1.5 rounded-full border border-hairline px-2.5 text-xs',
+                    handsFree ? 'bg-inverse text-bg' : 'text-muted hover:text-ink',
+                  )}
+                >
+                  <IconMic className="h-3.5 w-3.5" /> Talk
+                </button>
+              )}
               {voiceOut && (
                 <button
                   type="button"
@@ -781,16 +901,35 @@ export function Assistant() {
                   <IconMic className="h-4 w-4" />
                 </button>
               )}
-              <input
-                ref={inputRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={
-                  listening ? 'Listening… pause when you are done' : 'Ask, or say where to go'
-                }
-                aria-label="Ask the assistant"
-                className="h-9 min-w-0 flex-1 rounded-full border border-hairline bg-bg px-3.5 text-sm text-ink placeholder:text-muted"
-              />
+              <div className="relative min-w-0 flex-1">
+                <input
+                  ref={inputRef}
+                  value={listening && interim ? interim : draft}
+                  readOnly={listening}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={
+                    listening
+                      ? 'Listening… pause when you are done'
+                      : 'Ask, or say where to go'
+                  }
+                  aria-label="Ask the assistant"
+                  className={cn(
+                    'h-9 w-full rounded-full border border-hairline bg-bg px-3.5 text-sm text-ink placeholder:text-muted',
+                    listening && interim && 'italic text-muted',
+                  )}
+                />
+                {listening && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-3 bottom-0.5 h-0.5 overflow-hidden rounded-full bg-hairline"
+                  >
+                    <span
+                      className="block h-full bg-ink transition-[width] duration-100"
+                      style={{ width: `${Math.round(level * 100)}%` }}
+                    />
+                  </span>
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={busy || !draft.trim()}

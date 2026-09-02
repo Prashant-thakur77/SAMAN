@@ -7,6 +7,13 @@ The database path is set BEFORE any app module is imported, because
 from __future__ import annotations
 
 import os
+
+# The suite must behave the same on a laptop with Ollama running as on CI
+# without it. A test that wants a model says so (see test_knowledge.model_up);
+# nothing else may pick one up from the environment.
+os.environ.setdefault("SAMAN_OLLAMA_AUTODETECT", "false")
+os.environ.pop("OLLAMA_URL", None)
+
 import tempfile
 from pathlib import Path
 

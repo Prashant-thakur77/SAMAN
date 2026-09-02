@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import indiaSilhouette from '../assets/india.svg'
@@ -8,7 +8,7 @@ import { Assistant, AssistantMark } from '../components/Assistant'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { cn } from '../lib/cn'
-import { listItemVariants, listVariants } from '../lib/motion'
+import { EASE, listItemVariants, listVariants } from '../lib/motion'
 
 /**
  * / — the public front page.
@@ -156,6 +156,110 @@ function Colonnade() {
       {arcade(866, 6, 'r')}
       <line x1="0" y1="196" x2="1200" y2="196" />
     </Drawing>
+  )
+}
+
+/**
+ * The Taj Mahal in elevation: plinth, four minarets with three balconies each,
+ * the central iwan, two tiers of side arches, four chhatris and the bulbous
+ * dome with its finial. Symmetric, so one half is drawn and mirrored.
+ */
+function TajMahal() {
+  const cx = 600
+  const balcony = (x: number, y: number) => <path key={`${x}-${y}`} d={`M${x - 11} ${y} h22`} />
+  const minaret = (x: number) => (
+    <g key={x}>
+      <path d={`M${x - 7} 236 L${x - 5} 92 Q${x} 86 ${x + 5} 92 L${x + 7} 236 Z`} />
+      {[130, 170, 210].map((y) => balcony(x, y))}
+      <path d={`M${x - 8} 92 A8 6 0 0 1 ${x + 8} 92`} />
+      <path d={`M${x} 86 v-8`} />
+    </g>
+  )
+  const arch = (x: number, y: number, w: number, h: number) => (
+    <path
+      key={`${x}-${y}-${w}`}
+      d={`M${x - w / 2} ${y} v${-(h - w / 2)} Q${x - w / 2} ${y - h} ${x} ${y - h - w * 0.18} Q${x + w / 2} ${y - h} ${x + w / 2} ${y - (h - w / 2)} v${h - w / 2} Z`}
+    />
+  )
+  const chhatri = (x: number, y: number) => (
+    <g key={`c${x}`}>
+      <path d={`M${x - 16} ${y} A16 14 0 0 1 ${x + 16} ${y}`} />
+      <path d={`M${x} ${y - 14} v-6`} />
+      <path d={`M${x - 20} ${y} h40`} />
+      <path d={`M${x - 14} ${y} v18 M${x + 14} ${y} v18 M${x - 20} ${y + 18} h40`} />
+    </g>
+  )
+  const half = (
+    <g>
+      {/* side facade, two tiers of arches */}
+      {arch(cx - 118, 236, 34, 46)}
+      {arch(cx - 118, 176, 34, 46)}
+      {arch(cx - 168, 236, 30, 40)}
+      {arch(cx - 168, 176, 30, 40)}
+      <path d={`M${cx - 196} 236 v-118 l12 -10 h84`} />
+      {chhatri(cx - 98, 108)}
+      {minaret(cx - 290)}
+    </g>
+  )
+  return (
+    <Drawing viewBox="0 0 1200 250">
+      {/* plinth */}
+      <path d="M180 236 h840 M200 244 h800 M220 250 h760" />
+      <path d="M290 236 v-8 h620 v8" />
+      {/* central block and iwan */}
+      <path d={`M${cx - 110} 236 v-136 l12 -10 h196 l12 10 v136`} />
+      {arch(cx, 236, 72, 112)}
+      <path d={`M${cx - 48} 236 v-88 Q${cx - 48} 130 ${cx} 118 Q${cx + 48} 130 ${cx + 48} 148 v88`} />
+      {/* drum and dome */}
+      <path d={`M${cx - 40} 100 v-16 h80 v16`} />
+      <path d={`M${cx - 52} 84 C ${cx - 62} 40, ${cx - 28} 10, ${cx} 8 C ${cx + 28} 10, ${cx + 62} 40, ${cx + 52} 84`} />
+      <path d={`M${cx} 8 v-6 m-6 0 h12 M${cx} -2 a3 3 0 1 1 0.01 0`} />
+      {half}
+      <g transform={`translate(${cx * 2} 0) scale(-1 1)`}>{half}</g>
+    </Drawing>
+  )
+}
+
+/**
+ * The Red Fort's ramparts as a filled band: crenellated sandstone wall with
+ * the Lahori gate, its two octagonal towers and their chhatris. A silhouette,
+ * for the same job the skyline did.
+ */
+function RedFort() {
+  const merlons = (x0: number, x1: number, y: number) =>
+    Array.from({ length: Math.floor((x1 - x0) / 22) }, (_, i) => (
+      <rect key={i} x={x0 + i * 22} y={y - 10} width="12" height="10" />
+    ))
+  const tower = (x: number) => (
+    <g key={x}>
+      <rect x={x - 26} y="36" width="52" height="124" />
+      {merlons(x - 26, x + 30, 36)}
+      <path d={`M${x - 18} 36 v-8 h36 v8 Z`} />
+      <path d={`M${x - 14} 28 A14 12 0 0 1 ${x + 14} 28 L${x + 14} 30 L${x - 14} 30 Z`} />
+    </g>
+  )
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 1200 160"
+      preserveAspectRatio="xMidYMax slice"
+      fill="currentColor"
+      className="h-full w-full"
+    >
+      <rect x="0" y="80" width="1200" height="80" />
+      {merlons(0, 1200, 80)}
+      <rect x="520" y="52" width="160" height="108" />
+      {merlons(520, 684, 52)}
+      <path d="M560 160 v-58 Q600 66 640 102 v58 Z" fill="rgb(var(--surface))" />
+      {tower(500)}
+      {tower(700)}
+      {[300, 900].map((x) => (
+        <g key={x}>
+          <rect x={x - 16} y="60" width="32" height="100" />
+          {merlons(x - 16, x + 20, 60)}
+        </g>
+      ))}
+    </svg>
   )
 }
 
@@ -392,35 +496,6 @@ function Backdrop({ children, className }: { children: ReactNode; className?: st
   )
 }
 
-/** A filled skyline, the way the SIH site carries one behind its themes:
- *  silhouette rather than line, so it reads as distance. */
-function Skyline() {
-  // Deterministic heights so the silhouette is the same on every load.
-  const blocks = [
-    [0, 70, 60], [72, 44, 100], [118, 90, 80], [210, 50, 130], [262, 120, 70],
-    [384, 64, 110], [450, 40, 150], [492, 96, 90], [590, 70, 60], [662, 130, 120],
-    [794, 56, 140], [852, 88, 84], [942, 62, 104], [1006, 110, 66], [1118, 82, 96],
-  ] as const
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 1200 160"
-      preserveAspectRatio="xMidYMax slice"
-      fill="currentColor"
-      className="h-full w-full"
-    >
-      {blocks.map(([x, w, h], i) => (
-        <rect key={i} x={x} y={160 - h} width={w} height={h} />
-      ))}
-      {/* two domes and a tower, so it is not only offices */}
-      <path d="M300 96 A38 34 0 0 1 376 96 L376 160 L300 160 Z" />
-      <path d="M700 84 A26 24 0 0 1 752 84 L752 160 L700 160 Z" />
-      <rect x="1060" y="36" width="14" height="124" />
-      <rect x="1064" y="22" width="6" height="14" />
-    </svg>
-  )
-}
-
 /* ------------------------------------------------------------------ */
 
 /** Sections rise into place once, the first time they are scrolled to. */
@@ -512,6 +587,26 @@ function Eyebrow({ children }: { children: ReactNode }) {
 
 export default function Landing() {
   const reduce = useReducedMotion() ?? false
+  const [active, setActive] = useState<string>('')
+
+  // The section nearest the top of the viewport owns the nav indicator, so it
+  // slides along as you scroll and lands where a click sends it.
+  useEffect(() => {
+    const ids = NAV.map((entry) => entry.href.slice(1))
+    const targets = ids.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[]
+    if (targets.length === 0 || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        if (visible[0]) setActive(visible[0].target.id)
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: 0 },
+    )
+    targets.forEach((target) => observer.observe(target))
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <div className="landing relative min-h-screen bg-bg text-ink">
@@ -534,15 +629,39 @@ export default function Landing() {
             SAMAN
           </Link>
           <nav aria-label="Sections" className="hidden items-center gap-8 md:flex">
-            {NAV.map((entry) => (
-              <a
-                key={entry.href}
-                href={entry.href}
-                className="text-sm text-muted transition-colors duration-150 hover:text-ink"
-              >
-                {entry.label}
-              </a>
-            ))}
+            {NAV.map((entry) => {
+              const current = active === entry.href.slice(1)
+              return (
+                <a
+                  key={entry.href}
+                  href={entry.href}
+                  aria-current={current ? 'location' : undefined}
+                  onClick={(event) => {
+                    // Slide to the section rather than jump. The hash still
+                    // lands in the address bar for a link to be shared.
+                    const target = document.getElementById(entry.href.slice(1))
+                    if (!target) return
+                    event.preventDefault()
+                    target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+                    history.replaceState(null, '', entry.href)
+                  }}
+                  className={cn(
+                    'relative py-1 text-sm transition-colors duration-150 hover:text-ink',
+                    current ? 'text-ink' : 'text-muted',
+                  )}
+                >
+                  {entry.label}
+                  {current && (
+                    <motion.span
+                      layoutId="landing-nav-indicator"
+                      aria-hidden
+                      className="absolute inset-x-0 -bottom-[1.4rem] h-0.5 bg-earth"
+                      transition={{ duration: reduce ? 0 : 0.28, ease: EASE }}
+                    />
+                  )}
+                </a>
+              )
+            })}
           </nav>
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <ThemeToggle />
@@ -558,7 +677,14 @@ export default function Landing() {
         <motion.div variants={listVariants(reduce)} initial="initial" animate="animate" className="relative">
           {/* Bharat, behind the headline and to its right. Tinted, never solid,
               and absent on narrow screens where it would sit under the text. */}
-          <BharatSilhouette className="absolute right-[3%] top-6 hidden h-[34rem] w-[46%] opacity-[0.13] lg:block xl:h-[38rem]" />
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0, x: reduce ? 0 : 32 }}
+            animate={{ opacity: 1, x: 0, transition: { duration: 0.9, ease: EASE, delay: 0.2 } }}
+            className="absolute right-[3%] top-6 hidden h-[34rem] w-[46%] lg:block xl:h-[38rem]"
+          >
+            <BharatSilhouette className="h-full w-full opacity-[0.13]" />
+          </motion.div>
           <Band className="relative py-20 md:py-24">
             <Item>
               <Ornament className="h-6 w-48 text-earth" />
@@ -593,8 +719,8 @@ export default function Landing() {
           </Band>
 
           {/* A horizon under the headline rather than a picture behind it. */}
-          <Backdrop className="relative -mt-4 h-32 text-earth/25 md:h-44 lg:h-52">
-            <Colonnade />
+          <Backdrop className="relative -mt-4 h-32 text-earth/30 md:h-44 lg:h-56">
+            <TajMahal />
           </Backdrop>
         </motion.div>
 
@@ -683,8 +809,8 @@ export default function Landing() {
 
         {/* ---- how it works ---- */}
         <Reveal id="how" className="relative overflow-hidden border-t border-hairline">
-          <Backdrop className="absolute inset-x-0 bottom-0 h-32 text-earth-soft/25 md:h-44">
-            <Skyline />
+          <Backdrop className="absolute inset-x-0 bottom-0 h-32 text-earth-soft/40 md:h-44">
+            <RedFort />
           </Backdrop>
           {/* The list ends above the skyline, never on top of it. */}
           <Band className="relative pb-44 pt-20 md:pb-60 md:pt-24">
@@ -778,6 +904,9 @@ export default function Landing() {
               ))}
             </dl>
           </Band>
+          <Backdrop className="relative h-24 text-earth/20 md:h-32">
+            <Colonnade />
+          </Backdrop>
         </Reveal>
 
         {/* ---- guarantees, over the racking ---- */}

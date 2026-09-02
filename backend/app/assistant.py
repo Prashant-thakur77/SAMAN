@@ -28,7 +28,7 @@ from typing import Any
 from rapidfuzz import fuzz
 from sqlalchemy.orm import Session
 
-from . import copilot
+from . import copilot, knowledge
 from .normalize import apply_hindi_terms, has_devanagari, transliterate_devanagari
 from .visibility import Scope
 
@@ -498,8 +498,20 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
     kind = "copilot"
     action = _navigate("/copilot", "Continue in the Copilot")
     useful = bool(result.rows or result.citations or result.template)
-    if not useful and route and score >= ROUTE_MATCH_THRESHOLD:
+    # 5. Not a data question, not a screen, not a card: ask the local model,
+    #    grounded in the project's own documents, if one is running.
+    if not useful:
+        grounded = knowledge.answer(question)
+        if grounded and grounded.text:
+            return Reply(
+                "answer",
+                grounded.text,
+                mode="llm",
+                matched={"sources": grounded.sources},
+            )
+    if not useful and route and score >= ROUTE_MATCH_THRESHOLD and not is_asking:
         # Not a data question after all; the nearest screen is the best help.
+        # A question, though, is never a request to be taken somewhere.
         return Reply(
             "navigate",
             f"I could not answer that directly. {route.label} is the nearest place: {route.blurb}",

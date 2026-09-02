@@ -40,8 +40,8 @@ make dev       # API on :8000, UI on :5173
 ```
 
 `make demo` exits non-zero if the §8 M3 gate is not met, so it doubles as the
-quality check. `make check` runs everything CI does: ruff, 822 backend tests,
-51 frontend tests, the type-check and the licence gate. `make demo-snapshot`
+quality check. `make check` runs everything CI does: ruff, 882 backend tests,
+67 frontend tests, the type-check and the licence gate. `make demo-snapshot`
 and `make demo-restore` take and reinstate a restore point in under a second,
 for when a demo goes somewhere unplanned.
 
@@ -583,10 +583,28 @@ where one exists (Chrome's reaches Google; Firefox has none) and otherwise shows
 no microphone rather than one that cannot work. `/api/assistant/voice` and
 `/api/health` say which is active.
 
+While you speak, the words the recogniser has caught so far appear in the box
+and a level meter shows what the microphone hears; the sensitivity adapts to the
+room's noise floor. **Talk mode** makes it a conversation: listen, answer, read
+the answer aloud, listen again, until you switch it off. A question that arrived
+by voice is always answered by voice.
+
 **Speech out.** Turn the speaker on and replies are read aloud through the
 browser's `speechSynthesis`, preferring an Indian English voice; every reply also
 carries its own "read" button. The conversation survives moving between the
 front page and the application in the same tab.
+
+**A local model for everything else.** When Ollama is running on the machine
+(auto-detected on `localhost:11434`; set `OLLAMA_URL` to point elsewhere or
+`SAMAN_OLLAMA_AUTODETECT=false` to opt out), questions that neither the route
+catalogue nor the topic cards nor the Copilot can answer go to `qwen2.5:3b`
+(Apache-2.0, `ollama pull qwen2.5:3b`), grounded strictly in passages retrieved
+by TF-IDF from this README, `KNOWN_GAPS.md` and the build spec. It is told to
+say when the passages do not contain the answer, every figure it produces is
+checked against them, and navigation and data questions never reach it. This
+is retrieval-grounding rather than fine-tuning: the model learns the project
+from its documents at question time, with sources attached, and nothing about
+it is trained.
 
 `POST /api/assistant/query` is public and scoped like every other endpoint.
 

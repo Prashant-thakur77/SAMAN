@@ -138,6 +138,25 @@ describe('voice in the assistant', () => {
         screen.getByRole('button', { name: /transcribed on this server/i }),
       ).toBeInTheDocument(),
     )
+    // Talk mode exists only where the server can listen; it is the loop of
+    // listen, answer, speak, listen again.
+    expect(screen.getByRole('button', { name: /talk mode/i })).toBeInTheDocument()
+  })
+
+  it('does not offer talk mode on the browser recogniser', () => {
+    w['webkitSpeechRecognition'] = class {
+      lang = ''
+      interimResults = false
+      maxAlternatives = 1
+      onresult = null
+      onend = null
+      onerror = null
+      start = vi.fn()
+      stop = vi.fn()
+    }
+    renderAssistant()
+    open()
+    expect(screen.queryByRole('button', { name: /talk mode/i })).not.toBeInTheDocument()
   })
 
   it('reads a reply aloud when the speaker is on, and on request', async () => {
