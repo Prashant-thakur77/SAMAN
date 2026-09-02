@@ -153,6 +153,11 @@ Measured on a laptop CPU, single process, no GPU. The demo profile is what every
 screenshot, demo flow and metric gate uses; the benchmark profile exists only
 for the §8A performance run.
 
+Endpoint latency on the demo profile, warm: workbench queue 22 ms, search 18 ms,
+audit stream 4 ms, executive dashboard 227 ms, opportunity dashboard 325 ms, and
+`/api/metrics` 767 ms — the last recomputes the whole evaluation and is not on
+any page's critical path.
+
 **At 150,000 rows, blocking recall falls to 0.897 and the gate would not pass.**
 The per-pass bucket caps are tuned for the demo profile's density; at six times
 the volume every (class, defining-attribute) bucket exceeds its cap — the
