@@ -449,6 +449,15 @@ that could not be true:
   apart — the pair that substitutes for the other. An invariant test now asserts
   that every `block_on` names an identity-critical attribute.
 
+- **Three implementations of one comparison, and one of them let H7 equal H6.**
+  Consolidating the numeric-then-textual value comparison into a single
+  `compare.values_equal` surfaced a live bug in the equivalence engine:
+  `parse_number("H7")` returns a value of 0.0 with `fit_class="H7"`, so a naive
+  numeric comparison made every fit class equal to every other. The same defect
+  was fixed in `compare_attr` back in M3; it had been sitting in
+  `equivalence._equal` since. Writing the shared helper is what found it —
+  duplicated logic hides the second copy of a bug you have already fixed.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

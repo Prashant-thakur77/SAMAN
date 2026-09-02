@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from . import audit
 from .blocking import content_tokens
+from .compare import values_equal
 from .config import get_settings
 from .embed import Embedder, cosine, unpack
 from .extract import extract
@@ -280,19 +281,17 @@ def _pool(db: Session, probe: Probe) -> list[MatchCandidate]:
 
 
 def _same_value(a, b) -> bool:
-    """Compare two attribute values the way the comparators do, not as strings.
+    """Numerically first, textually after -- see `compare.values_equal`.
 
     A bore read from "25MM BORE" is 25.0 and one derived from designation 6005
-    is 25. As strings those differ, which silently cost the boost -- and with
-    it, the FAG record written in another CPSE's house style dropping out of
-    retrieval entirely.
+    is 25. As strings those differ, which silently cost the retrieval boost and
+    dropped the FAG record written in another CPSE's house style out of the
+    candidate pool entirely. A missing value matches nothing here, unlike in the
+    attribute comparator: an absent bore is not a reason to retrieve a row.
     """
     if a is None or b is None:
         return False
-    try:
-        return float(a) == float(b)
-    except (TypeError, ValueError):
-        return str(a).strip().upper() == str(b).strip().upper()
+    return values_equal(a, b)
 
 
 def _candidate(row) -> MatchCandidate:

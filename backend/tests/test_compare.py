@@ -13,6 +13,7 @@ from app.compare import (
     UNKNOWN,
     compare_attr,
     compare_attrs,
+    values_equal,
 )
 from app.taxonomy import AttrSpec, get_schema
 
@@ -185,3 +186,55 @@ class TestEvidence:
         sparse = {"bore_mm": 25, "seal_type": "ZZ"}
         result = compare_attrs(sparse, dict(sparse), BEARING)
         assert result.compared == 2 and result.agreement == 1.0
+
+
+class TestValuesEqual:
+    """One home for a comparison this codebase got wrong three times.
+
+    A bore read from "65MM BORE" is the float 65.0; the same bore derived from
+    designation 6313 is the int 65. Compared as strings they differ. It cost
+    the fit-class comparison, then Smart-Create's retrieval key, then the
+    identity-signature blocking key.
+    """
+
+    def test_an_int_and_a_float_agree(self):
+        assert values_equal(65, 65.0)
+        assert values_equal("65", 65.0)
+        assert values_equal("65.0", "65")
+
+    def test_a_unit_suffix_is_left_to_the_attribute_comparator(self):
+        """Unit-aware comparison needs the attribute's declared unit, which
+        this helper does not have. "25 MM" is text here, and `compare_attr` is
+        where it becomes 25 millimetres."""
+        assert not values_equal("25 MM", 25.0)
+        assert values_equal("25 MM", " 25 mm ")
+
+    def test_different_numbers_differ(self):
+        assert not values_equal(25, 30)
+        assert not values_equal("25.0", "25.1")
+
+    def test_text_falls_back_to_text(self):
+        assert values_equal("ss316", " SS316 ")
+
+    def test_a_fit_class_is_a_symbol_not_a_magnitude(self):
+        """`parse_number("H7")` yields value 0.0 with fit_class "H7", so a naive
+        numeric compare makes every fit class equal to every other. Fixed once
+        in `compare_attr`; it does not get to come back through here."""
+        assert not values_equal("H7", "H6")
+        assert values_equal("H7", "h7")
+        assert not values_equal("H7", 0.0)
+
+    def test_none_matches_only_none(self):
+        assert values_equal(None, None)
+        assert not values_equal(None, 25)
+        assert not values_equal(25, None)
+
+    def test_the_three_call_sites_share_it(self):
+        """Three implementations of one idea is how the fourth bug happens."""
+        from app import equivalence, smart_create
+
+        assert equivalence._equal is values_equal
+        assert smart_create._same_value(65, 65.0)
+        assert not smart_create._same_value(None, None), (
+            "an absent bore is not a reason to retrieve a row"
+        )

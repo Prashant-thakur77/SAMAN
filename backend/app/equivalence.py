@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from .compare import EPSILON, compare_attrs
+from .compare import EPSILON, compare_attrs, values_equal
 from .extract import parse_designation
 from .numeric import parse_number
 from .taxonomy import ClassSchema
@@ -135,11 +135,8 @@ def _as_float(value) -> float | None:
     return parsed.value if parsed else None
 
 
-def _equal(a, b) -> bool:
-    left, right = _as_float(a), _as_float(b)
-    if left is not None and right is not None:
-        return abs(left - right) <= EPSILON
-    return str(a).strip().upper() == str(b).strip().upper()
+#: One home for the numeric-then-textual comparison (see `compare.values_equal`).
+_equal = values_equal
 
 
 def evaluate_condition(condition: Condition, attrs_a: dict, attrs_b: dict) -> bool | None:

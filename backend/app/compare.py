@@ -28,6 +28,36 @@ from .units import UnitError
 #: Two floats within this are the same measurement, not a difference.
 EPSILON = 1e-6
 
+
+def values_equal(a, b) -> bool:
+    """Are two attribute values the same, numerically first and textually after?
+
+    The single home for a comparison this codebase has now got wrong three
+    times in three different places: a bore read from "65MM BORE" is the float
+    65.0, the same bore derived from designation 6313 is the int 65, and
+    compared as strings they are not equal. It cost the fit-class comparison in
+    M3, Smart-Create's retrieval key in M8, and the identity-signature blocking
+    key after that.
+
+    Two things it deliberately does *not* do. It does not parse a unit suffix —
+    "25 MM" is compared as text, because unit-aware comparison belongs in
+    `compare_attr` where the attribute's declared unit is known. And it never
+    compares a fit class by magnitude: `parse_number("H7")` yields a value of
+    0.0 with `fit_class="H7"`, so a naive numeric compare makes H7 and H6 equal.
+    They are different fits. That bug has been fixed once already in
+    `compare_attr`; it does not get to come back through here.
+    """
+    if a is None or b is None:
+        return a is None and b is None
+
+    left, right = parse_number(a), parse_number(b)
+    if left is not None and right is not None:
+        if left.fit_class or right.fit_class:
+            # A fit class is a symbol, not a magnitude.
+            return left.fit_class == right.fit_class
+        return abs(left.value - right.value) <= EPSILON
+    return str(a).strip().upper() == str(b).strip().upper()
+
 MATCH = "match"
 MISMATCH = "mismatch"
 IN_BAND = "in_band"
