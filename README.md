@@ -37,8 +37,8 @@ make dev       # API on :8000, UI on :5173
 ```
 
 `make demo` exits non-zero if the §8 M3 gate is not met, so it doubles as the
-quality check. `make check` runs everything CI does: ruff, 693 backend tests,
-14 frontend tests, the type-check and the licence gate. `make demo-snapshot`
+quality check. `make check` runs everything CI does: ruff, 822 backend tests,
+51 frontend tests, the type-check and the licence gate. `make demo-snapshot`
 and `make demo-restore` take and reinstate a restore point in under a second,
 for when a demo goes somewhere unplanned.
 
