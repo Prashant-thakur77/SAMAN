@@ -1,8 +1,10 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { type ReactNode } from 'react'
+import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Assistant } from '../components/Assistant'
+import indiaSilhouette from '../assets/india.svg'
+
+import { Assistant, AssistantMark } from '../components/Assistant'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { cn } from '../lib/cn'
@@ -288,6 +290,97 @@ function Jali({ className }: { className?: string }) {
   )
 }
 
+/**
+ * India, as a silhouette behind the hero.
+ *
+ * The outline is DataMeet's composite country boundary (CC BY 4.0), which
+ * follows the Survey of India depiction: its extent is 68.17–97.40 E and
+ * 6.75–37.10 N, which is how you check that it is the Government of India's
+ * map and not somebody else's. Simplified offline from 252,604 points to
+ * 1,765 for a 21 KB asset; islands are kept. Applied as a CSS mask so it takes
+ * a palette colour in either theme rather than a baked-in fill.
+ */
+function BharatSilhouette({ className }: { className?: string }) {
+  const style: CSSProperties = {
+    WebkitMaskImage: `url(${indiaSilhouette})`,
+    maskImage: `url(${indiaSilhouette})`,
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+    WebkitMaskSize: 'contain',
+    maskSize: 'contain',
+    WebkitMaskPosition: 'right center',
+    maskPosition: 'right center',
+  }
+  return <div aria-hidden style={style} className={cn('bg-earth', className)} />
+}
+
+/** Textures for the giant wordmark, as data-URI SVG patterns in the page's
+ *  own colours. One is picked per load, the way Sarvam's footer rotates the
+ *  art behind its name; here the art is generated rather than photographed. */
+const WORDMARK_TEXTURES = [
+  // jali stars
+  "data:image/svg+xml;utf8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="#A66A34"/><g fill="none" stroke="#F4ECE0" stroke-width="1.2"><path d="M24 4L28 16L40 12L32 24L40 36L28 32L24 44L20 32L8 36L16 24L8 12L20 16Z"/><circle cx="24" cy="24" r="5"/></g></svg>'),
+  // arcade
+  "data:image/svg+xml;utf8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect width="60" height="60" fill="#68401E"/><g fill="none" stroke="#CDB291" stroke-width="1.4"><path d="M8 58V26A22 22 0 0 1 52 26V58"/><path d="M0 58H60"/><path d="M18 58V32A12 12 0 0 1 42 32V58"/></g></svg>'),
+  // bearing rings
+  "data:image/svg+xml;utf8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#CDB291"/><g fill="none" stroke="#68401E" stroke-width="1.2"><circle cx="32" cy="32" r="26"/><circle cx="32" cy="32" r="18"/><circle cx="32" cy="32" r="9"/><circle cx="32" cy="6" r="3"/><circle cx="58" cy="32" r="3"/><circle cx="32" cy="58" r="3"/><circle cx="6" cy="32" r="3"/></g></svg>'),
+]
+
+/** The word SAMAN at the foot of the page, cropped, filled with a texture. */
+function GiantWordmark() {
+  const texture = useMemo(
+    () => WORDMARK_TEXTURES[Math.floor(Math.random() * WORDMARK_TEXTURES.length)],
+    [],
+  )
+  const style: CSSProperties = {
+    backgroundImage: `url("${texture}")`,
+    backgroundSize: '64px 64px',
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    color: 'transparent',
+    lineHeight: 0.78,
+  }
+  return (
+    <div aria-hidden className="pointer-events-none select-none overflow-hidden">
+      <p
+        style={style}
+        className="-mb-[0.2em] translate-y-[0.14em] whitespace-nowrap text-center font-semibold uppercase tracking-[0.06em]"
+      >
+        <span className="text-[26vw] leading-none md:text-[22vw]" style={{ fontSize: 'clamp(9rem, 22vw, 20rem)' }}>SAMAN</span>
+      </p>
+    </div>
+  )
+}
+
+/** Grain over the closing card, generated in the page: feTurbulence at low
+ *  opacity, blended soft-light, so the gradient reads as material rather than
+ *  as a flat fill. */
+function Grain() {
+  return (
+    <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full mix-blend-soft-light opacity-60">
+      <filter id="grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+      <rect width="100%" height="100%" filter="url(#grain)" />
+    </svg>
+  )
+}
+
+/** Concentric rings across the closing card, the bearing race again. */
+function Rings() {
+  return (
+    <svg aria-hidden viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid slice" className="pointer-events-none absolute inset-0 h-full w-full text-bg/20" fill="none" stroke="currentColor" strokeWidth="1">
+      {Array.from({ length: 9 }, (_, i) => (
+        <circle key={i} cx="600" cy="420" r={80 + i * 90} />
+      ))}
+    </svg>
+  )
+}
+
 /** A drawing laid behind the page, never in front of the reading. Position
  *  and tone come from the caller: two position utilities on one element
  *  resolve by stylesheet order, not by intent. */
@@ -382,6 +475,37 @@ function Band({ children, className }: { children: ReactNode; className?: string
   )
 }
 
+function FooterColumn({
+  heading,
+  links,
+  mono,
+}: {
+  heading: string
+  links: ReadonlyArray<readonly [string, string]>
+  mono?: boolean
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="micro-label text-earth">{heading}</p>
+      <ul className="space-y-2">
+        {links.map(([label, to]) => (
+          <li key={to}>
+            {to.startsWith('/api/') ? (
+              <a href={to} className={cn('text-sm text-muted hover:text-ink', mono && 'font-mono text-xs')}>
+                {label}
+              </a>
+            ) : (
+              <Link to={to} className={cn('text-sm text-muted hover:text-ink', mono && 'font-mono text-xs')}>
+                {label}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function Eyebrow({ children }: { children: ReactNode }) {
   return <p className="micro-label text-earth">{children}</p>
 }
@@ -431,8 +555,11 @@ export default function Landing() {
 
       <main id="main-content" tabIndex={-1} className="relative focus-visible:outline-none">
         {/* ---- hero ---- */}
-        <motion.div variants={listVariants(reduce)} initial="initial" animate="animate">
-          <Band className="py-20 md:py-24">
+        <motion.div variants={listVariants(reduce)} initial="initial" animate="animate" className="relative">
+          {/* Bharat, behind the headline and to its right. Tinted, never solid,
+              and absent on narrow screens where it would sit under the text. */}
+          <BharatSilhouette className="absolute right-[3%] top-6 hidden h-[34rem] w-[46%] opacity-[0.13] lg:block xl:h-[38rem]" />
+          <Band className="relative py-20 md:py-24">
             <Item>
               <Ornament className="h-6 w-48 text-earth" />
             </Item>
@@ -673,39 +800,87 @@ export default function Landing() {
           </Band>
         </Reveal>
 
-        {/* ---- close ---- */}
+        {/* ---- close: the card Sarvam ends on, in this page's colours ---- */}
         <Reveal className="border-t border-hairline">
-          <Band className="grid gap-8 py-20 md:py-24 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-20">
-            <div>
-              <Item>
-                <h2 className="max-w-[20ch] text-headline font-medium">
-                  It is running on this machine.
+          <Band className="py-16 md:py-20">
+            <Item className="relative overflow-hidden rounded-3xl border border-hairline bg-[linear-gradient(180deg,rgb(var(--ink))_0%,rgb(var(--earth-deep))_70%,rgb(var(--earth-soft))_140%)] px-6 py-16 text-center text-bg md:py-24">
+              <Rings />
+              <Grain />
+              <div className="relative mx-auto max-w-[26ch]">
+                <AssistantMark className="mx-auto h-8 w-8 text-bg/80" />
+                <h2 className="pt-6 text-headline font-medium text-bg">
+                  Build one material master for India.
                 </h2>
-              </Item>
-              <Item>
-                <p className="max-w-[44ch] pt-6 text-lead text-muted">
-                  Any seeded account, password <span className="font-mono">demo</span>.
+                <p className="pt-5 text-lead text-bg/70">
+                  Running on this machine. Any seeded account, password{' '}
+                  <span className="font-mono">demo</span>.
                 </p>
-              </Item>
-            </div>
-            <Item>
-              <Link to="/login">
-                <Button variant="primary">Open the demo</Button>
-              </Link>
+                <div className="pt-8">
+                  <Link
+                    to="/login"
+                    className="inline-flex h-11 items-center rounded-full bg-bg px-6 text-sm font-medium text-ink hover:opacity-90"
+                  >
+                    Open the demo
+                  </Link>
+                </div>
+              </div>
             </Item>
           </Band>
         </Reveal>
       </main>
 
-      <footer className="relative border-t border-hairline">
-        <Band className="flex flex-wrap items-center justify-between gap-4 py-8">
-          <p className="text-xs text-muted">
-            Smart India Hackathon 2026 · Problem statement SIH26099
-          </p>
+      <footer className="relative border-t border-hairline bg-[linear-gradient(180deg,rgb(var(--bg))_0%,rgb(var(--surface))_100%)]">
+        <Band className="grid gap-10 py-14 md:grid-cols-[1.3fr_1fr_1fr_1fr]">
+          <div className="space-y-3">
+            <p className="font-medium uppercase tracking-wordmark">SAMAN</p>
+            <p className="max-w-[28ch] text-sm text-muted">
+              Standardised Asset &amp; Material Analysis Network. One Nation, One Material Code.
+            </p>
+            <p className="pt-2 text-xs text-muted">
+              Smart India Hackathon 2026 · SIH26099
+              <br />
+              Ministry of Petroleum &amp; Natural Gas
+            </p>
+          </div>
+          <FooterColumn
+            heading="Screens"
+            links={[
+              ['Search', '/search'],
+              ['Workbench', '/workbench'],
+              ['Executive', '/dashboard/executive'],
+              ['Opportunity', '/dashboard/opportunity'],
+              ['Smart-Create', '/smart-create'],
+              ['Migration', '/migration'],
+            ]}
+          />
+          <FooterColumn
+            heading="Governance"
+            links={[
+              ['Audit trail', '/audit'],
+              ['Restricted mode', '/pprl'],
+              ['Admin', '/admin'],
+              ['Sign in', '/login'],
+            ]}
+          />
+          <FooterColumn
+            heading="Open interfaces"
+            links={[
+              ['/api/docs', '/api/docs'],
+              ['/api/health', '/api/health'],
+              ['/api/metrics', '/api/metrics'],
+            ]}
+            mono
+          />
+        </Band>
+        <Band className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline py-5">
           <p className="text-xs text-muted">
             A prototype. Not an official service of the Government of India.
           </p>
+          <p className="text-xs text-muted">
+            Map outline: DataMeet India community, CC BY 4.0. Everything else drawn in the page.
+          </p>
         </Band>
+        <GiantWordmark />
       </footer>
 
       {/* Inside `.landing`, so the widget takes the warm palette here and the

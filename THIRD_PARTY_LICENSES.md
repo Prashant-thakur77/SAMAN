@@ -457,3 +457,10 @@ browser.
 | [xml-name-validator](https://github.com/jsdom/xml-name-validator) | `5.0.0` | Apache-2.0 |
 | [xmlchars](https://github.com/lddubeau/xmlchars) | `2.2.0` | MIT |
 | [yallist](https://github.com/isaacs/yallist) | `3.1.1` | ISC |
+
+## Data and design assets
+
+| Asset | Source | Licence |
+|---|---|---|
+| India country outline (`frontend/src/assets/india.svg`) | [India boundaries](https://github.com/datameet/maps/blob/master/Country/india-composite.geojson) by the [DataMeet India community](http://datameet.org/), simplified for display | CC BY 4.0 |
+| Whisper `base` weights (`data/models/whisper-base`, fetched by `make deps-stt`, not committed) | [Systran/faster-whisper-base](https://huggingface.co/Systran/faster-whisper-base), a CTranslate2 conversion of OpenAI Whisper | MIT |

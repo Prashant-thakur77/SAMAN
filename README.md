@@ -908,6 +908,19 @@ a frontend type-check and production build, and the licence gate, which both
 refuses GPL/AGPL in the required set and fails if `THIRD_PARTY_LICENSES.md` is
 stale.
 
+### Design assets
+
+Every drawing on the front page (colonnade, materials frieze, skyline, racking,
+ornament, jali, the closing card's rings and grain, the wordmark textures) is
+generated in the page. The one thing that is not is the map: the India
+silhouette behind the hero is DataMeet's composite country boundary,
+[India boundaries](https://github.com/datameet/maps/blob/master/Country/india-composite.geojson)
+by the [DataMeet India community](http://datameet.org/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)),
+which follows the Survey of India depiction; its extent, 68.17–97.40 E and
+6.75–37.10 N, is how that was checked. It was simplified offline from 252,604
+points to 1,765 for a 21 KB asset and is applied as a CSS mask so it takes a
+palette colour in either theme.
+
 ### What is original to SAMAN
 
 The CNMC registry and its check-digit scheme; the tiered routing logic and its
