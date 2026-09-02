@@ -518,6 +518,14 @@ that could not be true:
   of scale is stated rather than smoothed: 19 minutes and 8.1 GB against 61
   seconds and 0.6 GB.
 
+- **Every purchase in the estate was attributed to a bearing vendor.** The seed
+  looked up `VENDORS.get("bearing.ball.deep_groove")` with the class hardcoded,
+  so a gate valve's last purchase read "BEARING HOUSE" on the item page and the
+  §9A vendor-overlap analysis was drawing from a three-name pool for all 12,000
+  items — every material overlapped with every other, which is the same as
+  finding nothing. Using the item's own class makes the analysis mean something:
+  1,681 materials bought from different vendors by different CPSEs.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

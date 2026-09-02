@@ -1382,20 +1382,27 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
         select(RawItem.id, RawItem.cpse_id, RawItem.price, RawItem.plant)
     ).all()
     price_by_raw = {rid: (cpse_id, price, plant) for rid, cpse_id, price, plant in item_rows}
-    id_pairs = db.execute(select(Item.id, Item.raw_item_id, Item.pack_qty)).all()
+    id_pairs = db.execute(
+        select(Item.id, Item.raw_item_id, Item.pack_qty, Item.class_code)
+    ).all()
     plants_by_cpse = {cpse_ids[s.code]: s.plants for s in styles}
     today = date.today()
 
     po_rows: list[dict] = []
     stock_rows: list[dict] = []
-    for item_id, raw_id, pack_qty in id_pairs:
+    for item_id, raw_id, pack_qty, class_code in id_pairs:
         cpse_id, price, plant = price_by_raw[raw_id]
         # The PO line price, per catalogued unit — a boxed item is priced per
         # box. Normalizing to a base unit is the analytics' job, so that the
         # §9A pack-size normalization is exercised rather than pre-baked.
         catalogued_price = price or 0.0
         base_unit_price = catalogued_price / max(pack_qty or 1.0, 1.0)
-        vendors = VENDORS.get("bearing.ball.deep_groove")
+        # The item's own class, not a hardcoded one. Every purchase in the
+        # estate used to be attributed to one of three *bearing* vendors
+        # whatever had been bought, which made the §9A vendor-overlap analysis
+        # meaningless — every item overlapped with every other on vendors, and
+        # a gate valve's last purchase read "BEARING HOUSE" on the item page.
+        vendors = VENDORS.get(class_code) or ("GENERAL SUPPLIES",)
 
         for _ in range(rng.choices((0, 1, 2, 3, 4), weights=(15, 30, 25, 20, 10))[0]):
             po_rows.append(
@@ -1405,9 +1412,7 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
                     "po_date": today - timedelta(days=rng.randint(1, 540)),
                     "qty": float(rng.randint(1, 250)),
                     "unit_price": round(catalogued_price * rng.uniform(0.92, 1.08), 2),
-                    "vendor": rng.choice(
-                        vendors if vendors else ("GENERAL SUPPLIES",)
-                    ),
+                    "vendor": rng.choice(vendors),
                 }
             )
 

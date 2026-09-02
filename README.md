@@ -234,21 +234,24 @@ threshold**. Measured on the demo profile, same machine:
 
 | Tier-1 engine | Precision | Recall | F1 | Wall clock | Peak RSS | Database |
 |---|---|---|---|---|---|---|
-| splink (Fellegi–Sunter) | 0.9926 | 0.9308 | 0.9607 | 80 s | 4.0 GB | 256 MB |
-| **rapidfuzz (default)** | **0.9940** | **0.9331** | **0.9626** | **53 s** | **0.6 GB** | **159 MB** |
+| splink (Fellegi–Sunter) | 0.9969 | 0.9588 | 0.9775 | 86 s | 4.2 GB | 257 MB |
+| **rapidfuzz (default)** | **0.9973** | **0.9595** | **0.9780** | **58 s** | **0.6 GB** | **161 MB** |
 
 Both runs are back-to-back on one machine, same seed, same frozen threshold,
-same held-out split. The fallback wins on every axis, so `make demo` **pins**
-it — `SAMAN_TIER1_ENGINE=rapidfuzz` — rather than using whichever engine
-happens to be installed on the laptop in front of you. `make demo-splink` runs
-the same demo on the spec-named engine.
+same held-out split. **On quality the two are a tie** — 0.0005 of F1 separates
+them, which is noise. The decision rests entirely on cost: rapidfuzz is a third
+faster and uses a seventh of the memory. So `make demo` **pins** it —
+`SAMAN_TIER1_ENGINE=rapidfuzz` — rather than using whichever engine happens to
+be installed on the laptop in front of you, and `make demo-splink` runs the same
+demo on the spec-named engine.
 
-That is not a criticism of splink — it is what this dataset looks like. The veto
-layer and attribute agreement do most of the discriminating work, which leaves
-Tier 1 supplying a similarity signal, and splink compares descriptions with
-Jaro-Winkler (order-sensitive) where rapidfuzz uses `token_set_ratio`
-(order-insensitive) — and the CPSE style profiles reorder attributes
-deliberately.
+That the two now agree is itself the finding. Earlier in the build they differed
+by 0.002 of F1; the veto layer, the blocking passes and the extraction fixes
+have since lifted *both* to 0.978, which says the accuracy is coming from the
+architecture around Tier 1 rather than from Tier 1 itself. That is what the
+tiered design predicts: the veto layer and attribute agreement do the
+discriminating, leaving Tier 1 to supply a similarity signal that either engine
+supplies well enough.
 
 splink is a real code path, not a credit in a table: `make deps-optional`
 installs it, `/api/health` reports which engine is live, and its
@@ -627,10 +630,10 @@ are kept honest — partial is marked partial.
 | Integration capability with SAP/ERP | `ErpAdapter` + mock ERP in `app/erp.py` | **Partial** — MARA/MAKT/EKPO/MARD/MBEW written and reversed through a named adapter contract, against a mock rather than a real SAP system |
 | Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | **Done** — 12-month demand windows, price-per-base-unit variance, vendor overlap, last-price trend |
 | Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done** — pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |
-| Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done** — one position across 11,778 rows; 28 transfer suggestions avoiding ₹15.9 Cr of purchase, 2,047 dead-stock materials worth ₹1,524 Cr |
-| Inter-CPSE collaboration | sharing engine + joint tenders | **Done** — 1,832 joint-tender candidates across two or more CPSEs, ₹235 Cr of identified saving under a stated 60% capture assumption |
+| Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done** — one position across 11,778 rows; 30 transfer suggestions avoiding ₹19.3 Cr of purchase, 2,028 dead-stock materials worth ₹1,538 Cr |
+| Inter-CPSE collaboration | sharing engine + joint tenders | **Done** — 1,830 joint-tender candidates across two or more CPSEs, ₹233 Cr of identified saving under a stated 60% capture assumption |
 | Faster procurement/specification finalization | Smart-Create (`app/smart_create.py`, `/smart-create`) + §2D specs | **Done** — the same matcher and veto layer run before a code is raised; overrides need a reason and are audited |
-| Foundation for strategic sourcing | vendor overlap + combined-volume analysis | **Done** — combined volume and vendor overlap on the Opportunity dashboard |
+| Foundation for strategic sourcing | vendor overlap + combined-volume analysis | **Done** — combined volume plus vendor overlap on 1,681 materials bought from different vendors by different CPSEs |
 
 ---
 
