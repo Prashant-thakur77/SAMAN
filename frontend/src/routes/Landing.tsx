@@ -159,66 +159,55 @@ function Colonnade() {
 }
 
 /**
- * A filled city skyline, the way the SIH site sets its sections over one: pale
- * silhouette, full width, no outline. Indian civic architecture rather than a
- * generic downtown: a triumphal arch at the centre, domes on drums, a clock
- * tower, chhatris on the corners of the larger blocks, and office towers
- * towards the edges. Deterministic, so every load draws the same city.
+ * A fort skyline, filled: a crenellated rampart the width of the page with
+ * bastions along it, a Lahori-gate style gateway at the centre (two octagonal
+ * towers with chhatris, a tall pointed arch), a domed mahal to the left and a
+ * triple-domed hall with minarets to the right. Drawn in one solid colour and
+ * faded as a whole by the container, so overlapping shapes never double up.
  */
-function CitySkyline() {
-  const ground = 300
-  const block = (x: number, w: number, h: number, windows = true) => (
-    <g key={`b${x}`}>
-      <rect x={x} y={ground - h} width={w} height={h} />
-      {windows &&
-        Array.from({ length: Math.max(0, Math.floor((h - 24) / 26)) }, (_, r) =>
-          Array.from({ length: Math.max(0, Math.floor((w - 12) / 20)) }, (_, c) => (
-            <rect
-              key={`${r}-${c}`}
-              x={x + 10 + c * 20}
-              y={ground - h + 14 + r * 26}
-              width="8"
-              height="12"
-              fill="rgb(var(--bg))"
-              opacity="0.55"
-            />
-          )),
-        )}
-    </g>
-  )
-  const dome = (x: number, r: number, drum: number, base: number) => (
-    <g key={`d${x}`}>
-      <rect x={x - r * 0.72} y={ground - base} width={r * 1.44} height={base} />
-      <rect x={x - r * 0.6} y={ground - base - drum} width={r * 1.2} height={drum} />
-      <path d={`M${x - r} ${ground - base - drum} A${r} ${r * 0.95} 0 0 1 ${x + r} ${ground - base - drum} Z`} />
-      <rect x={x - 2} y={ground - base - drum - r * 0.95 - 16} width="4" height="18" />
-    </g>
-  )
-  const chhatri = (x: number, y: number) => (
+function FortSkyline() {
+  const G = 300
+  const merlons = (x0: number, x1: number, y: number, w = 14, gap = 26) =>
+    Array.from({ length: Math.floor((x1 - x0) / gap) }, (_, i) => (
+      <rect key={`m${x0}-${i}`} x={x0 + i * gap} y={y - 12} width={w} height="12" />
+    ))
+  const chhatri = (x: number, y: number, r = 14) => (
     <g key={`c${x}-${y}`}>
-      <path d={`M${x - 12} ${y} A12 10 0 0 1 ${x + 12} ${y} Z`} />
-      <rect x={x - 14} y={y} width="28" height="3" />
-      <rect x={x - 11} y={y + 3} width="3" height="16" />
-      <rect x={x + 8} y={y + 3} width="3" height="16" />
+      <path d={`M${x - r} ${y} A${r} ${r * 0.85} 0 0 1 ${x + r} ${y} Z`} />
+      <rect x={x - r - 3} y={y} width={r * 2 + 6} height="4" />
+      <rect x={x - r + 2} y={y + 4} width="4" height={r + 4} />
+      <rect x={x + r - 6} y={y + 4} width="4" height={r + 4} />
+      <rect x={x - 1.5} y={y - r * 0.85 - 10} width="3" height="10" />
     </g>
   )
-  const archGate = (x: number) => (
-    <g key="gate">
-      <rect x={x - 70} y={ground - 190} width="140" height="190" />
-      <rect x={x - 54} y={ground - 214} width="108" height="24" />
-      <rect x={x - 24} y={ground - 230} width="48" height="16" />
-      <path d={`M${x - 34} ${ground} v-96 A34 34 0 0 1 ${x + 34} ${ground - 96} v96 Z`} fill="rgb(var(--bg))" />
-      {chhatri(x - 52, ground - 232)}
-      {chhatri(x + 52, ground - 232)}
+  const dome = (x: number, r: number, base: number, drum = 16) => (
+    <g key={`d${x}`}>
+      <rect x={x - r * 0.62} y={G - base - drum} width={r * 1.24} height={drum} />
+      <path d={`M${x - r} ${G - base - drum} C ${x - r * 1.1} ${G - base - drum - r * 0.9}, ${x - r * 0.35} ${G - base - drum - r * 1.25}, ${x} ${G - base - drum - r * 1.28} C ${x + r * 0.35} ${G - base - drum - r * 1.25}, ${x + r * 1.1} ${G - base - drum - r * 0.9}, ${x + r} ${G - base - drum} Z`} />
+      <rect x={x - 2} y={G - base - drum - r * 1.28 - 18} width="4" height="20" />
     </g>
   )
-  const clockTower = (x: number) => (
-    <g key="clock">
-      <rect x={x - 16} y={ground - 236} width="32" height="236" />
-      <rect x={x - 22} y={ground - 244} width="44" height="10" />
-      <path d={`M${x - 16} ${ground - 244} L${x} ${ground - 284} L${x + 16} ${ground - 244} Z`} />
-      <circle cx={x} cy={ground - 206} r="9" fill="rgb(var(--bg))" opacity="0.7" />
+  const bastion = (x: number, h: number, w = 44) => (
+    <g key={`b${x}`}>
+      <rect x={x - w / 2} y={G - h} width={w} height={h} />
+      {merlons(x - w / 2, x + w / 2, G - h, 10, 16)}
     </g>
+  )
+  const minaret = (x: number, h: number) => (
+    <g key={`n${x}`}>
+      <rect x={x - 7} y={G - h} width="14" height={h} />
+      {[0.35, 0.6, 0.82].map((f) => (
+        <rect key={f} x={x - 12} y={G - h * f} width="24" height="4" />
+      ))}
+      <path d={`M${x - 9} ${G - h} A9 8 0 0 1 ${x + 9} ${G - h} Z`} />
+    </g>
+  )
+  const arch = (x: number, y: number, w: number, h: number) => (
+    <path
+      key={`a${x}-${y}`}
+      d={`M${x - w / 2} ${y} v${-(h - w / 2)} Q${x - w / 2} ${y - h} ${x} ${y - h - w * 0.15} Q${x + w / 2} ${y - h} ${x + w / 2} ${y - (h - w / 2)} v${h - w / 2} Z`}
+      fill="rgb(var(--bg))"
+    />
   )
   return (
     <svg
@@ -228,25 +217,49 @@ function CitySkyline() {
       fill="currentColor"
       className="h-full w-full"
     >
-      {block(0, 70, 120)}
-      {block(78, 54, 168)}
-      {block(140, 90, 96)}
-      {dome(292, 42, 14, 110)}
-      {block(352, 68, 140)}
-      {chhatri(386, ground - 156)}
-      {block(430, 110, 88)}
-      {clockTower(590)}
-      {block(620, 80, 124)}
-      {archGate(720)}
-      {block(820, 80, 124)}
-      {dome(940, 56, 18, 128)}
-      {block(1010, 96, 92)}
-      {block(1116, 60, 176)}
-      {chhatri(1146, ground - 192)}
-      {block(1184, 100, 104)}
-      {block(1292, 64, 150)}
-      {block(1364, 76, 112)}
-      <rect x="0" y={ground - 6} width="1440" height="6" />
+      {/* rampart */}
+      <rect x="0" y={G - 88} width="1440" height="88" />
+      {merlons(6, 1440, G - 88)}
+      {[110, 330, 1110, 1330].map((x) => bastion(x, 126))}
+
+      {/* left: a domed mahal behind the wall */}
+      <rect x="380" y={G - 150} width="240" height="150" />
+      {merlons(384, 620, G - 150, 10, 18)}
+      {dome(500, 54, 150)}
+      {chhatri(408, G - 166, 12)}
+      {chhatri(592, G - 166, 12)}
+      {arch(440, G - 88, 22, 34)}
+      {arch(500, G - 88, 22, 34)}
+      {arch(560, G - 88, 22, 34)}
+
+      {/* centre: the gateway */}
+      <rect x="640" y={G - 196} width="160" height="196" />
+      {merlons(644, 800, G - 196, 10, 18)}
+      {bastion(628, 226, 40)}
+      {bastion(812, 226, 40)}
+      {chhatri(628, G - 226 - 6, 16)}
+      {chhatri(812, G - 226 - 6, 16)}
+      {chhatri(720, G - 212, 13)}
+      {arch(720, G, 64, 148)}
+      {arch(676, G - 110, 16, 26)}
+      {arch(764, G - 110, 16, 26)}
+
+      {/* right: a triple-domed hall with minarets */}
+      <rect x="880" y={G - 128} width="260" height="128" />
+      {merlons(884, 1140, G - 128, 10, 18)}
+      {dome(1010, 46, 128)}
+      {dome(940, 28, 128, 12)}
+      {dome(1080, 28, 128, 12)}
+      {arch(970, G - 88, 22, 34)}
+      {arch(1010, G - 88, 26, 40)}
+      {arch(1050, G - 88, 22, 34)}
+      {minaret(868, 214)}
+      {minaret(1152, 214)}
+
+      {/* far corners */}
+      {chhatri(40, G - 120, 16)}
+      {chhatri(1400, G - 120, 16)}
+      <rect x="0" y={G - 6} width="1440" height="6" />
     </svg>
   )
 }
@@ -676,8 +689,8 @@ export default function Landing() {
           </Band>
 
           {/* The city, pale and whole, inside the first screen. */}
-          <Backdrop className="relative h-40 w-full shrink-0 text-earth-soft/50 md:h-52 lg:h-60">
-            <CitySkyline />
+          <Backdrop className="relative h-40 w-full shrink-0 text-earth-soft opacity-60 md:h-52 lg:h-60">
+            <FortSkyline />
           </Backdrop>
         </motion.div>
 
@@ -766,8 +779,8 @@ export default function Landing() {
 
         {/* ---- how it works ---- */}
         <Reveal id="how" className="relative overflow-hidden border-t border-hairline">
-          <Backdrop className="absolute inset-x-0 bottom-0 h-32 text-earth-soft/35 md:h-44">
-            <CitySkyline />
+          <Backdrop className="absolute inset-x-0 bottom-0 h-32 text-earth-soft opacity-45 md:h-44">
+            <FortSkyline />
           </Backdrop>
           {/* The list ends above the skyline, never on top of it. */}
           <Band className="relative pb-44 pt-20 md:pb-60 md:pt-24">
