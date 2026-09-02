@@ -548,6 +548,15 @@ that could not be true:
   the point, so the axis is scaled to the data and the labels state the range —
   a chart that exaggerates without saying so is worse than no chart.
 
+- **The mock ERP and SAMAN disagreed about stock.** The ERP's MARD was seeded
+  from `raw_item.qty_on_hand` — the point-in-time snapshot §4 keeps for
+  provenance only — while every SAMAN inventory feature reads the authoritative
+  `stock` table. So the migration screen reported 370 units of a material whose
+  item page said 581. Nothing was *wrong* in either place, which is what makes
+  it the worst kind of bug: two numbers for one material, in a platform whose
+  entire purpose is to stop exactly that. The ERP now seeds from `stock`, with a
+  test comparing 25 materials across both.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

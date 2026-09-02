@@ -307,11 +307,16 @@ def seed_from_catalogue(db, path: Path | None = None, open_po_rate: float = 0.12
 
     from sqlalchemy import select
 
-    from .models import Cpse, RawItem
+    from .models import Cpse, Item, RawItem, Stock
 
     initialise(path)
     rng = random.Random(20260101)
 
+    # Stock and valuation come from `stock`, not from `raw_item.qty_on_hand`.
+    # §4 makes `stock` authoritative for every inventory feature, and the mock
+    # ERP is one: seeding MARD from the raw snapshot instead left the migration
+    # screen reporting 370 units of a material whose item page said 581. Two
+    # numbers for one material is the thing this whole platform exists to stop.
     rows = db.execute(
         select(
             RawItem.legacy_code,
@@ -321,22 +326,34 @@ def seed_from_catalogue(db, path: Path | None = None, open_po_rate: float = 0.12
             RawItem.price,
             RawItem.qty_on_hand,
             Cpse.code,
-        ).join(Cpse, Cpse.id == RawItem.cpse_id)
+            Stock.qty_on_hand,
+            Stock.unit_value,
+            Stock.plant,
+        )
+        .join(Cpse, Cpse.id == RawItem.cpse_id)
+        .join(Item, Item.raw_item_id == RawItem.id, isouter=True)
+        .join(Stock, Stock.item_id == Item.id, isouter=True)
     ).all()
 
     mara, makt, mard, mbew, ekpo = [], [], [], [], []
-    for n, (code, description, uom, plant, price, qty, cpse) in enumerate(rows):
+    for n, row in enumerate(rows):
+        (code, description, uom, plant, price, raw_qty, cpse,
+         stock_qty, unit_value, stock_plant) = row
         matnr = f"{cpse}-{code}"
-        werks = plant or "MAIN"
+        # A catalogue row that never reached the pipeline has no stock row; fall
+        # back to its own snapshot rather than reporting the material as empty.
+        qty = float(stock_qty if stock_qty is not None else (raw_qty or 0))
+        value = float(unit_value if unit_value is not None else (price or 0))
+        werks = stock_plant or plant or "MAIN"
         mara.append((matnr, "HIBE", (uom or "EA")[:3], werks, "", "", ""))
         makt.append((matnr, "EN", (description or "")[:80]))
-        mard.append((matnr, werks, float(qty or 0)))
-        mbew.append((matnr, werks, float(price or 0), float(price or 0) * float(qty or 0)))
+        mard.append((matnr, werks, qty))
+        mbew.append((matnr, werks, value, value * qty))
         # A minority of materials carry an open purchase order. Those are the
         # records a consolidation must hold back rather than change underneath.
         if rng.random() < open_po_rate:
             ekpo.append(
-                (f"45{n:08d}", 10, matnr, 100.0, float(rng.randint(1, 80)), float(price or 0))
+                (f"45{n:08d}", 10, matnr, 100.0, float(rng.randint(1, 80)), value)
             )
 
     with connect(path) as conn:

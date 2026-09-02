@@ -49,6 +49,33 @@ def registrar(db):
 
 
 class TestMockErp:
+    def test_the_erp_agrees_with_saman_about_stock(self, migratable):
+        """§4 makes `stock` authoritative for every inventory feature, and the
+        mock ERP is one. Seeding MARD from `raw_item.qty_on_hand` instead left
+        the migration screen reporting 370 units of a material whose item page
+        said 581 — two numbers for one material, which is the thing this
+        platform exists to stop."""
+        from sqlalchemy import select
+
+        from app.db import SessionLocal
+        from app.models import Cpse, Item, RawItem, Stock
+
+        with SessionLocal() as db:
+            rows = db.execute(
+                select(Cpse.code, RawItem.legacy_code, Stock.qty_on_hand)
+                .join(Item, Item.raw_item_id == RawItem.id)
+                .join(Cpse, Cpse.id == RawItem.cpse_id)
+                .join(Stock, Stock.item_id == Item.id)
+                .limit(25)
+            ).all()
+        assert rows, "the fixture needs seeded stock"
+
+        adapter = erp.MockErpAdapter()
+        for cpse, legacy, stock_qty in rows:
+            matnr = f"{cpse}-{legacy}"
+            reported = adapter.read_open_transactions([matnr])[matnr].stock_qty
+            assert reported == pytest.approx(stock_qty), matnr
+
     def test_the_mock_has_the_sap_tables_a_consolidation_touches(self, migratable):
         with erp.connect() as conn:
             for table in erp.TABLES:
