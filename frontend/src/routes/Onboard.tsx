@@ -46,6 +46,7 @@ export default function Onboard() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const poll = useRef<number | null>(null)
+  const picker = useRef<HTMLInputElement | null>(null)
   const reduce = useReducedMotion() ?? false
   const navigate = useNavigate()
   const { can } = useSession()
@@ -177,21 +178,33 @@ export default function Onboard() {
                 <label htmlFor="csv" className="micro-label block">
                   Catalogue file (CSV)
                 </label>
+                {/* The native file control carries the browser's own chrome,
+                    which is the one place the interface stops looking like
+                    itself. Hidden, and driven by our own button. */}
                 <input
                   id="csv"
+                  ref={picker}
                   type="file"
                   accept=".csv,text/csv"
+                  className="sr-only"
                   onChange={(e) => {
                     const chosen = e.target.files?.[0] ?? null
                     setFile(chosen)
                     setReport(null)
                     if (chosen) void readHeaders(chosen)
                   }}
-                  className="block w-full border border-hairline px-3 py-2 text-sm file:mr-4 file:border-0 file:bg-inverse file:px-3 file:py-1.5 file:text-xs file:text-bg"
                 />
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button variant="secondary" onClick={() => picker.current?.click()}>
+                    Choose a file
+                  </Button>
+                  <span className="font-mono text-xs text-muted">
+                    {file ? file.name : 'No file chosen'}
+                  </span>
+                </div>
                 {file && (
                   <p className="text-xs text-muted">
-                    {file.name} · {(file.size / 1024).toFixed(0)} KB · {headers.length} columns
+                    {(file.size / 1024).toFixed(0)} KB · {headers.length} columns
                   </p>
                 )}
               </div>

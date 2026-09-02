@@ -68,7 +68,7 @@ def erp_state(
         "fingerprint": erp.fingerprint(),
         "sample": sample,
         "note": (
-            "A superseded material is blocked, never deleted — the row and its "
+            "A superseded material is blocked, never deleted. The row and its "
             "history stay, which is how a real consolidation is done."
         ),
     }

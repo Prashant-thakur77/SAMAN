@@ -86,6 +86,13 @@ export default function DashExecutive() {
                 {kpi.note && <p className="text-xs text-muted">{kpi.note}</p>}
               </motion.div>
             ))}
+            {/* The grid paints its gaps with the hairline colour, so a row that
+                does not divide evenly leaves grey blocks that read as a
+                rendering fault rather than as empty space. Seven KPIs in three
+                columns left two of them. */}
+            {Array.from({ length: (3 - (data.kpis.length % 3)) % 3 }).map((_, index) => (
+              <div key={`filler-${index}`} aria-hidden className="hidden bg-bg md:block" />
+            ))}
           </motion.dl>
 
           <section className="space-y-4">
