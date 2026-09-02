@@ -116,23 +116,24 @@ actually renders.
 
 | | |
 |---|---|
-| ![Sign in](docs/screenshots/login.png) | ![Home](docs/screenshots/home.png) |
-| **Sign in.** Pick a seeded account and its role. Every one uses the password `demo`. | **Home.** Role-aware: a registrar gets the national KPIs, a steward gets their queue. |
-| ![Executive dashboard](docs/screenshots/executive.png) | ![Opportunity dashboard](docs/screenshots/opportunity.png) |
-| **Executive.** KPIs that reconcile with `/api/metrics`, per-CPSE progress, a class × CPSE heatmap in grayscale. | **Opportunity.** joint-tender candidates with the discount assumption stated inline and adjustable, price variance per base unit, inventory sharing. |
-| ![Review workbench](docs/screenshots/workbench.png) | ![ERP migration](docs/screenshots/migration.png) |
-| **Workbench.** two records side by side, tier scores, attribute comparison with identity-critical fields marked. Keyboard-first: `A` approve, `R` reject, `J`/`K` move. | **Migration.** plan, dry run, a safe/held/conflict traffic light, apply, and a journal that can roll the batch back. |
-| ![Search](docs/screenshots/search.png) | ![Copilot](docs/screenshots/copilot.png) |
-| **Search.** one field across every CPSE's catalogue; a row opens the item in a drawer beside the results, and `⌘K` opens the same search anywhere. | **Copilot.** answers with citations and the query behind them. Never free-form SQL, and it cannot see what its viewer may not. |
-| ![Audit](docs/screenshots/audit.png) | ![Admin](docs/screenshots/admin.png) |
-| **Audit.** the hash-chained event stream, verifiable from the page. | **Admin.** which engine is live in each tier, sovereign-mode toggle, prevented-duplicate counter. |
-| ![Smart-Create](docs/screenshots/smart-create.png) | ![Restricted mode](docs/screenshots/restricted-mode.png) |
-| **Smart-Create.** the duplicate check before a code is raised. | **Restricted mode.** two CPSEs find their common materials without either handing over a catalogue. |
-| ![Item](docs/screenshots/item.png) | ![Cluster](docs/screenshots/cluster.png) |
-| **Item.** the raw row beside the golden record it belongs to, every CPSE's stock of it, and its price history as a sparkline. | **Cluster.** the golden record, the template that rendered it, and which member and rule produced every fused field. |
-| ![Onboard](docs/screenshots/onboard.png) | ![Scanning a marking](docs/screenshots/scan.png) |
-| **Onboard.** upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. | **Camera input.** photograph a material's marking and the same duplicate check runs on what the reader saw. |
-
+| ![Front page](docs/screenshots/landing.png) | ![Sign in](docs/screenshots/login.png) |
+| **Front page.** what the system is, how it decides and what it scores, with the engine modes and the held-out metrics read live from the API rather than written into the page. | **Sign in.** pick a seeded account and its role. Every one uses the password `demo`. |
+| ![Home](docs/screenshots/home.png) | ![Executive](docs/screenshots/executive.png) |
+| **Home.** role-aware: a registrar gets the national KPIs, a steward gets their queue. | **Executive.** KPIs that reconcile with `/api/metrics`, per-CPSE progress, a class × CPSE heatmap in grayscale. |
+| ![Opportunity](docs/screenshots/opportunity.png) | ![Workbench](docs/screenshots/workbench.png) |
+| **Opportunity.** joint-tender candidates with the discount assumption stated inline and adjustable, price variance per base unit, inventory sharing. | **Workbench.** two records side by side, tier scores, attribute comparison with identity-critical fields marked. Keyboard-first: `A` approve, `R` reject, `J`/`K` move. |
+| ![Migration](docs/screenshots/migration.png) | ![Search](docs/screenshots/search.png) |
+| **Migration.** plan, dry run, a safe/held/conflict traffic light, apply, and a journal that can roll the batch back. | **Search.** one field across every CPSE's catalogue; a row opens the item in a drawer beside the results, and `⌘K` opens the same search anywhere. |
+| ![Copilot](docs/screenshots/copilot.png) | ![Audit](docs/screenshots/audit.png) |
+| **Copilot.** answers with citations and the query behind them. Never free-form SQL, and it cannot see what its viewer may not. | **Audit.** the hash-chained event stream, verifiable from the page. |
+| ![Admin](docs/screenshots/admin.png) | ![Smart-Create](docs/screenshots/smart-create.png) |
+| **Admin.** which engine is live in each tier, sovereign-mode toggle, prevented-duplicate counter. | **Smart-Create.** the duplicate check before a code is raised. |
+| ![Restricted mode](docs/screenshots/restricted-mode.png) | ![Item](docs/screenshots/item.png) |
+| **Restricted mode.** two CPSEs find their common materials without either handing over a catalogue. | **Item.** the raw row beside the golden record it belongs to, every CPSE's stock of it, and its price history as a sparkline. |
+| ![Cluster](docs/screenshots/cluster.png) | ![Onboard](docs/screenshots/onboard.png) |
+| **Cluster.** the golden record, the template that rendered it, and which member and rule produced every fused field. | **Onboard.** upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. |
+| ![Camera input](docs/screenshots/scan.png) |  |
+| **Camera input.** photograph a material's marking and the same duplicate check runs on what the reader saw. |  |
 ---
 
 ## Demo script

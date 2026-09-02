@@ -158,6 +158,16 @@ def capture(base_url: str, role: str, password: str) -> int:
         context = browser.new_context(viewport=VIEWPORT, device_scale_factor=2)
         page = context.new_page()
 
+        # The public front page comes first, because it is what a visitor meets
+        # first. Framed like every other shot rather than full-page, so the
+        # gallery stays a grid.
+        page.goto(f"{base_url}/welcome", wait_until="networkidle")
+        page.wait_for_selector("text=One Nation, One Material Code", timeout=15_000)
+        page.wait_for_timeout(1_500)
+        page.screenshot(path=str(OUTPUT / "landing.png"), full_page=False)
+        written.append("landing.png")
+        print(f"  {(OUTPUT / 'landing.png').relative_to(REPO)}  (light)")
+
         # /login is a picker over the seeded accounts, not an email field:
         # choose the role, then sign in.
         page.goto(f"{base_url}/login", wait_until="networkidle")

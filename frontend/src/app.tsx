@@ -2,6 +2,7 @@ import { AnimatePresence } from 'framer-motion'
 import { Suspense, lazy } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 
+import { useSession } from './lib/session'
 import { RequireRole } from './components/RequireRole'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RouteTransition } from './components/RouteTransition'
@@ -15,8 +16,9 @@ import Copilot from './routes/Copilot'
 const DashExecutive = lazy(() => import('./routes/DashExecutive'))
 const DashOpportunity = lazy(() => import('./routes/DashOpportunity'))
 
-import Home from './routes/Home' 
+import Home from './routes/Home'
 import Item from './routes/Item'
+import Landing from './routes/Landing'
 import Login from './routes/Login'
 import Migration from './routes/Migration'
 import NotFound from './routes/NotFound'
@@ -56,21 +58,33 @@ const SHELL_ROUTES = [
 
 export default function App() {
   const location = useLocation()
+  const { user, loading } = useSession()
 
-  // /login stands outside the shell: no sidebar, no command bar.
+  // `/` is two different screens depending on who is asking: the public front
+  // page for a visitor, the operator's home for anyone signed in. `/welcome`
+  // reaches the front page either way, which is what the footer, the demo
+  // script and a signed-in user showing somebody else the system all need.
+  const atRoot = location.pathname === '/'
+  const showLanding = location.pathname === '/welcome' || (atRoot && !user)
+
+  // The session is one request away on a cold load, and `user` is null until it
+  // lands. Rendering the landing page in that gap would flash the front page at
+  // a signed-in user every time they open the application.
+  if (atRoot && loading) return <div className="min-h-screen bg-bg" />
+
+  // /login and the landing page stand outside the shell: no sidebar, no
+  // command bar.
   //
   // `initial={false}` for the same reason the shell routes use it: a route
   // transition needs two routes, and there is no outgoing one on a cold load.
   // Without it the first screen anybody sees fades up from nothing, which on a
   // cold bundle takes long enough to look like a slow application rather than a
   // deliberate animation.
-  if (location.pathname === '/login') {
+  if (location.pathname === '/login' || showLanding) {
     return (
       <AnimatePresence mode="wait" initial={false}>
-        <RouteTransition key="login">
-          <ErrorBoundary>
-            <Login />
-          </ErrorBoundary>
+        <RouteTransition key={showLanding ? 'landing' : 'login'}>
+          <ErrorBoundary>{showLanding ? <Landing /> : <Login />}</ErrorBoundary>
         </RouteTransition>
       </AnimatePresence>
     )

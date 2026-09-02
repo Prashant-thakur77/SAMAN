@@ -878,3 +878,34 @@ export type BootstrapStatus = {
 export const getBootstrapStatus = () => api.get<BootstrapStatus>('/bootstrap/status')
 export const loadDemoData = () =>
   api.post<{ started: boolean; profile: string; note: string }>('/bootstrap/demo-data', {})
+
+/**
+ * The §0.6 evaluation report, narrowed to what a reader outside the
+ * application is shown. `/api/metrics` needs no session by design: a claim
+ * about accuracy that only its own operators can check is not evidence.
+ */
+export type MetricsReport = {
+  split: string
+  note: string
+  counts: { items_total: number; items_holdout: number; clusters: number }
+  duplicate: {
+    pairwise: { precision: number; recall: number; f1: number }
+    bcubed: { precision: number; recall: number; f1: number }
+  }
+  baseline_exact_text: { pairwise: { precision: number; recall: number }; note: string }
+  blocking: { recall: number; target: number }
+  veto: { precision: number; traps_refused: number; traps_total: number }
+  equivalence: {
+    status: string
+    precision?: number
+    recall?: number
+    direction_accuracy?: number
+  }
+  automation: { automation_rate: number; auto_decided: number; needs_review: number }
+  engines: { tier1_linkage: string; tier2_embedding: string; tier3_adjudication: string }
+  gate: Record<string, { value: number; target: number; pass: boolean }>
+  gate_passed: boolean
+  worst_class: string | null
+}
+
+export const getMetrics = () => api.get<MetricsReport>('/metrics')

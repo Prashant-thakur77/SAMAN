@@ -1,6 +1,6 @@
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
@@ -118,9 +118,12 @@ export default function Login() {
       <main className="flex flex-1 items-start justify-center px-6 pb-24 pt-8">
         <motion.div animate={controls} className="w-full max-w-md space-y-8">
           <div className="space-y-3">
-            <h1 className="font-sans text-lg font-medium uppercase tracking-wordmark text-ink">
-              SAMAN
-            </h1>
+            {/* The way back to the front page, where the wordmark already is. */}
+            <Link to="/welcome" className="inline-block">
+              <h1 className="font-sans text-lg font-medium uppercase tracking-wordmark text-ink">
+                SAMAN
+              </h1>
+            </Link>
             <p className="text-sm text-muted">Standardised Asset &amp; Material Analysis Network</p>
             <p className="text-sm text-ink">One Nation, One Material Code</p>
           </div>
