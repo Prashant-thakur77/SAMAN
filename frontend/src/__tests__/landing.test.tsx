@@ -49,11 +49,29 @@ describe('the landing page', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 
-  it('shows the same bearing as four catalogues write it', () => {
+  it('shows one real cluster, raw rows through to the issued code', () => {
     renderLanding()
-    expect(screen.getByText('BRG BALL DG 6205 ZZ SKF')).toBeInTheDocument()
-    expect(screen.getByText('BEARING,BALL,DEEP GROOVE 25X52X15')).toBeInTheDocument()
-    expect(screen.getByText(/every one of those is a 25 mm/i)).toBeInTheDocument()
+    // These are rows from the demo database, not copy written for the page, so
+    // the front page cannot describe a system that does not exist (spec §10).
+    for (const cpse of ['CPCL', 'GAIL', 'IOCL']) {
+      expect(screen.getByText(cpse)).toBeInTheDocument()
+    }
+    expect(
+      screen.getByText('BRG,BALL,85MM BORE,150MM OD,28MM W,ZZ,2720 KG,150 C,FAG,6217-2ZR/H150'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'BEARING, BALL DEEP GROOVE, 85MM BORE, 150MM OD, 28MM W, ZZ, FAG 6217-2ZR',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/every one of these is the same 85 mm/i)).toBeInTheDocument()
+  })
+
+  it('shows a code in the issued format, check digit and all', () => {
+    renderLanding()
+    // CCCC-SSS-NNNNNN-K. A code on the front page that could not have been
+    // issued is the sort of detail an assessor checks first.
+    expect(screen.getByText(/^[A-Z]{4}-\d{3}-\d{6}-\d$/)).toBeInTheDocument()
   })
 
   it('gives the pipeline as five ordered steps', () => {

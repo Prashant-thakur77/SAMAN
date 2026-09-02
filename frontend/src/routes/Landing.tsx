@@ -27,13 +27,28 @@ const NAV = [
   { href: '#code', label: 'The code' },
 ] as const
 
-/** The same bearing, as four catalogues actually write it. */
+/**
+ * One real cluster, exactly as it stands in the demo database: three raw rows,
+ * the record they were fused into, and the code that was issued for it. Nothing
+ * here is written for the page (spec §10).
+ */
 const SAME_BEARING = [
-  { cpse: 'CPCL', text: 'BRG BALL DG 6205 ZZ SKF' },
-  { cpse: 'GAIL', text: 'BEARING,BALL,DEEP GROOVE 25X52X15' },
-  { cpse: 'IOCL', text: 'DEEP GROOVE BALL BRG 6205-2Z' },
-  { cpse: 'ONGC', text: 'BALL BEARING 25MM BORE SHIELDED' },
+  {
+    cpse: 'CPCL',
+    text: 'BRG,BALL,85MM BORE,150MM OD,28MM W,ZZ,2720 KG,150 C,FAG,6217-2ZR/H150',
+  },
+  {
+    cpse: 'GAIL',
+    text: 'FAG - BEARING - BALL - 85MM BORE - 150MM OD - 28MM W - ZZ - 2720 KG - 150 C - 6217-2ZR/H150 - GTIN 8905095590714',
+  },
+  {
+    cpse: 'IOCL',
+    text: 'BEARING BALL 85MM BORE 150MM OD 28MM W ZZ 2720 KG 150 C FAG 6217-2ZR/H150 EAN 8905095590714',
+  },
 ] as const
+
+const GOLDEN = 'BEARING, BALL DEEP GROOVE, 85MM BORE, 150MM OD, 28MM W, ZZ, FAG 6217-2ZR'
+const GOLDEN_CODE = 'BRNG-010-000003-7'
 
 const STAGES = [
   {
@@ -202,99 +217,122 @@ export default function Landing() {
           initial="initial"
           animate="animate"
         >
-          <Band className="py-28 md:py-40">
+          <Band className="py-20 md:py-28">
             <Item>
               <p className="micro-label">Standardised Asset &amp; Material Analysis Network</p>
             </Item>
             <Item>
-              <h1 className="max-w-[16ch] pt-8 text-display font-medium">
+              <h1 className="max-w-[20ch] pt-8 text-display font-medium">
                 One Nation, One Material Code
               </h1>
             </Item>
-            <Item>
-              <p className="max-w-[46ch] pt-10 text-lead text-muted">
-                Public sector undertakings describe the same part in different words, in
-                different systems, under different codes. SAMAN works out which rows are
-                the same material and gives each one a single national code.
-              </p>
-            </Item>
-            <Item className="flex flex-wrap items-center gap-4 pt-12">
-              <a href="#how">
-                <Button variant="primary">See how it decides</Button>
-              </a>
-              <Link to="/login">
-                <Button variant="secondary">Open the demo</Button>
-              </Link>
-            </Item>
+            <div className="grid gap-10 pt-12 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-16">
+              <Item>
+                <p className="max-w-[52ch] text-lead text-muted">
+                  Public sector undertakings describe the same part in different words, in
+                  different systems, under different codes. SAMAN works out which rows are
+                  the same material and gives each one a single national code.
+                </p>
+              </Item>
+              <Item className="flex flex-wrap items-center gap-4">
+                <a href="#how">
+                  <Button variant="primary">See how it decides</Button>
+                </a>
+                <Link to="/login">
+                  <Button variant="secondary">Open the demo</Button>
+                </Link>
+              </Item>
+            </div>
           </Band>
         </motion.div>
 
         {/* ---- the problem, shown rather than described ---- */}
         <Reveal id="problem" className="border-t border-hairline">
-          <Band className="py-24 md:py-32">
-            <Item>
-              <p className="micro-label">The problem</p>
-            </Item>
-            <Item>
-              <h2 className="max-w-[20ch] pt-6 text-headline font-medium">
-                Four catalogues. One bearing.
-              </h2>
-            </Item>
+          <Band className="grid gap-12 py-20 md:py-28 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-20">
+            <div>
+              <Item>
+                <p className="micro-label">The problem</p>
+              </Item>
+              <Item>
+                <h2 className="pt-6 text-headline font-medium">
+                  Three catalogues. One bearing.
+                </h2>
+              </Item>
+              <Item>
+                <p className="max-w-[44ch] pt-8 text-lead text-muted">
+                  Every one of these is the same 85 mm deep-groove ball bearing. Three
+                  codes, three stock balances, three purchase orders, and no query that
+                  spans them. The surplus in one warehouse is invisible to the buyer in
+                  the next.
+                </p>
+              </Item>
+              <Item>
+                <p className="max-w-[44ch] pt-6 text-base text-muted">
+                  Taken from the demo database as it stands, not written for this page.
+                </p>
+              </Item>
+            </div>
 
-            <ul className="border-b border-hairline pt-14">
-              {SAME_BEARING.map((row) => (
-                <ItemLi
-                  key={row.cpse}
-                  className="grid grid-cols-[4rem_1fr] items-baseline gap-4 border-t border-hairline py-5 md:grid-cols-[7rem_1fr] md:gap-8"
-                >
-                  <span className="micro-label">{row.cpse}</span>
-                  <span className="font-mono text-base md:text-lg">{row.text}</span>
-                </ItemLi>
-              ))}
-            </ul>
+            <div>
+              <ul className="border-b border-hairline">
+                {SAME_BEARING.map((row) => (
+                  <ItemLi
+                    key={row.cpse}
+                    className="grid grid-cols-[4rem_1fr] items-baseline gap-4 border-t border-hairline py-5 md:gap-8"
+                  >
+                    <span className="micro-label">{row.cpse}</span>
+                    <span className="break-words font-mono text-sm md:text-base">
+                      {row.text}
+                    </span>
+                  </ItemLi>
+                ))}
+              </ul>
 
-            <Item>
-              <p className="max-w-[52ch] pt-8 text-lead text-muted">
-                Every one of those is a 25 mm deep-groove ball bearing. Four codes, four
-                stock balances, four purchase orders, and no query that spans them. The
-                surplus in one warehouse is invisible to the buyer in the next.
-              </p>
-            </Item>
+              <Item className="pt-10">
+                <p className="micro-label">Resolved to one record</p>
+              </Item>
+              <Item className="mt-4 border border-hairline p-6">
+                <p className="break-words font-mono text-sm md:text-base">{GOLDEN}</p>
+                <p className="pt-5 font-mono text-lg md:text-xl">{GOLDEN_CODE}</p>
+              </Item>
+            </div>
           </Band>
         </Reveal>
 
         {/* ---- how it works ---- */}
         <Reveal id="how" className="border-t border-hairline bg-surface">
-          <Band className="py-24 md:py-32">
-            <Item>
-              <p className="micro-label">How it works</p>
-            </Item>
-            <Item>
-              <h2 id="how-title" className="max-w-[22ch] pt-6 text-headline font-medium">
-                Cheap certainty first. Judgement last.
-              </h2>
-            </Item>
-            <Item>
-              <p className="max-w-[52ch] pt-8 text-lead text-muted">
-                Deciding whether two rows are the same material is five questions asked in
-                order. Each one is more expensive than the last, and each only ever sees
-                what the one before it could not settle.
-              </p>
-            </Item>
+          <Band className="py-20 md:py-28">
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,32rem)_1fr] lg:gap-20">
+              <div>
+                <Item>
+                  <p className="micro-label">How it works</p>
+                </Item>
+                <Item>
+                  <h2 id="how-title" className="pt-6 text-headline font-medium">
+                    Cheap certainty first. Judgement last.
+                  </h2>
+                </Item>
+              </div>
+              <Item className="lg:self-end">
+                <p className="max-w-[52ch] text-lead text-muted">
+                  Deciding whether two rows are the same material is five questions asked
+                  in order. Each one is more expensive than the last, and each only ever
+                  sees what the one before it could not settle.
+                </p>
+              </Item>
+            </div>
 
             <ol aria-labelledby="how-title" className="pt-16">
               {STAGES.map((stage) => (
                 <ItemLi
                   key={stage.index}
-                  className="grid gap-4 border-t border-hairline py-10 md:grid-cols-[6rem_1fr] md:gap-12"
+                  className="grid gap-3 border-t border-hairline py-8 md:grid-cols-[4rem_minmax(0,20rem)_1fr] md:gap-12 md:py-10"
                 >
                   <p className="font-mono text-lg text-muted">{stage.index}</p>
-                  <div>
-                    <h3 className="text-xl font-medium">{stage.heading}</h3>
-                    <p className="max-w-[54ch] pt-4 text-base text-muted md:text-lead">
-                      {stage.body}
-                    </p>
-                  </div>
+                  <h3 className="text-xl font-medium">{stage.heading}</h3>
+                  <p className="max-w-[60ch] text-base text-muted md:text-lead">
+                    {stage.body}
+                  </p>
                 </ItemLi>
               ))}
             </ol>
@@ -303,46 +341,61 @@ export default function Landing() {
 
         {/* ---- the veto, given the room it deserves ---- */}
         <Reveal className="border-t border-hairline">
-          <Band className="py-28 md:py-40">
-            <Item>
-              <p className="micro-label">Why it can be trusted</p>
-            </Item>
-            <Item>
-              <p className="pt-8 font-mono text-headline">25 mm is not 30 mm.</p>
-            </Item>
-            <Item>
-              <p className="max-w-[54ch] pt-10 text-lead text-muted">
-                Two rows can read almost identically and still be different parts. Every
-                matching system that scores similarity alone will eventually merge them,
-                and in a materials catalogue that means a maintenance crew is issued
-                something that does not fit.
-              </p>
-            </Item>
-            <Item>
-              <p className="max-w-[54ch] pt-6 text-lead text-muted">
-                So the attributes that define identity are compared separately, in real
-                units, and a disagreement on any of them refuses the match outright. No
-                score is permitted to overrule it. That refusal is recorded with the
-                reason, which is why the system can say not only what it merged, but what
-                it declined to.
-              </p>
-            </Item>
+          <Band className="grid gap-12 py-20 md:py-28 lg:grid-cols-[auto_1fr] lg:gap-20">
+            <div>
+              <Item>
+                <p className="micro-label">Why it can be trusted</p>
+              </Item>
+              <Item>
+                <p className="whitespace-nowrap pt-8 font-mono text-headline">25 mm is not 30 mm.</p>
+              </Item>
+            </div>
+            <div className="lg:pt-14">
+              <Item>
+                <p className="max-w-[58ch] text-lead text-muted">
+                  Two rows can read almost identically and still be different parts. Every
+                  matching system that scores similarity alone will eventually merge them,
+                  and in a materials catalogue that means a maintenance crew is issued
+                  something that does not fit.
+                </p>
+              </Item>
+              <Item>
+                <p className="max-w-[58ch] pt-6 text-lead text-muted">
+                  So the attributes that define identity are compared separately, in real
+                  units, and a disagreement on any of them refuses the match outright. No
+                  score is permitted to overrule it. That refusal is recorded with the
+                  reason, which is why the system can say not only what it merged, but
+                  what it declined to.
+                </p>
+              </Item>
+            </div>
           </Band>
         </Reveal>
 
         {/* ---- the code itself ---- */}
         <Reveal id="code" className="border-t border-hairline bg-surface">
-          <Band className="py-24 md:py-32">
-            <Item>
-              <p className="micro-label">The code</p>
-            </Item>
-            <Item>
-              <h2 className="max-w-[22ch] pt-6 text-headline font-medium">
-                One material, one number, everywhere.
-              </h2>
-            </Item>
+          <Band className="py-20 md:py-28">
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,32rem)_1fr] lg:gap-20">
+              <div>
+                <Item>
+                  <p className="micro-label">The code</p>
+                </Item>
+                <Item>
+                  <h2 className="pt-6 text-headline font-medium">
+                    One material, one number, everywhere.
+                  </h2>
+                </Item>
+              </div>
+              <Item className="lg:self-end">
+                <p className="max-w-[52ch] text-lead text-muted">
+                  Issuing it is the easy half. The rest is moving several ERPs onto it
+                  without losing what came before, which is why the code is the middle of
+                  the story rather than the end of it.
+                </p>
+              </Item>
+            </div>
 
-            <Item className="pt-14">
+            <Item className="pt-16">
               <p className="font-mono text-headline">
                 {SEGMENTS.map((segment, index) => (
                   <span key={segment.label}>
@@ -363,25 +416,21 @@ export default function Landing() {
                 </Item>
               ))}
             </dl>
-
-            <Item>
-              <p className="max-w-[54ch] pt-10 text-lead text-muted">
-                Issuing it is the easy half. The rest is moving four ERPs onto it without
-                losing what came before.
-              </p>
-            </Item>
           </Band>
         </Reveal>
 
         {/* ---- the promises ---- */}
         <Reveal className="border-t border-hairline">
-          <Band className="py-24 md:py-32">
+          <Band className="py-20 md:py-28">
             <Item>
               <p className="micro-label">What it guarantees</p>
             </Item>
-            <div className="grid gap-12 pt-14 md:grid-cols-3 md:gap-10">
+            <div className="grid gap-10 pt-12 md:grid-cols-3">
               {PROMISES.map((promise) => (
-                <Item key={promise.heading} className="space-y-4">
+                <Item
+                  key={promise.heading}
+                  className="space-y-4 border-t border-hairline pt-6"
+                >
                   <h3 className="text-xl font-medium">{promise.heading}</h3>
                   <p className="text-base text-muted">{promise.body}</p>
                 </Item>
@@ -392,20 +441,22 @@ export default function Landing() {
 
         {/* ---- close ---- */}
         <Reveal className="border-t border-hairline">
-          <Band className="py-28 md:py-36">
+          <Band className="grid gap-10 py-20 md:py-28 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-20">
+            <div>
+              <Item>
+                <h2 className="max-w-[20ch] text-headline font-medium">
+                  It is running on this machine.
+                </h2>
+              </Item>
+              <Item>
+                <p className="max-w-[52ch] pt-8 text-lead text-muted">
+                  Sign in with any seeded account, password{' '}
+                  <span className="font-mono">demo</span>, and follow this bearing from
+                  three catalogues to a single code.
+                </p>
+              </Item>
+            </div>
             <Item>
-              <h2 className="max-w-[18ch] text-headline font-medium">
-                It is running on this machine.
-              </h2>
-            </Item>
-            <Item>
-              <p className="max-w-[48ch] pt-8 text-lead text-muted">
-                Sign in with any seeded account, password{' '}
-                <span className="font-mono">demo</span>, and follow one bearing from four
-                catalogues to a single code.
-              </p>
-            </Item>
-            <Item className="pt-12">
               <Link to="/login">
                 <Button variant="primary">Open the demo</Button>
               </Link>
