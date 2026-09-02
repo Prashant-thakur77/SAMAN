@@ -20,6 +20,10 @@ export default {
       inverse: withAlpha('--inverse'),
       ok: withAlpha('--ok'),
       danger: withAlpha('--danger'),
+      // Front page only (see .landing in tokens.css). Outside it these
+      // resolve to muted, so a stray use is dull rather than broken.
+      earth: withAlpha('--earth'),
+      forest: withAlpha('--forest'),
     },
     // Fixed scale, spec §1.3: 12 / 14 / 16 / 20 / 28 / 40 (+ 11px micro-label).
     fontSize: {

@@ -49,3 +49,66 @@
 
   color-scheme: dark;
 }
+
+/* ---- the public front page ----
+ *
+ * The application is monochrome and stays that way: it is an instrument people
+ * work in all day, and §1.1 rations colour for a reason. The front page has a
+ * different job, so it runs a warmer palette of its own.
+ *
+ * Scoped to `.landing` rather than declared globally, which means every
+ * existing utility class keeps working inside it — `bg-bg` and `text-ink`
+ * simply resolve to the warm values — and neither palette can drift into the
+ * other by accident.
+ */
+.landing {
+  --bg: 252 249 244; /* #FCF9F4 warm paper */
+  --surface: 245 238 228; /* #F5EEE4 light brown wash */
+  --ink: 26 20 16; /* #1A1410 */
+  --muted: 107 93 79; /* #6B5D4F warm grey-brown */
+  --hairline: 226 215 200; /* #E2D7C8 */
+  --inverse: 27 100 64; /* #1B6440 — the primary button fills green */
+
+  --earth: 168 100 42; /* #A8642A ochre */
+  --forest: 27 100 64; /* #1B6440 */
+
+  color-scheme: light;
+}
+
+.dark .landing {
+  --bg: 18 16 13; /* #12100D */
+  --surface: 28 24 19; /* #1C1813 */
+  --ink: 245 240 232; /* #F5F0E8 */
+  --muted: 168 155 138; /* #A89B8A */
+  --hairline: 48 41 34; /* #302922 */
+  --inverse: 92 186 132; /* #5CBA84 */
+
+  --earth: 224 156 88; /* #E09C58 */
+  --forest: 92 186 132; /* #5CBA84 */
+
+  color-scheme: dark;
+}
+
+/* Defined so the Tailwind colours resolve to something sane if either name is
+   ever used outside the front page. */
+:root {
+  --earth: 82 82 82;
+  --forest: 82 82 82;
+}
+
+/* The wash behind the front page. Two earth pools and a green one, kept far
+   enough below the text that contrast is unaffected, over a faint dot grid
+   that fades out before the content gets dense. */
+.landing-field {
+  background-image:
+    radial-gradient(58rem 40rem at 10% -10%, rgb(var(--earth) / 0.18), transparent 62%),
+    radial-gradient(52rem 38rem at 94% 4%, rgb(var(--forest) / 0.16), transparent 60%),
+    radial-gradient(44rem 32rem at 72% 92%, rgb(var(--earth) / 0.12), transparent 58%);
+}
+
+.landing-grid {
+  background-image: radial-gradient(rgb(var(--ink) / 0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+  -webkit-mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.9), transparent 72%);
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.9), transparent 72%);
+}

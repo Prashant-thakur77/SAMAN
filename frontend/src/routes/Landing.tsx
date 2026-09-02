@@ -152,13 +152,20 @@ const SEGMENTS = [
   {
     part: 'BRNG',
     label: 'Family',
+    tone: 'text-forest',
     body: 'Four letters for the class of thing. Bearings, valves, gaskets, cable.',
   },
-  { part: '010', label: 'Segment', body: 'The group within that family.' },
-  { part: '000003', label: 'Serial', body: 'Issued once and never reissued, even after a merge.' },
+  { part: '010', label: 'Segment', tone: 'text-earth', body: 'The group within that family.' },
+  {
+    part: '000003',
+    label: 'Serial',
+    tone: 'text-ink',
+    body: 'Issued once and never reissued, even after a merge.',
+  },
   {
     part: '7',
     label: 'Check',
+    tone: 'text-danger',
     body: 'A Damm digit. Mistype a figure or swap two, and the code fails where it is keyed.',
   },
 ] as const
@@ -227,6 +234,72 @@ function ItemLi({ children, className }: { children: ReactNode; className?: stri
   )
 }
 
+/**
+ * A civic colonnade, drawn rather than photographed.
+ *
+ * The SIH site carries a faded government building behind its masthead. There
+ * is no network at runtime here and no image to fetch, so this is line art:
+ * an arcade, two chhatris and a domed centre block, generated from a loop
+ * rather than hand-authored path data. It depicts no particular building, and
+ * it sits far enough back that it never competes with the type.
+ */
+function Colonnade() {
+  const arch = (x: number, key: string) => (
+    <g key={key}>
+      <path d={`M${x} 196 L${x} 150 A18 18 0 0 1 ${x + 36} 150 L${x + 36} 196`} />
+      <line x1={x - 3} y1="150" x2={x + 39} y2="150" />
+    </g>
+  )
+  const arcade = (start: number, count: number, prefix: string) =>
+    Array.from({ length: count }, (_, i) => arch(start + i * 46, `${prefix}-${i}`))
+
+  const chhatri = (x: number, key: string) => (
+    <g key={key}>
+      <path d={`M${x - 26} 138 A26 26 0 0 1 ${x + 26} 138 Z`} />
+      <line x1={x} y1="112" x2={x} y2="104" />
+      <line x1={x - 30} y1="138" x2={x + 30} y2="138" />
+      <line x1={x - 22} y1="138" x2={x - 22} y2="196" />
+      <line x1={x + 22} y1="138" x2={x + 22} y2="196" />
+    </g>
+  )
+
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 1200 210"
+      preserveAspectRatio="xMidYMax meet"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      className="h-full w-full"
+    >
+      {arcade(60, 6, 'l')}
+      {chhatri(392, 'c-l')}
+
+      {/* centre block: steps, portico, drum, dome, finial */}
+      <g>
+        <path d="M470 196 L470 128 L730 128 L730 196" />
+        <line x1="452" y1="196" x2="748" y2="196" />
+        <line x1="462" y1="186" x2="738" y2="186" />
+        {[500, 540, 580, 620, 660, 700].map((x) => (
+          <line key={x} x1={x} y1="186" x2={x} y2="132" />
+        ))}
+        <line x1="470" y1="128" x2="730" y2="128" />
+        <path d="M540 128 L540 104 L660 104 L660 128" />
+        <path d="M534 104 A66 60 0 0 1 666 104" />
+        <line x1="600" y1="44" x2="600" y2="28" />
+        <circle cx="600" cy="24" r="4" />
+      </g>
+
+      {chhatri(808, 'c-r')}
+      {arcade(866, 6, 'r')}
+
+      <line x1="0" y1="196" x2="1200" y2="196" />
+    </svg>
+  )
+}
+
 /** One container width and one gutter, used by every band on the page. */
 function Band({
   children,
@@ -246,7 +319,13 @@ export default function Landing() {
   const reduce = useReducedMotion() ?? false
 
   return (
-    <div className="min-h-screen bg-bg text-ink">
+    <div className="landing relative min-h-screen bg-bg text-ink">
+      {/* The application is monochrome by design. This page is not, and the
+          palette swap rides on the `landing` class rather than on new utility
+          classes, so nothing here can leak into a screen people work in. */}
+      <div aria-hidden className="landing-field pointer-events-none fixed inset-0" />
+      <div aria-hidden className="landing-grid pointer-events-none fixed inset-0" />
+
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:border focus:border-hairline focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:text-ink"
@@ -254,7 +333,7 @@ export default function Landing() {
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-40 border-b border-hairline bg-bg">
+      <header className="sticky top-0 z-40 border-b border-hairline bg-bg/90 backdrop-blur-sm">
         <Band className="flex h-16 items-center gap-8">
           <Link to="/" className="shrink-0 font-medium uppercase tracking-wordmark">
             SAMAN
@@ -279,7 +358,7 @@ export default function Landing() {
         </Band>
       </header>
 
-      <main id="main-content" tabIndex={-1} className="focus-visible:outline-none">
+      <main id="main-content" tabIndex={-1} className="relative focus-visible:outline-none">
         {/* ---- hero ---- */}
         <motion.div
           variants={listVariants(reduce)}
@@ -288,12 +367,17 @@ export default function Landing() {
         >
           <Band className="py-20 md:py-28">
             <Item>
-              <p className="micro-label">Standardised Asset &amp; Material Analysis Network</p>
+              <p className="micro-label text-earth">
+                Standardised Asset &amp; Material Analysis Network
+              </p>
             </Item>
             <Item>
               <h1 className="max-w-[20ch] pt-8 text-display font-medium">
                 One Nation, One Material Code
               </h1>
+            </Item>
+            <Item>
+              <div aria-hidden className="mt-8 h-1 w-24 bg-forest" />
             </Item>
             <div className="grid gap-10 pt-12 lg:grid-cols-[1fr_auto] lg:items-end lg:gap-16">
               <Item>
@@ -313,6 +397,15 @@ export default function Landing() {
               </Item>
             </div>
           </Band>
+
+          {/* Anchored to the foot of the hero so the arcade reads as a horizon
+              under the headline rather than as a picture behind it. */}
+          <div
+            aria-hidden
+            className="pointer-events-none relative -mt-8 h-32 text-earth/25 md:h-44 lg:h-52"
+          >
+            <Colonnade />
+          </div>
         </motion.div>
 
         {/* ---- the problem, shown rather than described ---- */}
@@ -320,7 +413,7 @@ export default function Landing() {
           <Band className="grid gap-12 py-20 md:py-28 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-20">
             <div>
               <Item>
-                <p className="micro-label">The problem</p>
+                <p className="micro-label text-earth">The problem</p>
               </Item>
               <Item>
                 <h2 className="pt-6 text-headline font-medium">
@@ -349,7 +442,7 @@ export default function Landing() {
                     key={row.cpse}
                     className="grid grid-cols-[4rem_1fr] items-baseline gap-4 border-t border-hairline py-5 md:gap-8"
                   >
-                    <span className="micro-label">{row.cpse}</span>
+                    <span className="micro-label text-earth">{row.cpse}</span>
                     <span className="break-words font-mono text-sm md:text-base">
                       {row.text}
                     </span>
@@ -358,11 +451,11 @@ export default function Landing() {
               </ul>
 
               <Item className="pt-10">
-                <p className="micro-label">Resolved to one record</p>
+                <p className="micro-label text-forest">Resolved to one record</p>
               </Item>
-              <Item className="mt-4 border border-hairline p-6">
+              <Item className="mt-4 border border-forest/40 bg-bg/60 p-6">
                 <p className="break-words font-mono text-sm md:text-base">{GOLDEN}</p>
-                <p className="pt-5 font-mono text-lg md:text-xl">{GOLDEN_CODE}</p>
+                <p className="pt-5 font-mono text-lg text-forest md:text-xl">{GOLDEN_CODE}</p>
               </Item>
             </div>
           </Band>
@@ -374,7 +467,7 @@ export default function Landing() {
             <div className="grid gap-10 lg:grid-cols-[minmax(0,32rem)_1fr] lg:gap-20">
               <div>
                 <Item>
-                  <p className="micro-label">What it fixes</p>
+                  <p className="micro-label text-earth">What it fixes</p>
                 </Item>
                 <Item>
                   <h2 id="fixes-title" className="pt-6 text-headline font-medium">
@@ -397,15 +490,15 @@ export default function Landing() {
                 className="hidden gap-12 border-b border-hairline pb-3 md:grid md:grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)]"
               >
                 <span />
-                <span className="micro-label">The problem today</span>
-                <span className="micro-label">What SAMAN does</span>
+                <span className="micro-label text-earth">The problem today</span>
+                <span className="micro-label text-forest">What SAMAN does</span>
               </li>
               {FIXES.map((entry, index) => (
                 <ItemLi
                   key={entry.problem}
                   className="grid gap-3 border-b border-hairline py-8 md:grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)] md:gap-12"
                 >
-                  <p className="font-mono text-sm text-muted">
+                  <p className="font-mono text-sm text-earth">
                     {String(index + 1).padStart(2, '0')}
                   </p>
                   <div className="space-y-2">
@@ -425,7 +518,7 @@ export default function Landing() {
             <div className="grid gap-10 lg:grid-cols-[minmax(0,32rem)_1fr] lg:gap-20">
               <div>
                 <Item>
-                  <p className="micro-label">How it works</p>
+                  <p className="micro-label text-earth">How it works</p>
                 </Item>
                 <Item>
                   <h2 id="how-title" className="pt-6 text-headline font-medium">
@@ -448,7 +541,7 @@ export default function Landing() {
                   key={stage.index}
                   className="grid gap-3 border-t border-hairline py-8 md:grid-cols-[4rem_minmax(0,20rem)_1fr] md:gap-12 md:py-10"
                 >
-                  <p className="font-mono text-lg text-muted">{stage.index}</p>
+                  <p className="font-mono text-lg text-earth">{stage.index}</p>
                   <h3 className="text-xl font-medium">{stage.heading}</h3>
                   <p className="max-w-[60ch] text-base text-muted md:text-lead">
                     {stage.body}
@@ -464,10 +557,10 @@ export default function Landing() {
           <Band className="grid gap-12 py-20 md:py-28 lg:grid-cols-[auto_1fr] lg:gap-20">
             <div>
               <Item>
-                <p className="micro-label">Why it can be trusted</p>
+                <p className="micro-label text-earth">Why it can be trusted</p>
               </Item>
               <Item>
-                <p className="whitespace-nowrap pt-8 font-mono text-headline">25 mm is not 30 mm.</p>
+                <p className="whitespace-nowrap pt-8 font-mono text-headline text-danger">25 mm is not 30 mm.</p>
               </Item>
             </div>
             <div className="lg:pt-14">
@@ -498,7 +591,7 @@ export default function Landing() {
             <div className="grid gap-10 lg:grid-cols-[minmax(0,32rem)_1fr] lg:gap-20">
               <div>
                 <Item>
-                  <p className="micro-label">The code</p>
+                  <p className="micro-label text-earth">The code</p>
                 </Item>
                 <Item>
                   <h2 className="pt-6 text-headline font-medium">
@@ -516,11 +609,13 @@ export default function Landing() {
             </div>
 
             <Item className="pt-16">
+              {/* Each segment takes the colour its annotation below uses, so the
+                  code and its explanation are read as one object. */}
               <p className="font-mono text-headline">
                 {SEGMENTS.map((segment, index) => (
                   <span key={segment.label}>
                     {index > 0 && <span className="text-muted">-</span>}
-                    {segment.part}
+                    <span className={segment.tone}>{segment.part}</span>
                   </span>
                 ))}
               </p>
@@ -530,7 +625,8 @@ export default function Landing() {
               {SEGMENTS.map((segment) => (
                 <Item key={segment.label} className="space-y-3 border-t border-hairline pt-5">
                   <dt className="micro-label">
-                    {segment.label} · <span className="font-mono">{segment.part}</span>
+                    {segment.label} ·{' '}
+                    <span className={`font-mono ${segment.tone}`}>{segment.part}</span>
                   </dt>
                   <dd className="max-w-[32ch] text-base text-muted">{segment.body}</dd>
                 </Item>
@@ -543,7 +639,7 @@ export default function Landing() {
         <Reveal className="border-t border-hairline">
           <Band className="py-20 md:py-28">
             <Item>
-              <p className="micro-label">What it guarantees</p>
+              <p className="micro-label text-earth">What it guarantees</p>
             </Item>
             <div className="grid gap-10 pt-12 md:grid-cols-3">
               {PROMISES.map((promise) => (
@@ -585,7 +681,7 @@ export default function Landing() {
         </Reveal>
       </main>
 
-      <footer className="border-t border-hairline">
+      <footer className="relative border-t border-hairline">
         <Band className="flex flex-wrap items-center justify-between gap-4 py-8">
           <p className="text-xs text-muted">
             Smart India Hackathon 2026 · Problem statement SIH26099
