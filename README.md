@@ -275,7 +275,7 @@ decision is as misleading as provenance that understates it.
 
 An unresolved disagreement on an identity-critical attribute does **not**
 auto-approve: the cluster is flagged and routed to a steward, and `POST
-/api/cnmc/issue` refuses it with 409. On the demo profile 870 of 7,107 clusters
+/api/cnmc/issue` refuses it with 409. On the demo profile 862 of 7,142 clusters
 are held back this way, every one of them a same-part-number-different-
 specification data-quality error rather than a matching failure.
 

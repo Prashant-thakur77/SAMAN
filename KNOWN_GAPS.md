@@ -44,8 +44,8 @@ Recorded rather than silently substituted, per the "how to use this spec" note.
   SKF 6205-2Z and FAG 6205-2ZR are two catalogue entries that are
   *interchangeable*, not identical — merging them into one CNMC would erase a
   distinction CPSE masters genuinely carry. The matcher refuses such pairs and
-  records an equivalence instead (§2B). 360 such pairs are planted as truth and
-  all 168 held-out ones are handled correctly.
+  records an equivalence instead (§2B). 160 cross-brand traps are planted in the
+  held-out split and all 160 are refused correctly.
 - **Refusals must hold transitively.** Connected components merge A–B–C even
   when A and C are a hard mismatch. Clusters are therefore refined until no two
   members inside one would be refused by any rule. Before this, pairwise
