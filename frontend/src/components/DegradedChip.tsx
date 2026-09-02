@@ -21,9 +21,13 @@ export function DegradedChip() {
 
   if (!health) return null
 
-  const { capabilities } = health
+  // Defensive because this chip lives in the always-rendered command bar,
+  // outside any route error boundary: a health payload missing a tier would
+  // otherwise throw and take the whole shell — sidebar, nav, everything — with
+  // it. A missing tier reads as "not degraded" rather than as a blank app.
+  const capabilities = health.capabilities ?? {}
   const degradedTiers = (['linkage', 'embedding', 'llm'] as const).filter(
-    (t) => capabilities[t].degraded,
+    (t) => capabilities[t]?.degraded,
   )
 
   if (degradedTiers.length === 0) {

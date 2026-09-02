@@ -490,6 +490,18 @@ that could not be true:
   *not* to be refused: a guard that refuses "ignore the small differences and
   show me bearings" is one nobody keeps.
 
+- **With the API down, every screen rendered an empty column.** Not a crash and
+  not an infinite spinner — the sidebar, the skip link and a "Backend
+  unreachable" chip all stood — but the content area was simply blank on all
+  sixteen routes, with no statement of what had happened or what to do. The
+  shell now says it once, in the place the user is looking, rather than sixteen
+  times in sixteen routes.
+- **The degraded chip could take the whole application with it.** It reads
+  `capabilities.linkage.degraded` and lives in the always-rendered command bar,
+  outside any route error boundary, so a health payload missing a tier would
+  throw and blank the shell — sidebar, navigation and all. Found because a test
+  mock was shaped slightly wrong, which is the useful kind of test failure.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
+import { useHealth } from '../lib/useHealth'
+
 import { CommandBar } from './CommandBar'
 import { CommandPalette } from './CommandPalette'
 import { RouteAnnouncer } from './RouteAnnouncer'
 import { Sidebar } from './Sidebar'
+import { Button } from './primitives/Button'
+import { EmptyState } from './primitives/EmptyState'
 
 const COLLAPSE_KEY = 'saman.sidebar.collapsed'
 
@@ -20,6 +24,7 @@ export function Shell({ children }: { children: ReactNode }) {
     }
   })
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const { unreachable } = useHealth()
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((c) => {
@@ -63,7 +68,25 @@ export function Shell({ children }: { children: ReactNode }) {
           tabIndex={-1}
           className="flex-1 px-6 py-8 focus-visible:outline-none"
         >
-          <div className="mx-auto w-full max-w-content">{children}</div>
+          <div className="mx-auto w-full max-w-content">
+            {/* A blank content column is not a crash, but it is not an
+                explanation either. With the API down every screen renders
+                nothing at all, so say why once here rather than sixteen times
+                in sixteen routes (spec §8A). */}
+            {unreachable ? (
+              <EmptyState
+                title="SAMAN cannot reach its API"
+                description="Every screen needs the backend on :8000. Start it with `make dev`, or `docker compose up` for both services, then reload. Nothing has been lost — the database is on disk."
+                action={
+                  <Button variant="primary" onClick={() => window.location.reload()}>
+                    Reload
+                  </Button>
+                }
+              />
+            ) : (
+              children
+            )}
+          </div>
         </main>
         <footer className="border-t border-hairline px-6 py-4">
           <p className="mx-auto max-w-content text-xs text-muted">
