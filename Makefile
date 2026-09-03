@@ -114,6 +114,12 @@ tunnel:  ## Temporary public HTTPS link to a local port (default 80) through a C
 	docker run --rm --network host cloudflare/cloudflared:latest tunnel \
 	  --url http://localhost:$(or $(PORT),80) --protocol http2 --edge-ip-version 4 --retries 10
 
+link:  ## Public HTTPS link on your reserved ngrok domain (stable across restarts)
+	# A quick tunnel gets a new random name every restart and Cloudflare expires
+	# it without warning; a reserved domain survives both. The free plan shows
+	# each visitor a one-time warning page, which `tunnel` (Cloudflare) does not.
+	ngrok http $(or $(PORT),80) $(if $(NGROK_DOMAIN),--url=$(NGROK_DOMAIN),)
+
 screenshots:  ## Regenerate docs/screenshots from the running app (needs make preview)
 	cd backend && ../$(PY) scripts/screenshots.py
 

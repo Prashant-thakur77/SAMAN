@@ -110,6 +110,14 @@ and any downloaded speech models live there and survive rebuilds. A fresh
 `data/` shows the login page's "Load demo data" button; a `data/` copied from
 a laptop that ran `make demo` comes up as it was.
 
+**A link that keeps its name.** `make link` puts the stack on a reserved ngrok
+domain, which survives restarts and machine reboots — unlike a Cloudflare quick
+tunnel, whose name is random every time and which Cloudflare expires without
+warning. It needs a free ngrok account and its one reserved domain. The free
+plan shows each visitor a one-time warning page before the site; anyone handing
+the link to an audience should know that, and `make tunnel` below has no such
+page in exchange for an address that changes.
+
 **A link from a laptop, in a minute.** `make tunnel` opens a Cloudflare quick
 tunnel to port 80 (`make tunnel PORT=4173` for `make preview`) and prints a
 public HTTPS address. No account, nothing installed beyond Docker. The link
