@@ -95,6 +95,19 @@ services:
         || ollama pull ${OLLAMA_MODEL:-qwen2.5:3b}
     restart: "no"
 
+  # Laptop path: reach an Ollama already running on the host, GPU and all,
+  # even though it listens on 127.0.0.1 only. Binds on the Docker bridge
+  # address, so the forwarded port is never on the LAN. With this profile set
+  # OLLAMA_URL=http://host.docker.internal:11435.
+  host-ollama-bridge:
+    image: python:3.12-slim
+    profiles: ["host-llm"]
+    network_mode: host
+    volumes:
+      - ./tcp-bridge.py:/bridge.py:ro
+    command: ["python", "/bridge.py", "${DOCKER_BRIDGE_IP:-172.17.0.1}", "11435", "127.0.0.1", "11434"]
+    restart: unless-stopped
+
 volumes:
   caddy_data:
   caddy_config:

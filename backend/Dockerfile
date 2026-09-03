@@ -15,11 +15,17 @@ RUN pip install --no-cache-dir --timeout 180 --retries 8 -r requirements.txt
 # small and every screen still works on the browser's engines.
 ARG SAMAN_EXTRAS=none
 RUN if [ "$SAMAN_EXTRAS" = "voice" ]; then \
-      pip install --no-cache-dir --timeout 180 --retries 8 \
-        faster-whisper==1.2.1 piper-tts==1.7.0 rapidocr-onnxruntime==1.4.4 ; \
+      apt-get update && apt-get install --no-install-recommends -y libxcb1 libglib2.0-0 libgl1 \
+        && rm -rf /var/lib/apt/lists/* \
+        && pip install --no-cache-dir --timeout 180 --retries 8 \
+          faster-whisper==1.2.1 piper-tts==1.7.0 rapidocr-onnxruntime==1.4.4 ; \
     fi
 
 COPY backend/ ./backend/
+# The assistant answers questions from the project's own documents; without
+# them in the image the grounded path has nothing to retrieve and says so.
+COPY README.md KNOWN_GAPS.md SAMAN_CLAUDE_CODE_SPEC.md ./
+COPY docs/*.md ./docs/
 WORKDIR /srv/backend
 
 ENV PYTHONUNBUFFERED=1 \

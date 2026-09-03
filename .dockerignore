@@ -1,7 +1,11 @@
-**/node_modules
-**/.venv
-**/__pycache__
-**/dist
-**/.pytest_cache
-data/*.db
+# Build context for the images in backend/Dockerfile and deploy/Dockerfile.web.
+# The databases, models and node_modules are mounted or installed, never copied.
 .git
+data/
+frontend/node_modules/
+frontend/dist/
+backend/.venv/
+backend/.pytest_cache/
+backend/**/__pycache__/
+docs/screenshots/
+deploy/.env
