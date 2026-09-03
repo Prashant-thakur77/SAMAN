@@ -20,6 +20,7 @@ from .routers import (
     dashboard,
     health,
     ingest,
+    learn,
     metrics,
     migration,
     pipeline,
@@ -69,6 +70,7 @@ app.include_router(migration.router, prefix="/api")
 app.include_router(smart_create.router, prefix="/api")
 app.include_router(pprl.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
+app.include_router(learn.router, prefix="/api")
 
 
 @app.on_event("startup")

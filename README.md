@@ -61,7 +61,9 @@ docker compose up
 | http://localhost:8000/api/docs | API reference |
 | http://localhost:8000/api/health | Active engine modes per tier |
 
-`make help` lists every target.
+`make learn` trains the pairwise model on every Workbench decision and `make
+simulate-reviews` stands in for reviewers on the tuning split (demo only; see
+"Learning from the Workbench"). `make help` lists every target.
 
 ### Optional accelerators
 
@@ -130,9 +132,9 @@ actually renders.
 | ![Copilot](docs/screenshots/copilot.png) | ![Audit](docs/screenshots/audit.png) |
 | **Copilot.** answers with citations and the query behind them. Never free-form SQL, and it cannot see what its viewer may not. | **Audit.** the hash-chained event stream, verifiable from the page. |
 | ![Admin](docs/screenshots/admin.png) | ![Smart-Create](docs/screenshots/smart-create.png) |
-| **Admin.** which engine is live in each tier, sovereign-mode toggle, prevented-duplicate counter. | **Smart-Create.** the duplicate check before a code is raised. |
+| **Admin.** which engine is live in each tier, sovereign-mode toggle, prevented-duplicate counter, and the learned model with its fifteen weights and held-out score. | **Smart-Create.** the duplicate check before a code is raised. |
 | ![Restricted mode](docs/screenshots/restricted-mode.png) | ![Item](docs/screenshots/item.png) |
-| **Restricted mode.** two CPSEs find their common materials without either handing over a catalogue. | **Item.** the raw row beside the golden record it belongs to, every CPSE's stock of it, and its price history as a sparkline. |
+| **Restricted mode.** two CPSEs find their common materials without either handing over a catalogue. | **Item.** the raw row beside the golden record it belongs to, its UNSPSC and HSN codes, every CPSE's stock of it, and its price history as a sparkline. |
 | ![Cluster](docs/screenshots/cluster.png) | ![Onboard](docs/screenshots/onboard.png) |
 | **Cluster.** the golden record, the template that rendered it, and which member and rule produced every fused field. | **Onboard.** upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. |
 | ![Camera input](docs/screenshots/scan.png) | ![Ask SAMAN](docs/screenshots/assistant.png) |
@@ -259,6 +261,8 @@ CPSEs. Show the encodings crossing the wire.
 | "What if it's wrong?" | Nothing auto-merges past the veto layer; every decision is reversible; the ERP write-back rolls back byte-identical. |
 | "Can I see another CPSE's prices?" | Not as a steward; you get an anonymised band. Enforced in one place so the dashboards and the Copilot cannot diverge. |
 | "Does it need the internet?" | No. `/api/health` shows which engine is live in each tier and every optional one has a working fallback. |
+| "Does it learn from us?" | Yes, and you can read the whole model. Every Workbench decision is a label; a fifteen-weight pairwise classifier trains on them, orders the grey queue by what it is least sure of, and is scored on the held-out split beside the pipeline. It never decides. |
+| "What HSN do I put on the PO?" | The item page carries the class's UNSPSC code and HSN heading with the level each was assigned at. A class default, stated as one, for the taxation cell to confirm. |
 
 ---
 
@@ -801,6 +805,48 @@ With `OLLAMA_URL` set, a local model rephrases the sentence, and only the
 sentence. If it introduces a figure that is not in the evidence, its output is
 discarded and the deterministic wording stands, the same guard the Copilot uses.
 
+### Learning from the Workbench
+
+The question every evaluator asks about an "AI" platform is whether it gets
+better with use. SAMAN's answer is a model small enough to print.
+
+Every approve and reject in the Workbench is written to `pair_label`. `make
+learn` (or **Train now** on the admin page) fits a logistic regression over
+fifteen features the pipeline already stores for each pair: the anchor, fuzzy
+and semantic scores, attribute agreement, how many identity-critical
+attributes matched, mismatched or were unknown, how many performance
+attributes sat in or out of band, whether the pair was vetoed. The result is
+`data/models/pairwise.json`: means, scales, fifteen weights and an intercept.
+No pickle, nothing a reviewer cannot read.
+
+What it is allowed to do is deliberately narrow. It **never decides**: the
+veto layer stays absolute and the pipeline's confidence stays the number a
+merge is judged by. It orders the grey queue by uncertainty (**Most
+informative first** on the Workbench) so a reviewer's next ten minutes teach
+it the most, and it shows its probability on every card beside the pipeline's,
+marked when the two disagree.
+
+It is measured where it matters. On the demo profile, with 400 labels the demo
+simulates from the **tuning split's** ground truth (`make simulate-reviews`,
+written as `source=simulated`, never a task and never the held-out split):
+
+| Held-out pairs with evidence | Learned model AUC | Pipeline confidence AUC |
+|---|---|---|
+| all bands (4,647) | **0.997** | 0.702 |
+| grey band only (698) | **0.965** | 0.222 |
+
+The grey row is the honest one: inside the grey band the pipeline's own score
+is, by construction, the least informative number on the card, and the
+reviewers' labels are what separate the pairs. The largest weights are
+attribute agreement (positive) and the veto (negative), which is the platform
+learning back what the veto layer encodes.
+
+Why this and not a fine-tuned language model: the decisions that matter are
+pairwise and attribute-driven, and fifteen weights can be audited where a 3B
+model cannot. The labelled pairs are exported as JSON lines from the admin
+page (**download the labelled corpus**), which is exactly the training set a
+future LoRA on the local LLM would need and did not exist before.
+
 ### Reading a material's marking
 
 A storekeeper holding an unlabelled part cannot type its description, but the
@@ -876,12 +922,12 @@ are kept honest; partial is marked partial.
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done.** Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
 | Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done.** duplicates P 0.997 / R 0.960; directed equivalence P 0.927 / R 0.944, direction accuracy 0.990 |
-| Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done.** deterministic rendering, 4-rule fusion, per-field provenance naming the rule that chose each value |
+| Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done.** deterministic rendering, 4-rule fusion, per-field provenance naming the rule that chose each value; every class carries its UNSPSC code and HSN heading |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done.** 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done.** `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |
 | Mapping of existing CPSE codes to the common national code | mapping block on the item page | **Done.** `/items/:id` lists every CPSE's code under one CNMC |
 | Legacy code rationalization and migration support | `app/migration.py`, `/migration` | **Done.** plan → dry-run → impact → apply → verify → rollback; open POs auto-held, rollback asserted byte-identical |
-| User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | **Done.** keyboard-first workbench over all three bands, role-gated, self-approval refused |
+| User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | **Done.** keyboard-first workbench over all three bands, role-gated, self-approval refused; every decision trains the pairwise model (`app/learn.py`), which orders the queue and never decides |
 | Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | **Done.** KPIs reconcile with `/api/metrics`; class x CPSE heatmap in grayscale |
 | Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | **Done.** tamper- and reorder-evident, verified from the UI |
 | Integration capability with SAP/ERP | `ErpAdapter` + mock ERP in `app/erp.py` | **Partial.** MARA/MAKT/EKPO/MARD/MBEW written and reversed through a named adapter contract, against a mock rather than a real SAP system |

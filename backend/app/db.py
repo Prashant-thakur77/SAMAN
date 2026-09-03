@@ -62,8 +62,19 @@ def session_scope() -> Iterator[Session]:
 
 
 def init_db() -> None:
+    from sqlalchemy import inspect, text
+
     from . import models  # noqa: F401  — register mappers before create_all
 
+    # `pair_label` gained its item columns the day it was introduced; a
+    # database from earlier that day has the old shape. Nothing else ever
+    # wrote to it, so rebuilding it loses nothing.
+    inspector = inspect(engine)
+    if "pair_label" in inspector.get_table_names():
+        columns = {c["name"] for c in inspector.get_columns("pair_label")}
+        if "item_a" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("DROP TABLE pair_label"))
     Base.metadata.create_all(bind=engine)
 
 

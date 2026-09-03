@@ -363,6 +363,11 @@ def apply_decision(
     task.state = "done"
     decision = Decision(task_id=task.id, user_id=user.id, action=action, note=note)
     db.add(decision)
+    if pair is not None and action in ("approve", "reject"):
+        # The answer is also a label: what the learned model trains on.
+        from .learn import record_label
+
+        record_label(db, pair, action == "approve", user.id)
     db.flush()
 
     audit.record(

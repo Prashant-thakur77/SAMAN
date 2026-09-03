@@ -8,7 +8,7 @@ import { Sparkline } from '../components/charts/Sparkline'
 import { CodeChip, StatusChip } from '../components/primitives/Chip'
 import { EmptyState } from '../components/primitives/EmptyState'
 import { TBody, TD, TH, THead, TR, Table } from '../components/primitives/Table'
-import { ApiError, getItem, type ItemDetail } from '../lib/api'
+import { ApiError, getItem, type ItemDetail, type StandardCode, type Standards } from '../lib/api'
 import { cn } from '../lib/cn'
 
 /**
@@ -78,6 +78,7 @@ export default function Item() {
           ) : (
             <p className="text-sm text-muted">Not yet standardized.</p>
           )}
+          <StandardsBlock standards={detail.standards} />
         </div>
       </section>
 
@@ -235,6 +236,39 @@ export default function Item() {
           </ul>
         )}
       </section>
+    </div>
+  )
+}
+
+/**
+ * The public codes a class maps to. UNSPSC is what GeM and tenders categorise
+ * by; the HSN heading is what every purchase order needs for GST. Both are
+ * class defaults with a stated level, not a per-item determination, and the
+ * block says so.
+ */
+function StandardsBlock({ standards }: { standards?: Standards }) {
+  const rows = [
+    standards?.unspsc && { scheme: 'UNSPSC', ...standards.unspsc },
+    standards?.hsn && { scheme: 'HSN', ...standards.hsn },
+  ].filter(Boolean) as (StandardCode & { scheme: string })[]
+  if (rows.length === 0) return null
+  return (
+    <div className="space-y-2 border-t border-hairline pt-3" data-testid="standards">
+      <p className="micro-label">Classification codes</p>
+      <dl className="space-y-1">
+        {rows.map((row) => (
+          <div key={row.scheme} className="flex flex-wrap items-baseline gap-x-3 text-sm">
+            <dt className="w-16 shrink-0 text-muted">{row.scheme}</dt>
+            <dd className="font-mono">{row.code}</dd>
+            <dd className="text-muted">
+              {row.title} <span className="text-xs">({row.level})</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-xs text-muted">
+        Assigned per class; confirm the HSN with your taxation cell before invoicing.
+      </p>
     </div>
   )
 }

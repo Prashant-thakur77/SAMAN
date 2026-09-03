@@ -8,15 +8,21 @@ import { TBody, TD, TH, THead, TR, Table } from '../components/primitives/Table'
 import { Toggle } from '../components/primitives/Toggle'
 import {
   ApiError,
+  CORPUS_URL,
   createUser,
   getHealthPanel,
+  getLearnStatus,
   getUsers,
   patchUser,
   setSovereign,
+  simulateLabels,
+  trainModel,
   type AdminUser,
   type HealthPanel,
+  type LearnStatus,
   type Role,
 } from '../lib/api'
+import { cn } from '../lib/cn'
 import { useSession } from '../lib/session'
 
 /**
@@ -29,6 +35,7 @@ export default function Admin() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [health, setHealth] = useState<HealthPanel | null>(null)
+  const [learn, setLearn] = useState<LearnStatus | null>(null)
   const [message, setMessage] = useState<{ tone: 'ok' | 'danger'; text: string } | null>(null)
   const [draft, setDraft] = useState({ email: '', name: '', role: 'viewer', cpse_code: '' })
   const [busy, setBusy] = useState(false)
@@ -36,10 +43,15 @@ export default function Admin() {
 
   const load = useCallback(async () => {
     try {
-      const [userList, panel] = await Promise.all([getUsers(), getHealthPanel()])
+      const [userList, panel, learned] = await Promise.all([
+        getUsers(),
+        getHealthPanel(),
+        getLearnStatus(),
+      ])
       setUsers(userList.users)
       setRoles(userList.roles)
       setHealth(panel)
+      setLearn(learned)
     } catch (err) {
       setMessage({
         tone: 'danger',
@@ -156,6 +168,10 @@ export default function Admin() {
                 : `${Math.round(health.smart_create.prevention_rate * 100)}% prevention rate`}
             </span>
           </div>
+
+          {learn && (
+            <LearnedModelPanel status={learn} busy={busy} run={run} />
+          )}
 
           <div className="flex flex-wrap items-center gap-4 card p-4">
             <StatusChip tone={health.audit.valid ? 'ok' : 'danger'}>
@@ -314,6 +330,121 @@ export default function Admin() {
           <p className="text-xs text-muted">New accounts start with the password “demo”.</p>
         </div>
       </section>
+    </div>
+  )
+}
+
+/**
+ * The platform's own local model: a pairwise classifier trained on reviewers'
+ * decisions. Its weights are shown because they are the model; there is
+ * nothing else to it. It orders the queue and offers an opinion; it never
+ * decides, and the panel says so.
+ */
+function LearnedModelPanel({
+  status,
+  busy,
+  run,
+}: {
+  status: LearnStatus
+  busy: boolean
+  run: (work: () => Promise<unknown>, success: string) => Promise<void>
+}) {
+  const model = status.model
+  const weights = model
+    ? Object.entries(model.weights).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    : []
+  const maxWeight = weights.reduce((m, [, w]) => Math.max(m, Math.abs(w)), 0) || 1
+  const pct = (value: number | null | undefined) =>
+    value === null || value === undefined ? '—' : `${(value * 100).toFixed(1)}%`
+  return (
+    <div className="space-y-4 card p-5" data-testid="learned-model">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-prose space-y-1">
+          <p className="micro-label">Learned model · trained on the Workbench</p>
+          <p className="text-sm text-muted">{status.note}</p>
+          <p className="text-xs text-muted">
+            Every approve or reject is a label. The model orders the grey queue by what it is
+            least sure of and shows its opinion on each card. It never decides; the veto layer
+            and the pipeline's confidence do.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void run(() => simulateLabels(400), 'Added 400 simulated labels.')}
+            title="Demo only: answers tuning-split pairs from the seed's ground truth. Never the held-out split."
+          >
+            Simulate reviewers
+          </Button>
+          <Button disabled={busy} onClick={() => void run(() => trainModel(), 'Model trained.')}>
+            {model ? 'Retrain' : 'Train now'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1 bg-surface p-4">
+          <p className="micro-label">labels</p>
+          <p className="font-mono text-sm">
+            {Object.values(status.labels).reduce((a, b) => a + b, 0).toLocaleString('en-IN')}
+          </p>
+          <p className="text-xs text-muted">
+            {Object.entries(status.labels)
+              .map(([source, n]) => `${n} ${source}`)
+              .join(' · ') || 'none yet'}
+          </p>
+        </div>
+        <div className="space-y-1 bg-surface p-4">
+          <p className="micro-label">cross-validated AUC</p>
+          <p className="font-mono text-sm">{pct(model?.cv.auc)}</p>
+          <p className="text-xs text-muted">
+            {model?.cv.folds ? `${model.cv.folds} folds` : 'needs 50+ labels'}
+          </p>
+        </div>
+        <div className="space-y-1 bg-surface p-4">
+          <p className="micro-label">held-out AUC · model</p>
+          <p className="font-mono text-sm">{pct(model?.holdout?.model_auc)}</p>
+          <p className="text-xs text-muted">
+            {model?.holdout ? `${model.holdout.pairs.toLocaleString('en-IN')} pairs` : '—'}
+          </p>
+        </div>
+        <div className="space-y-1 bg-surface p-4">
+          <p className="micro-label">held-out AUC · pipeline</p>
+          <p className="font-mono text-sm">{pct(model?.holdout?.pipeline_auc)}</p>
+          <p className="text-xs text-muted">same pairs, hand-tuned score</p>
+        </div>
+      </div>
+
+      {model && (
+        <div className="space-y-2">
+          <p className="micro-label">weights, standardised · the whole model</p>
+          <ul className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+            {weights.map(([name, w]) => (
+              <li key={name} className="flex items-center gap-3 text-xs">
+                <span className="w-44 shrink-0 font-mono text-muted">{name.replace(/_/g, ' ')}</span>
+                <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-accent-soft">
+                  <span
+                    className={cn('absolute top-0 h-full', w >= 0 ? 'bg-ok' : 'bg-danger')}
+                    style={{
+                      left: w >= 0 ? '50%' : `${50 - (Math.abs(w) / maxWeight) * 50}%`,
+                      width: `${(Math.abs(w) / maxWeight) * 50}%`,
+                    }}
+                  />
+                </span>
+                <span className="w-14 text-right font-mono">{w.toFixed(2)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted">
+            Trained {new Date(model.trained_at).toLocaleString('en-IN')} ·{' '}
+            <a className="underline underline-offset-2 hover:text-ink" href={CORPUS_URL}>
+              download the labelled corpus (JSONL)
+            </a>{' '}
+            · what a future fine-tune of the local language model would train on.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

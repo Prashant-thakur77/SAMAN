@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import audit, inventory, opportunity, review
+from .. import audit, inventory, learn, opportunity, review
 from ..adjudicate import adjudicate
 from ..auth import current_user_optional, require_roles, require_user
 from ..db import get_db
@@ -29,6 +29,7 @@ from ..models import (
     ReviewTask,
     User,
 )
+from ..taxonomy import get_schema
 from ..visibility import scope_for
 
 router = APIRouter(tags=["review"])
@@ -142,6 +143,9 @@ def _task_card(db: Session, task: ReviewTask, rephrase: bool = True) -> dict:
             "attribute_diff": diff,
             "agreement": attributes.get("agreement"),
             "items": [left, right],
+            # The learned model's opinion, beside the pipeline's. It never
+            # decides; it is here so a reviewer can see when the two disagree.
+            "learned": learn.score(pair),
             # Tier 3 (§0.4): a recommendation with its reasons, so the reviewer
             # starts from a position rather than from a score. It never decides.
             "adjudication": adjudicate(
@@ -168,9 +172,19 @@ def queues(
     state: str = Query(default="pending"),
     limit: int = Query(default=25, le=200),
     offset: int = 0,
+    order: str = Query(default="id"),
     db: Session = Depends(get_db),
 ) -> dict:
-    """The three band queues with their counts, and a page of cards (§6.5)."""
+    """The three band queues with their counts, and a page of cards (§6.5).
+
+    `order=uncertainty` puts the pairs the learned model is least sure about
+    first, so a reviewer's time teaches it the most. It needs a trained model;
+    without one the queue stays in id order and says so.
+    """
+    if order not in ("id", "uncertainty"):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "order must be 'id' or 'uncertainty'."
+        )
     if band is not None and band not in BANDS:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -188,13 +202,29 @@ def queues(
     query = select(ReviewTask).where(ReviewTask.state == state)
     if band:
         query = query.where(ReviewTask.band == band)
-    tasks = (
-        db.execute(query.order_by(ReviewTask.id).offset(offset).limit(limit)).scalars().all()
-    )
+    model = learn.load_model()
+    if order == "uncertainty" and model is not None:
+        # Score every pending task in the band, then page the sorted list.
+        # A few thousand pairs of stored JSON; measured in tens of milliseconds.
+        scored = []
+        for task, pair in db.execute(
+            select(ReviewTask, Pair)
+            .join(Pair, Pair.id == ReviewTask.pair_id)
+            .where(query.whereclause)
+        ).all():
+            opinion = learn.score(pair, model)
+            scored.append((opinion["uncertainty"] if opinion else -1.0, task.id, task))
+        scored.sort(key=lambda row: (-row[0], row[1]))
+        tasks = [task for _, _, task in scored[offset : offset + limit]]
+    else:
+        order = "id"
+        tasks = (
+            db.execute(query.order_by(ReviewTask.id).offset(offset).limit(limit)).scalars().all()
+        )
     total = db.execute(
         select(func.count(ReviewTask.id)).where(
             ReviewTask.state == state,
-            *( [ReviewTask.band == band] if band else [] ),
+            *([ReviewTask.band == band] if band else []),
         )
     ).scalar()
 
@@ -204,6 +234,8 @@ def queues(
         "counts": {b: counts.get(b, 0) for b in BANDS},
         "total": total,
         "offset": offset,
+        "order": order,
+        "model_available": model is not None,
         "tasks": [_task_card(db, task, rephrase=i == 0) for i, task in enumerate(tasks)],
     }
 
@@ -335,9 +367,7 @@ def audit_stream(
     if action:
         query = query.where(AuditEvent.action.like(f"{action}%"))
 
-    total = db.execute(
-        select(func.count()).select_from(query.subquery())
-    ).scalar()
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
     events = (
         db.execute(query.order_by(AuditEvent.seq.desc()).offset(offset).limit(limit))
         .scalars()
@@ -405,15 +435,22 @@ def get_item(
             select(ClusterMember.item_id).where(
                 ClusterMember.cluster_id == cluster_id, ClusterMember.item_id != item_id
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
         if cluster_id
         else []
     )
-    relations = db.execute(
-        select(Relation).where(
-            (Relation.item_a == item_id) | (Relation.item_b == item_id)
-        ).order_by(Relation.confidence.desc()).limit(25)
-    ).scalars().all()
+    relations = (
+        db.execute(
+            select(Relation)
+            .where((Relation.item_a == item_id) | (Relation.item_b == item_id))
+            .order_by(Relation.confidence.desc())
+            .limit(25)
+        )
+        .scalars()
+        .all()
+    )
 
     return {
         **card,
@@ -428,6 +465,9 @@ def get_item(
             else None
         ),
         "cnmc": {"code": code.code, "status": code.status} if code else None,
+        # Public codes the class maps to (UNSPSC for GeM and tenders, the HSN
+        # heading every PO needs), with the level each was assigned at.
+        "standards": get_schema(card["class_code"]).standards,
         "duplicates": [_item_card(db, sibling) for sibling in siblings],
         "equivalents": [
             {
@@ -439,9 +479,7 @@ def get_item(
                 "direction": relation.direction,
                 "basis": relation.basis,
                 "confidence": relation.confidence,
-                "substitutes_this": (
-                    relation.direction == "a_to_b" and relation.item_b == item_id
-                )
+                "substitutes_this": (relation.direction == "a_to_b" and relation.item_b == item_id)
                 or (relation.direction == "b_to_a" and relation.item_a == item_id),
             }
             for relation in relations

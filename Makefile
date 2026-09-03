@@ -137,6 +137,12 @@ demo:  ## Seed, run the pipeline, print the held-out metrics table
 demo-splink:  ## The same demo on the spec-named Tier-1 engine (needs make deps-optional)
 	cd backend && SAMAN_TIER1_ENGINE=splink ../$(PY) -m app.cli demo --profile demo
 
+learn:  ## Train the pairwise model on every Workbench label (writes data/models/pairwise.json)
+	cd backend && ../$(PY) -m app.cli learn
+
+simulate-reviews:  ## Demo only: label tuning-split pairs from ground truth as simulated reviewers
+	cd backend && ../$(PY) -m app.cli simulate-reviews --n 400
+
 tune:  ## Sweep match thresholds on the tuning split (never on held-out)
 	cd backend && ../$(PY) -m app.cli tune
 

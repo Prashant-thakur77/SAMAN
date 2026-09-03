@@ -154,6 +154,18 @@ TOPICS: tuple[Topic, ...] = (
         "/welcome", "Read the front page",
     ),
     Topic(
+        "learning",
+        ("does it learn", "learned model", "learn from", "does the ai learn", "get better",
+         "train the model", "trained model", "model says", "most informative", "pairwise model",
+         "seekhta hai", "sikhta hai", "fine tune", "fine-tune", "finetune"),
+        "Yes. Every approve or reject in the Workbench is a label, and a small pairwise "
+        "model trains on them: fifteen readable weights, saved as JSON. It orders the grey "
+        "queue by what it is least sure of and shows its opinion on each card beside the "
+        "pipeline's confidence. It never decides. The language model is not fine-tuned; the "
+        "labelled pairs export as the corpus that would need.",
+        "/admin", "See the learned model",
+    ),
+    Topic(
         "cnmc",
         ("cnmc", "what is the code", "national code", "check digit", "damm", "code format",
          "code kya hai"),

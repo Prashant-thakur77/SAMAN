@@ -10,7 +10,14 @@ import { useWorkbenchKeys } from '../lib/useWorkbenchKeys'
 import { Button } from '../components/primitives/Button'
 import { StatusChip } from '../components/primitives/Chip'
 import { EmptyState } from '../components/primitives/EmptyState'
-import { ApiError, getQueue, postDecision, type QueueResponse, type TaskCard } from '../lib/api'
+import {
+  ApiError,
+  getQueue,
+  postDecision,
+  type QueueOrder,
+  type QueueResponse,
+  type TaskCard,
+} from '../lib/api'
 import { cn } from '../lib/cn'
 import { decisionCardVariants } from '../lib/motion'
 import { useSession } from '../lib/session'
@@ -47,6 +54,9 @@ export default function Workbench() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [decided, setDecided] = useState<Record<number, string>>({})
+  // With a trained model, the queue can lead with the pairs it is least sure
+  // about: the reviewer's next ten minutes then teach the system the most.
+  const [order, setOrder] = useState<QueueOrder>('id')
   const reduce = useReducedMotion() ?? false
   const navigate = useNavigate()
   const { user } = useSession()
@@ -55,14 +65,14 @@ export default function Workbench() {
     async (which: Band) => {
       setError(null)
       try {
-        const next = await getQueue(which, 0, 50)
+        const next = await getQueue(which, 0, 50, order)
         setQueue(next)
         setCursor(0)
       } catch (err) {
         setError(err instanceof ApiError ? err.message : 'Could not load the queue.')
       }
     },
-    [],
+    [order],
   )
 
   useEffect(() => {
@@ -154,6 +164,22 @@ export default function Workbench() {
             <span className="font-mono text-xs">{counts[entry.key]}</span>
           </button>
         ))}
+        {queue?.model_available && (
+          <button
+            type="button"
+            onClick={() => setOrder((o) => (o === 'id' ? 'uncertainty' : 'id'))}
+            aria-pressed={order === 'uncertainty'}
+            title="Order the queue by how unsure the learned model is, so each decision teaches it the most. The model never decides."
+            className={cn(
+              'ml-auto rounded-full border px-3 py-1 text-xs',
+              order === 'uncertainty'
+                ? 'border-inverse bg-inverse text-bg'
+                : 'border-hairline text-muted hover:text-ink',
+            )}
+          >
+            Most informative first
+          </button>
+        )}
       </div>
 
       {error && (
@@ -197,6 +223,20 @@ export default function Workbench() {
               <div className="flex items-center gap-4">
                 {task.verdict === 'conflict' && (
                   <StatusChip tone="danger">Specification conflict</StatusChip>
+                )}
+                {task.learned && (
+                  <div
+                    className="text-right"
+                    title="The learned pairwise model, trained on reviewers' decisions. Shown beside the pipeline's confidence; it never decides."
+                  >
+                    <p className="micro-label">model says</p>
+                    <p className="font-mono text-sm">
+                      {Math.round(task.learned.probability * 100)}% {task.learned.leans}
+                      {!task.learned.agrees_with_pipeline && (
+                        <span className="ml-2 text-xs text-muted">disagrees</span>
+                      )}
+                    </p>
+                  </div>
                 )}
                 <div className="text-right">
                   <p className="micro-label">confidence</p>

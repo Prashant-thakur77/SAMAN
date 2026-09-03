@@ -122,6 +122,7 @@ def get_cluster(cluster_id: int, db: Session = Depends(get_db)) -> dict:
         "status": cluster.status,
         "member_count": len(members),
         "class_code": schema.code,
+        "standards": schema.standards,
         "golden": (
             {
                 "id": golden.id,

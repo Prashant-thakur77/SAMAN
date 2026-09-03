@@ -17,6 +17,9 @@ version: 1
 classes:
   bearing.ball.deep_groove:
     label: Ball bearing, deep groove
+    standards:
+      unspsc: {code: '31171504', title: 'Ball bearings', level: commodity}
+      hsn: {code: '848210', title: 'Ball bearings', level: subheading}
     noun: BEARING
     keywords: [bearing, brg, brng, bearng, ball bearing, deep groove, dgbb]
     block_on: bore_mm
@@ -34,6 +37,9 @@ classes:
 
   valve.gate:
     label: Gate valve
+    standards:
+      unspsc: {code: '40141607', title: 'Gate valves', level: commodity}
+      hsn: {code: '848180', title: 'Taps, cocks and valves: other appliances', level: subheading}
     noun: VALVE
     keywords: [valve, vlv, vv, gate valve, gt valve]
     block_on: size_nb_mm
@@ -51,6 +57,9 @@ classes:
 
   gasket.spiral_wound:
     label: Spiral-wound gasket
+    standards:
+      unspsc: {code: '31400000', title: 'Gaskets', level: family}
+      hsn: {code: '848410', title: 'Gaskets of metal sheeting combined with other material', level: subheading}
     noun: GASKET
     keywords: [gasket, gskt, gsk, spiral wound, swg]
     block_on: size_nb_mm
@@ -67,6 +76,9 @@ classes:
 
   pipe.seamless:
     label: Seamless pipe
+    standards:
+      unspsc: {code: '40171500', title: 'Commercial pipe and piping', level: class}
+      hsn: {code: '7304', title: 'Tubes and pipes, seamless, of iron or steel', level: heading}
     noun: PIPE
     keywords: [pipe, ppe, seamless, smls, tube]
     block_on: nps_mm
@@ -83,6 +95,9 @@ classes:
 
   fastener.bolt.hex:
     label: Hexagon head bolt
+    standards:
+      unspsc: {code: '31161600', title: 'Bolts', level: class}
+      hsn: {code: '731815', title: 'Other screws and bolts, with or without nuts or washers', level: subheading}
     noun: BOLT
     keywords: [bolt, blt, hex bolt, hexagon, screw, stud]
     block_on: length_mm
@@ -99,6 +114,9 @@ classes:
 
   cable.power:
     label: Power cable
+    standards:
+      unspsc: {code: '26121600', title: 'Electrical cable and accessories', level: class}
+      hsn: {code: '8544', title: 'Insulated wire and cable', level: heading}
     noun: CABLE
     keywords: [cable, cbl, wire, armoured, unarmoured, conductor]
     block_on: csa_mm2
@@ -116,6 +134,9 @@ classes:
 
   chemical.reagent:
     label: Laboratory / process chemical
+    standards:
+      unspsc: {code: '12000000', title: 'Chemicals including bio chemicals and gas materials', level: segment}
+      hsn: null  # depends on the substance (chapters 28, 29 and 38); not a class default
     noun: CHEMICAL
     keywords: [chemical, acid, caustic, solvent, reagent, hydroxide, chloride, carbonate,
                sulphuric, nitric, phosphoric, acetic, methanol, ethanol, alcohol,
@@ -139,6 +160,9 @@ classes:
 
   ppe.helmet:
     label: Safety helmet
+    standards:
+      unspsc: {code: '46181701', title: 'Hard hats', level: commodity}
+      hsn: {code: '650610', title: 'Safety headgear', level: subheading}
     noun: HELMET
     keywords: [helmet, hard hat, safety helmet, ppe, hat]
     block_on: null

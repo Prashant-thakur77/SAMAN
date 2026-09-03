@@ -20,6 +20,8 @@ from pathlib import Path
 TEST_DB = Path(tempfile.gettempdir()) / "saman-test.db"
 os.environ["SAMAN_DB_PATH"] = str(TEST_DB)
 os.environ["SAMAN_SECRET_KEY"] = "test-secret"
+# The learned model is a file; the suite must not write into data/models.
+os.environ["SAMAN_LEARN_MODEL_PATH"] = str(Path(tempfile.gettempdir()) / "saman-test-pairwise.json")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

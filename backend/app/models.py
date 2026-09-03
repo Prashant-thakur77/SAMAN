@@ -277,6 +277,31 @@ class Decision(Base):
 # --------------------------------------------------------------------------
 
 
+class PairLabel(Base):
+    """A reviewer's answer about one pair, kept as training data.
+
+    Written by every approve/reject in the Workbench (`source="reviewer"`) and,
+    for the demo, by a simulator that answers from the tuning split's ground
+    truth (`source="simulated"`). The learned model (`learn.py`) trains on
+    these; nothing else reads them. A pair may be labelled more than once; the
+    latest answer wins.
+    """
+
+    __tablename__ = "pair_label"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # The pair id at the time of the answer, for reference only: a pipeline
+    # rerun rebuilds the pair table, so the label is keyed by its two items and
+    # this column carries no foreign key.
+    pair_id: Mapped[int] = mapped_column(Integer, index=True)
+    item_a: Mapped[int] = mapped_column(ForeignKey("item.id"), index=True)
+    item_b: Mapped[int] = mapped_column(ForeignKey("item.id"), index=True)
+    label: Mapped[bool] = mapped_column(Boolean)  # True = duplicate
+    source: Mapped[str] = mapped_column(String(16), default="reviewer", index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class PurchaseHistory(Base):
     """Authoritative source for all price analytics (see the §4 data-authority note).
 

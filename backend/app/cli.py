@@ -1,8 +1,8 @@
 """Command-line entry points used by the Makefile.
 
-    python -m app.cli seed --profile demo
-    python -m app.cli pipeline
-    python -m app.cli status
+python -m app.cli seed --profile demo
+python -m app.cli pipeline
+python -m app.cli status
 """
 
 from __future__ import annotations
@@ -31,9 +31,7 @@ def cmd_seed(args: argparse.Namespace) -> int:
         summary = seed_database(db, profile=args.profile)
         from .erp import seed_from_catalogue
 
-        summary.update(
-            {f"erp_{k}": v for k, v in seed_from_catalogue(db).items()}
-        )
+        summary.update({f"erp_{k}": v for k, v in seed_from_catalogue(db).items()})
     summary["seconds"] = round(time.time() - started, 1)
     _print_table(f"SAMAN seed · {args.profile} profile", summary)
     print("\nSeeded users all use password 'demo'.")
@@ -83,6 +81,19 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
         _print_table("Smart-Create activity", seed_smart_create_activity(db))
 
+        # The learned model needs labels; stand in for reviewers on the tuning
+        # split so the demo can show a trained model and its held-out score.
+        from . import learn
+
+        _print_table(
+            "Simulated reviewer labels (tuning split only)", learn.simulate_labels(db, 400)
+        )
+        try:
+            model = learn.train(db)
+            _print_table("Learned pairwise model", _learn_summary(model))
+        except learn.NotEnoughLabels as exc:
+            print(f"  learned model: {exc}")
+
         report = compute_metrics(db)
 
     print_metrics(report)
@@ -109,16 +120,22 @@ def print_metrics(report: dict) -> None:
     print("  " + "-" * 62)
     for name, entry in report["gate"].items():
         value = "n/a" if entry["value"] is None else f"{entry['value']:.4f}"
-        print(f"  {name.replace('_', ' '):34} {value:>9} {entry['target']:>8.2f}   "
-              f"{'PASS' if entry['pass'] else 'FAIL'}")
+        print(
+            f"  {name.replace('_', ' '):34} {value:>9} {entry['target']:>8.2f}   "
+            f"{'PASS' if entry['pass'] else 'FAIL'}"
+        )
 
     print(f"\n  {'DUPLICATE DETECTION':34} {'precision':>9} {'recall':>8} {'F1':>8}")
     print("  " + "-" * 62)
     print(f"  {'pairwise':34} {dup['precision']:>9.4f} {dup['recall']:>8.4f} {dup['f1']:>8.4f}")
-    print(f"  {'B-cubed (cluster level)':34} {bcubed['precision']:>9.4f} "
-          f"{bcubed['recall']:>8.4f} {bcubed['f1']:>8.4f}")
-    print(f"  {'baseline: exact text match':34} {base['precision']:>9.4f} "
-          f"{base['recall']:>8.4f} {base['f1']:>8.4f}")
+    print(
+        f"  {'B-cubed (cluster level)':34} {bcubed['precision']:>9.4f} "
+        f"{bcubed['recall']:>8.4f} {bcubed['f1']:>8.4f}"
+    )
+    print(
+        f"  {'baseline: exact text match':34} {base['precision']:>9.4f} "
+        f"{base['recall']:>8.4f} {base['f1']:>8.4f}"
+    )
 
     veto = report["veto"]
     print("\n  VETO LAYER (planted §2A traps, held-out)")
@@ -131,8 +148,10 @@ def print_metrics(report: dict) -> None:
     print("\n  PER CLASS (worst first)")
     print("  " + "-" * 62)
     for row in report["per_class"]:
-        print(f"  {row['class_code']:34} {row['precision']:>9.4f} {row['recall']:>8.4f} "
-              f"{row['f1']:>8.4f}")
+        print(
+            f"  {row['class_code']:34} {row['precision']:>9.4f} {row['recall']:>8.4f} "
+            f"{row['f1']:>8.4f}"
+        )
     print(f"\n  Worst-performing class: {report['worst_class']}")
 
     engines = report.get("engines", {})
@@ -150,18 +169,60 @@ def print_metrics(report: dict) -> None:
     print("=" * 66)
 
 
+def _learn_summary(model) -> dict:
+    return {
+        "labels": model.n_labels,
+        "by_source": ", ".join(f"{k} {v}" for k, v in sorted(model.labels.items())),
+        "cv_auc": model.cv.get("auc"),
+        "holdout_pairs": (model.holdout or {}).get("pairs"),
+        "holdout_model_auc": (model.holdout or {}).get("model_auc"),
+        "holdout_pipeline_auc": (model.holdout or {}).get("pipeline_auc"),
+        "saved_to": str(__import__("app.learn", fromlist=["model_path"]).model_path()),
+    }
+
+
+def cmd_learn(_args: argparse.Namespace) -> int:
+    """Train the pairwise model on every label in the Workbench."""
+    from . import learn
+
+    init_db()
+    with SessionLocal() as db:
+        try:
+            model = learn.train(db)
+        except learn.NotEnoughLabels as exc:
+            print(f"!! {exc}")
+            return 1
+        _print_table("Learned pairwise model", _learn_summary(model))
+        _print_table("Weights (standardised)", model.weights())
+    return 0
+
+
+def cmd_simulate_reviews(args: argparse.Namespace) -> int:
+    """Label tuning-split pairs from ground truth, as simulated reviewers."""
+    from . import learn
+
+    init_db()
+    with SessionLocal() as db:
+        _print_table("Simulated reviewer labels", learn.simulate_labels(db, args.n))
+    return 0
+
+
 def cmd_tune(_args: argparse.Namespace) -> int:
     from .tuning import report
 
     with SessionLocal() as db:
         result = report(db)
-    print(f"\nThreshold sweep on the {result['split']} split "
-          f"(precision floor {result['precision_floor']})")
+    print(
+        f"\nThreshold sweep on the {result['split']} split "
+        f"(precision floor {result['precision_floor']})"
+    )
     print(f"{'T_HIGH':>8} {'precision':>10} {'recall':>8} {'F1':>8} {'clusters':>9}")
     for row in result["sweep"]:
         mark = "  <-- recommended" if row["threshold"] == result["recommended_T_HIGH"] else ""
-        print(f"{row['threshold']:>8} {row['precision']:>10.4f} {row['recall']:>8.4f} "
-              f"{row['f1']:>8.4f} {row['clusters']:>9,}{mark}")
+        print(
+            f"{row['threshold']:>8} {row['precision']:>10.4f} {row['recall']:>8.4f} "
+            f"{row['f1']:>8.4f} {row['clusters']:>9,}{mark}"
+        )
     print(f"\nRecommended T_HIGH = {result['recommended_T_HIGH']}")
     print(result["note"])
     return 0
@@ -208,6 +269,15 @@ def main(argv: list[str] | None = None) -> int:
     demo = sub.add_parser("demo", help="seed, run the pipeline, print metrics")
     demo.add_argument("--profile", choices=sorted(PROFILES), default="demo")
     demo.set_defaults(func=cmd_demo)
+
+    learn_cmd = sub.add_parser("learn", help="train the pairwise model on Workbench labels")
+    learn_cmd.set_defaults(func=cmd_learn)
+
+    simulate = sub.add_parser(
+        "simulate-reviews", help="label tuning-split pairs from ground truth (demo only)"
+    )
+    simulate.add_argument("--n", type=int, default=400)
+    simulate.set_defaults(func=cmd_simulate_reviews)
 
     tune = sub.add_parser("tune", help="sweep match thresholds on the tuning split")
     tune.set_defaults(func=cmd_tune)

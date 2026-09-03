@@ -165,6 +165,15 @@ export type TaskCard = {
   attribute_diff?: AttrDiff[]
   agreement?: number
   items?: [ItemCard, ItemCard]
+  /** The learned pairwise model's opinion. It never decides. */
+  learned?: LearnedOpinion | null
+}
+
+export type LearnedOpinion = {
+  probability: number
+  leans: 'duplicate' | 'distinct'
+  agrees_with_pipeline: boolean
+  uncertainty: number
 }
 
 export type QueueResponse = {
@@ -172,13 +181,49 @@ export type QueueResponse = {
   counts: { high: number; grey: number; low: number }
   total: number
   offset: number
+  order?: 'id' | 'uncertainty'
+  model_available?: boolean
   tasks: TaskCard[]
 }
 
-export const getQueue = (band?: string, offset = 0, limit = 25) =>
+export type QueueOrder = 'id' | 'uncertainty'
+
+export const getQueue = (band?: string, offset = 0, limit = 25, order: QueueOrder = 'id') =>
   api.get<QueueResponse>(
-    `/queues?limit=${limit}&offset=${offset}${band ? `&band=${band}` : ''}`,
+    `/queues?limit=${limit}&offset=${offset}&order=${order}${band ? `&band=${band}` : ''}`,
   )
+
+// ---- learning from the Workbench ----
+
+export type LearnStatus = {
+  trained: boolean
+  model: {
+    trained_at: string
+    n_labels: number
+    labels: Record<string, number>
+    features: string[]
+    weights: Record<string, number>
+    cv: { folds: number; auc: number | null; precision: number | null; recall: number | null }
+    holdout: {
+      pairs: number
+      positives?: number
+      model_auc: number | null
+      pipeline_auc: number | null
+    } | null
+    path: string
+  } | null
+  labels: Record<string, number>
+  labels_since_training: number
+  min_labels: number
+  decides: false
+  note: string
+}
+
+export const getLearnStatus = () => api.get<LearnStatus>('/learn/status')
+export const trainModel = () => api.post<LearnStatus>('/learn/train')
+export const simulateLabels = (n: number) =>
+  api.post<LearnStatus & { simulated: { added: number } }>('/learn/simulate', { n })
+export const CORPUS_URL = '/api/learn/corpus'
 
 export const postDecision = (body: {
   task_id: number
@@ -197,11 +242,16 @@ export type Provenance = {
   candidates: { value: string; member_id: number; source: string }[]
 }
 
+/** A class-level public code and the level it was assigned at. */
+export type StandardCode = { code: string; title: string; level: string }
+export type Standards = { unspsc?: StandardCode; hsn?: StandardCode }
+
 export type ClusterDetail = {
   cluster_id: number
   status: string
   member_count: number
   class_code: string
+  standards: Standards
   golden: {
     id: number
     std_description: string
@@ -267,6 +317,7 @@ export type PurchaseTrend = {
 export type ItemDetail = ItemCard & {
   golden: { id: number; std_description: string; status: string; attrs: Record<string, unknown> } | null
   cnmc: { code: string; status: string } | null
+  standards: Standards
   cluster: { id: number; status: string } | null
   duplicates: ItemCard[]
   equivalents: {

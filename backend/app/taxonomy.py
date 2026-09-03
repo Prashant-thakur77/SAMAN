@@ -6,7 +6,7 @@ extractor, the veto layer and the description renderer all see one definition.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -50,6 +50,11 @@ class ClassSchema:
     max_len: int
     block_on: str | None
     attributes: dict[str, AttrSpec]
+    #: Public classification codes the class maps to: UNSPSC (what GeM and
+    #: tenders categorise by) and the HSN heading every PO needs for GST. Each
+    #: carries the level it was assigned at, so a family-level UNSPSC or a
+    #: four-digit HSN heading is never mistaken for a per-item determination.
+    standards: dict[str, dict] = field(default_factory=dict)
 
     def by_role(self, role: str) -> list[AttrSpec]:
         return [a for a in self.attributes.values() if a.role == role]
@@ -61,6 +66,27 @@ class ClassSchema:
     @property
     def performance(self) -> list[AttrSpec]:
         return self.by_role("performance")
+
+
+UNSPSC_LEVELS = ("segment", "family", "class", "commodity")
+HSN_LEVELS = ("heading", "subheading")
+
+
+def _parse_standards(raw: dict[str, Any] | None) -> dict[str, dict]:
+    """Validate the class's public codes; a wrong-length code is a data error."""
+    out: dict[str, dict] = {}
+    schemes = (("unspsc", UNSPSC_LEVELS, (8,)), ("hsn", HSN_LEVELS, (4, 6, 8)))
+    for scheme, levels, lengths in schemes:
+        entry = (raw or {}).get(scheme)
+        if not entry:
+            continue
+        code = str(entry.get("code", ""))
+        if not code.isdigit() or len(code) not in lengths:
+            raise ValueError(f"{scheme} code {code!r} is not {'/'.join(map(str, lengths))} digits")
+        if entry.get("level") not in levels:
+            raise ValueError(f"{scheme} level {entry.get('level')!r} not in {levels}")
+        out[scheme] = {"code": code, "title": str(entry.get("title", "")), "level": entry["level"]}
+    return out
 
 
 def _parse_attr(name: str, raw: dict[str, Any]) -> AttrSpec:
@@ -101,6 +127,7 @@ def load_schemas() -> dict[str, ClassSchema]:
             max_len=int(raw.get("max_len", 120)),
             block_on=block_on,
             attributes=attrs,
+            standards=_parse_standards(raw.get("standards")),
         )
     if UNCLASSIFIED not in out:
         raise ValueError("classes.yaml must define an 'unclassified' fallback class")
