@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import erp, migration, visibility
+from .. import audit, erp, migration, visibility
 from ..auth import require_roles
 from ..db import get_db
 from ..models import User
@@ -62,6 +62,8 @@ def erp_state(
     return {
         "system": "mock SAP (MARA / MAKT / EKPO / MARD / MBEW)",
         "database": str(erp.erp_path()),
+        # Which door is open on this machine (docs/sap-integration.md).
+        "adapter": erp.adapter_status(),
         "counts": counts,
         "materials_blocked": blocked,
         "materials_cross_referenced": coded,
@@ -148,3 +150,32 @@ def batch_detail(
         return migration.batch_detail(db, batch_id)
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@router.get("/loadfiles")
+def loadfiles(
+    user: Annotated[User, Depends(require_roles(*REGISTRAR))],
+    cluster_ids: str | None = Query(default=None, description="comma-separated"),
+    db: Session = Depends(get_db),
+) -> Response:
+    """The dry run as SAP load files: a zip for an LSMW or LTMC rollout."""
+    ids = [int(x) for x in cluster_ids.split(",") if x.strip()] if cluster_ids else None
+    planned = migration.dry_run(db, ids)
+    data = migration.load_files(db, planned)
+    audit.record(
+        db,
+        action="migration.loadfiles",
+        entity="erp",
+        payload={
+            "clusters": planned.get("clusters", 0),
+            "would_apply": planned.get("would_apply", 0),
+            "would_hold": planned.get("would_hold", 0),
+            "erp_fingerprint": planned.get("erp_fingerprint"),
+        },
+        user=user.email,
+    )
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="saman-sap-loadfiles.zip"'},
+    )

@@ -710,7 +710,18 @@ export type MigrationPlan = {
   note: string
 }
 
+export type ErpAdapterStatus = {
+  requested: string
+  mode: 'mock' | 'rfc'
+  engine: string
+  degraded: boolean
+  note: string
+}
+
+export const LOADFILES_URL = '/api/migration/loadfiles'
+
 export type ErpState = {
+  adapter: ErpAdapterStatus
   system: string
   database: string
   counts: Record<string, number>

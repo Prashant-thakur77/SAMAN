@@ -26,18 +26,20 @@ def migratable(pipeline_run):
         erp.seed_from_catalogue(db)
 
     with TestClient(app) as client:
-        client.post(
-            "/api/auth/login", json={"email": "registrar@min.gov.in", "password": "demo"}
-        )
+        client.post("/api/auth/login", json={"email": "registrar@min.gov.in", "password": "demo"})
         with SessionLocal() as db:
-            golden_ids = db.execute(
-                select(GoldenRecord.id)
-                .join(ClusterMember, ClusterMember.cluster_id == GoldenRecord.cluster_id)
-                .where(GoldenRecord.status == "draft")
-                .group_by(GoldenRecord.id)
-                .having(func.count() >= 2)
-                .limit(8)
-            ).scalars().all()
+            golden_ids = (
+                db.execute(
+                    select(GoldenRecord.id)
+                    .join(ClusterMember, ClusterMember.cluster_id == GoldenRecord.cluster_id)
+                    .where(GoldenRecord.status == "draft")
+                    .group_by(GoldenRecord.id)
+                    .having(func.count() >= 2)
+                    .limit(8)
+                )
+                .scalars()
+                .all()
+            )
         for golden_id in golden_ids:
             client.post(f"/api/cnmc/issue/{golden_id}")
     return len(golden_ids)
@@ -103,9 +105,10 @@ class TestMockErp:
         after = adapter.read_masters([matnr])[matnr]
         assert after["lvorm"] == "X" and after["zz_supersedes"] == "SURVIVOR-1"
         with erp.connect() as conn:
-            assert conn.execute(
-                "SELECT COUNT(*) FROM mara WHERE matnr = ?", (matnr,)
-            ).fetchone()[0] == 1
+            assert (
+                conn.execute("SELECT COUNT(*) FROM mara WHERE matnr = ?", (matnr,)).fetchone()[0]
+                == 1
+            )
         adapter.restore(matnr, before)
 
 
@@ -228,10 +231,12 @@ class TestApplyAndRollback:
         result = migration.apply(db, registrar)
         try:
             applied = db.execute(
-                select(MigrationChange).where(
+                select(MigrationChange)
+                .where(
                     MigrationChange.batch_id == result["batch_id"],
                     MigrationChange.state == migration.STATE_APPLIED,
-                ).limit(1)
+                )
+                .limit(1)
             ).scalar_one()
             erp.MockErpAdapter().write_crossref(applied.erp_key, "TAMPERED-000-000001-1")
             report = migration.verify(db, result["batch_id"])
@@ -318,11 +323,7 @@ class TestApplyAndRollback:
 
         assert erp.fingerprint() == bulk_fingerprint
         adapter.restore_many(
-            [
-                (c["matnr"], c["before"])
-                for c in preview["changes"]
-                if c["will_apply"]
-            ]
+            [(c["matnr"], c["before"]) for c in preview["changes"] if c["will_apply"]]
         )
         assert erp.fingerprint() == baseline
 
@@ -393,3 +394,33 @@ class TestMigrationApi:
             assert detail["changes"] and detail["verification"]["in_sync"]
         finally:
             as_registrar.post(f"/api/migration/rollback/{applied['batch_id']}")
+
+
+class TestLoadFiles:
+    """The first rollout goes in as load files a basis team applies."""
+
+    def test_the_zip_matches_the_dry_run(self, migratable, as_registrar):
+        import csv
+        import io
+        import zipfile
+
+        preview = as_registrar.post("/api/migration/dryrun", json={"limit": 2000}).json()
+        response = as_registrar.get("/api/migration/loadfiles")
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"].startswith("application/zip")
+        archive = zipfile.ZipFile(io.BytesIO(response.content))
+        assert {"crossref.csv", "block.csv", "held.csv", "README.txt"} <= set(archive.namelist())
+
+        def rows(name):
+            return list(csv.DictReader(io.TextIOWrapper(archive.open(name), encoding="utf-8")))
+
+        crossref, block, held = rows("crossref.csv"), rows("block.csv"), rows("held.csv")
+        assert len(crossref) + len(block) == preview["would_apply"]
+        assert len(held) == preview["would_hold"]
+        assert all(row["ZZ_CNMC"] for row in crossref)
+        assert all(len(row["UNSPSC"]) in (0, 8) for row in crossref)
+        assert all(row["LVORM"] == "X" and row["ZZ_SUPERSEDES"] for row in block)
+        assert "Blocked, never deleted" in archive.read("README.txt").decode()
+
+    def test_only_a_registrar_may_download(self, migratable, as_steward):
+        assert as_steward.get("/api/migration/loadfiles").status_code == 403

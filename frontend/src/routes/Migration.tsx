@@ -12,6 +12,7 @@ import {
   ApiError,
   getBatchDetail,
   getErpState,
+  LOADFILES_URL,
   getMigrationBatches,
   migrationApply,
   migrationDryRun,
@@ -142,6 +143,20 @@ export default function Migration() {
           <p className="max-w-prose text-xs text-muted">
             {erp.system} · {erp.note}
           </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 card p-4">
+            <div className="space-y-1">
+              <p className="micro-label">Connector</p>
+              <p className="font-mono text-sm">{erp.adapter.engine}</p>
+              <p className="max-w-prose text-xs text-muted">{erp.adapter.note}</p>
+            </div>
+            <a
+              href={LOADFILES_URL}
+              className="rounded-full border border-hairline px-4 py-2 text-sm hover:bg-accent-soft"
+              title="The dry run as crossref.csv, block.csv and held.csv in SAP field names, for an LSMW or LTMC rollout by the basis team. Registrar only."
+            >
+              Download SAP load files
+            </a>
+          </div>
           <p className="break-all font-mono text-[11px] text-muted">
             state {erp.fingerprint.slice(0, 24)}…
           </p>

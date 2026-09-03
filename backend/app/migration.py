@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import audit
-from .erp import MockErpAdapter, fingerprint
+from .erp import fingerprint, get_adapter
 from .models import (
     ClusterMember,
     Cnmc,
@@ -102,7 +102,7 @@ def plan(db: Session, cluster_ids: list[int] | None = None, adapter=None) -> dic
     are blocked against it. The survivor is the row with the most stock, because
     that is the record the organisation is actually transacting on.
     """
-    adapter = adapter or MockErpAdapter()
+    adapter = adapter or get_adapter()
     coded = _coded_clusters(db, cluster_ids)
     if not coded:
         return {
@@ -244,7 +244,7 @@ def paginate(planned: dict, limit: int | None = DEFAULT_PAGE, offset: int = 0) -
 
 def dry_run(db: Session, cluster_ids: list[int] | None = None, adapter=None) -> dict:
     """The plan, plus the per-record diff the apply would write (§2C)."""
-    adapter = adapter or MockErpAdapter()
+    adapter = adapter or get_adapter()
     planned = plan(db, cluster_ids, adapter)
     for change in planned["changes"]:
         before = change["before"]
@@ -279,7 +279,7 @@ def apply(
     Idempotent: a change whose after-image already matches the ERP is recorded
     as applied without writing again, so a retried batch cannot double-apply.
     """
-    adapter = adapter or MockErpAdapter()
+    adapter = adapter or get_adapter()
     preview = dry_run(db, cluster_ids, adapter)
     before_fingerprint = preview["erp_fingerprint"]
 
@@ -397,16 +397,20 @@ def _restore(adapter, rows: list[tuple[str, dict]]) -> None:
 
 def rollback(db: Session, batch_id: int, user: User, adapter=None) -> dict:
     """Restore every applied row in a batch from its before-image (§2C)."""
-    adapter = adapter or MockErpAdapter()
+    adapter = adapter or get_adapter()
     batch = db.get(MigrationBatch, batch_id)
     if batch is None:
         raise ValueError(f"no migration batch {batch_id}")
 
-    changes = db.execute(
-        select(MigrationChange).where(
-            MigrationChange.batch_id == batch_id, MigrationChange.state == STATE_APPLIED
+    changes = (
+        db.execute(
+            select(MigrationChange).where(
+                MigrationChange.batch_id == batch_id, MigrationChange.state == STATE_APPLIED
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     before_fingerprint = fingerprint()
     _restore(adapter, [(c.erp_key, json.loads(c.before_json or "{}")) for c in changes])
@@ -438,10 +442,12 @@ def rollback(db: Session, batch_id: int, user: User, adapter=None) -> dict:
 
 def verify(db: Session, batch_id: int, adapter=None) -> dict:
     """Re-diff a batch against the ERP: is it still in the state we wrote?"""
-    adapter = adapter or MockErpAdapter()
-    changes = db.execute(
-        select(MigrationChange).where(MigrationChange.batch_id == batch_id)
-    ).scalars().all()
+    adapter = adapter or get_adapter()
+    changes = (
+        db.execute(select(MigrationChange).where(MigrationChange.batch_id == batch_id))
+        .scalars()
+        .all()
+    )
     if not changes:
         return {"batch_id": batch_id, "checked": 0, "in_sync": True, "drifted": []}
 
@@ -449,9 +455,7 @@ def verify(db: Session, batch_id: int, adapter=None) -> dict:
     drifted = []
     checked = 0
     for change in changes:
-        expected_json = (
-            change.after_json if change.state == STATE_APPLIED else change.before_json
-        )
+        expected_json = change.after_json if change.state == STATE_APPLIED else change.before_json
         if not expected_json:
             continue
         checked += 1
@@ -496,11 +500,15 @@ def batch_detail(db: Session, batch_id: int) -> dict:
     batch = db.get(MigrationBatch, batch_id)
     if batch is None:
         raise ValueError(f"no migration batch {batch_id}")
-    changes = db.execute(
-        select(MigrationChange)
-        .where(MigrationChange.batch_id == batch_id)
-        .order_by(MigrationChange.id)
-    ).scalars().all()
+    changes = (
+        db.execute(
+            select(MigrationChange)
+            .where(MigrationChange.batch_id == batch_id)
+            .order_by(MigrationChange.id)
+        )
+        .scalars()
+        .all()
+    )
     return {
         "id": batch.id,
         "status": batch.status,
@@ -517,3 +525,103 @@ def batch_detail(db: Session, batch_id: int) -> dict:
         ],
         "verification": verify(db, batch_id),
     }
+
+
+# --------------------------------------------------------------------------
+# Load files: the first rollout, applied by a basis team (docs/sap-integration.md)
+# --------------------------------------------------------------------------
+
+LOADFILE_README = """SAMAN -> SAP load files
+=======================
+
+Generated from a dry run of the migration plan. One row per planned change,
+in SAP field names, for an LSMW recording or an LTMC (Migration Cockpit)
+project. Map the columns once; every later batch uses the same layout.
+
+crossref.csv  {crossref} surviving masters
+    MATNR            the material that keeps transacting
+    ZZ_CNMC          the national code (append field on MARA, CHAR 20)
+    UNSPSC, HSN      the class's public codes, for classification and GST
+    CNMC_DESCRIPTION the standardised description (MAKT, if the site adopts it)
+
+block.csv     {block} superseded materials
+    MATNR            the material being retired
+    LVORM            X: deletion flag set. Blocked, never deleted.
+    ZZ_SUPERSEDES    the surviving master (append field on MARA, CHAR 18)
+    ZZ_CNMC          the national code, so a blocked row still resolves
+
+held.csv      {held} rows NOT to load
+    Materials with open purchase order lines, or a valuation the plan holds
+    for review. Resolve them in SAMAN and export again.
+
+After loading, run Verify on SAMAN's Migration screen: it re-reads the ERP
+against the journal and reports any drift.
+"""
+
+
+def load_files(db: Session, planned: dict) -> bytes:
+    """A zip of the dry run's changes as CSVs in SAP field names."""
+    import csv
+    import io
+    import zipfile
+
+    from .taxonomy import get_schema
+
+    changes = planned.get("changes", [])
+    cluster_ids = {c["cluster_id"] for c in changes}
+    info: dict[int, tuple[str, dict]] = {}
+    if cluster_ids:
+        rows = db.execute(
+            select(GoldenRecord.cluster_id, GoldenRecord.std_description, Item.class_code)
+            .join(ClusterMember, ClusterMember.cluster_id == GoldenRecord.cluster_id)
+            .join(Item, Item.id == ClusterMember.item_id)
+            .where(GoldenRecord.cluster_id.in_(cluster_ids))
+        ).all()
+        for cluster_id, text, class_code in rows:
+            info.setdefault(cluster_id, (text, get_schema(class_code).standards))
+
+    crossref, block, held = io.StringIO(), io.StringIO(), io.StringIO()
+    w_cross = csv.writer(crossref)
+    w_block = csv.writer(block)
+    w_held = csv.writer(held)
+    w_cross.writerow(["MATNR", "ZZ_CNMC", "UNSPSC", "HSN", "CNMC_DESCRIPTION"])
+    w_block.writerow(["MATNR", "LVORM", "ZZ_SUPERSEDES", "ZZ_CNMC"])
+    w_held.writerow(["MATNR", "ACTION", "IMPACT", "OPEN_PO_LINES", "OPEN_QTY", "ZZ_CNMC"])
+    counts = {"crossref": 0, "block": 0, "held": 0}
+    for change in changes:
+        will_apply = change.get("will_apply", change.get("impact") == IMPACT_SAFE)
+        if not will_apply:
+            w_held.writerow(
+                [
+                    change["matnr"],
+                    change["action"],
+                    change["impact"],
+                    change.get("open_po_lines", 0),
+                    change.get("open_qty", 0),
+                    change["cnmc"],
+                ]
+            )
+            counts["held"] += 1
+        elif change["action"] == "crossref":
+            text, standards = info.get(change["cluster_id"], ("", {}))
+            w_cross.writerow(
+                [
+                    change["matnr"],
+                    change["cnmc"],
+                    (standards.get("unspsc") or {}).get("code", ""),
+                    (standards.get("hsn") or {}).get("code", ""),
+                    text,
+                ]
+            )
+            counts["crossref"] += 1
+        else:
+            w_block.writerow([change["matnr"], "X", change["surviving_matnr"], change["cnmc"]])
+            counts["block"] += 1
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("crossref.csv", crossref.getvalue())
+        archive.writestr("block.csv", block.getvalue())
+        archive.writestr("held.csv", held.getvalue())
+        archive.writestr("README.txt", LOADFILE_README.format(**counts))
+    return buffer.getvalue()

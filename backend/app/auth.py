@@ -17,7 +17,7 @@ import os
 import time
 from typing import Annotated
 
-from fastapi import Cookie, Depends, HTTPException, Response, status
+from fastapi import Cookie, Depends, Header, HTTPException, Response, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -108,11 +108,39 @@ def _user_from_token(token: str | None, db: Session) -> User | None:
 # --------------------------------------------------------------------------
 
 
+def api_keys() -> dict[str, str]:
+    """key -> user email, from SAMAN_API_KEYS ("email=key,email2=key2")."""
+    out: dict[str, str] = {}
+    for entry in (get_settings().saman_api_keys or "").split(","):
+        email, _, key = entry.strip().partition("=")
+        if email and key:
+            out[key] = email.strip().lower()
+    return out
+
+
+def _user_from_api_key(key: str | None, db: Session) -> User | None:
+    """A machine caller (the SAP-side hook) acting as a named user.
+
+    Compared in constant time against every configured key, so a wrong key
+    costs the same as a right one."""
+    if not key:
+        return None
+    email = None
+    for candidate, owner in api_keys().items():
+        if hmac.compare_digest(candidate, key):
+            email = owner
+    if email is None:
+        return None
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    return user if user and user.active else None
+
+
 def current_user_optional(
     saman_session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+    saman_key: Annotated[str | None, Header(alias="X-SAMAN-Key")] = None,
     db: Session = Depends(get_db),
 ) -> User | None:
-    return _user_from_token(saman_session, db)
+    return _user_from_token(saman_session, db) or _user_from_api_key(saman_key, db)
 
 
 def require_user(user: Annotated[User | None, Depends(current_user_optional)]) -> User:

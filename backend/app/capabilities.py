@@ -52,6 +52,10 @@ class Capabilities:
     ocr_mode: str = "absent"
     stt_mode: str = "absent"
     tts_mode: str = "absent"
+    #: "mock" | "rfc": which ERP door is open (docs/sap-integration.md).
+    erp_mode: str = "mock"
+    erp_engine: str = ""
+    erp_degraded: bool = False
     degraded: list[str] = field(default_factory=list)
     #: True when Tier 1 is on the fallback because an operator chose it, not
     #: because splink is missing. A deliberate choice is not a degradation, and
@@ -100,6 +104,11 @@ class Capabilities:
                 "mode": self.tts_mode,
                 "engine": "piper (local, CPU)" if self.tts_mode != "absent" else "none",
                 "available": self.tts_mode != "absent",
+            },
+            "erp": {
+                "mode": self.erp_mode,
+                "engine": self.erp_engine,
+                "degraded": self.erp_degraded,
             },
             "sovereign_mode": self.sovereign_mode,
             "degraded": self.degraded,
@@ -162,9 +171,13 @@ def detect() -> Capabilities:
             "local speech recognition absent (make deps-stt); voice falls back to the browser"
         )
     if ocr == "absent":
-        notes.append(
-            "OCR reader not installed — Smart-Create accepts typed descriptions only"
-        )
+        notes.append("OCR reader not installed — Smart-Create accepts typed descriptions only")
+
+    from . import erp as _erp
+
+    erp_status = _erp.adapter_status()
+    if erp_status["degraded"]:
+        degraded.append(erp_status["note"])
 
     if settings.llm_enabled:
         llm = "ollama"
@@ -182,6 +195,9 @@ def detect() -> Capabilities:
         ocr_mode=ocr,
         stt_mode=stt_mode,
         tts_mode=tts_mode,
+        erp_mode=erp_status["mode"],
+        erp_engine=erp_status["engine"],
+        erp_degraded=erp_status["degraded"],
         sovereign_mode=sovereign,
         # Notes about deliberate choices are worth showing on the health panel,
         # but they are not degradations and must not be counted as such.

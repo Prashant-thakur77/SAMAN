@@ -52,6 +52,21 @@ class Settings(BaseSettings):
     ollama_url: str | None = None
     ollama_model: str = "qwen2.5:3b"
 
+    # ERP adapter (docs/sap-integration.md). "mock" ships with the demo; "rfc"
+    # needs pyrfc and the SAP NetWeaver RFC SDK and falls back to the mock,
+    # with a note at /api/health, when either is missing.
+    saman_erp_adapter: str = "mock"
+    sap_ashost: str | None = None
+    sap_sysnr: str = "00"
+    sap_client: str = "100"
+    sap_user: str | None = None
+    sap_passwd: str | None = None
+    sap_cnmc_field: str = "ZZ_CNMC"
+    sap_supersedes_field: str = "ZZ_SUPERSEDES"
+    #: Machine access for the SAP-side hook: "email=key,email2=key2". A key acts
+    #: as the named user, so every call is attributed and scoped like a person's.
+    saman_api_keys: str = ""
+
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

@@ -220,7 +220,8 @@ TOPICS: tuple[Topic, ...] = (
     Topic(
         "migration_topic",
         ("how does migration work", "what is migration", "rollback", "roll back", "open po",
-         "open purchase order", "held", "block", "never deleted", "sap"),
+         "open purchase order", "held", "block", "never deleted", "sap", "sap integration",
+         "how does sap", "load file", "lsmw", "ltmc", "bapi", "rfc", "connect to sap"),
         "Plan, dry run, impact, apply, verify, roll back, against the ERP's MARA, MAKT, EKPO, "
         "MARD and MBEW. Records with open purchase orders are held automatically. A "
         "superseded material is blocked, never deleted, and rollback restores the ERP "

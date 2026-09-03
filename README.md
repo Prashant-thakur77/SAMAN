@@ -709,6 +709,22 @@ A plan names every duplicate nationally, which would otherwise hand a steward a
 competitor's stock valuation, so it goes through the same §0.9b visibility gate
 as the dashboards and the Copilot: the rows stay, the money is withheld.
 
+**Three doors into a real SAP system**, documented in
+[docs/sap-integration.md](docs/sap-integration.md). The first rollout goes in
+as **load files**: the dry run downloads as `crossref.csv`, `block.csv` and
+`held.csv` in SAP field names, for an LSMW recording or an LTMC project run by
+the basis team in a maintenance window. Ongoing batches go through the
+**RFC adapter** (`RfcErpAdapter`, `SAMAN_ERP_ADAPTER=rfc`): `RFC_READ_TABLE`
+for the reads, `BAPI_MATERIAL_SAVEDATA` for the deletion flag and the two
+customer fields that carry the national code, one `BAPI_TRANSACTION_COMMIT`
+per batch. It implements the same eight-operation contract as the mock, is
+tested against a fake connection that records every call, and has not been run
+against a live SAP system, which the docs say plainly; without `pyrfc` it
+falls back to the mock and says so at `/api/health`. The third door is a
+**hook at material creation**: a BAdI on the material master save calls
+Smart-Create's check with an API key (`SAMAN_API_KEYS`, sent as
+`X-SAMAN-Key`), so the duplicate is caught inside MM01 rather than after it.
+
 ### Stopping duplicates being created
 
 Every other part of SAMAN cleans up duplicates that already exist. Smart-Create
@@ -930,7 +946,7 @@ are kept honest; partial is marked partial.
 | User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | **Done.** keyboard-first workbench over all three bands, role-gated, self-approval refused; every decision trains the pairwise model (`app/learn.py`), which orders the queue and never decides |
 | Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | **Done.** KPIs reconcile with `/api/metrics`; class x CPSE heatmap in grayscale |
 | Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | **Done.** tamper- and reorder-evident, verified from the UI |
-| Integration capability with SAP/ERP | `ErpAdapter` + mock ERP in `app/erp.py` | **Partial.** MARA/MAKT/EKPO/MARD/MBEW written and reversed through a named adapter contract, against a mock rather than a real SAP system |
+| Integration capability with SAP/ERP | `ErpAdapter`, mock ERP and `RfcErpAdapter` in `app/erp.py`; load files; API-key hook; [docs/sap-integration.md](docs/sap-integration.md) | **Partial.** MARA/MAKT/EKPO/MARD/MBEW written and reversed through a named adapter contract. Three doors built: load files for LSMW/LTMC, an RFC adapter over BAPIs tested against a recorded fake, and an API-key hook for a BAdI at material creation. No live SAP system has been connected |
 | Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | **Done.** 12-month demand windows, price-per-base-unit variance, vendor overlap, last-price trend |
 | Units of measurement harmonization | base UoM + `pack_qty` in `app/normalize.py` | **Done.** pack size extracted, UoM canonicalized, unit-aware comparison via `pint` |
 | Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done.** one position across 11,778 rows; 30 transfer suggestions avoiding ₹19.3 Cr of purchase, 2,028 dead-stock materials worth ₹1,538 Cr |

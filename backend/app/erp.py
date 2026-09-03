@@ -337,8 +337,18 @@ def seed_from_catalogue(db, path: Path | None = None, open_po_rate: float = 0.12
 
     mara, makt, mard, mbew, ekpo = [], [], [], [], []
     for n, row in enumerate(rows):
-        (code, description, uom, plant, price, raw_qty, cpse,
-         stock_qty, unit_value, stock_plant) = row
+        (
+            code,
+            description,
+            uom,
+            plant,
+            price,
+            raw_qty,
+            cpse,
+            stock_qty,
+            unit_value,
+            stock_plant,
+        ) = row
         matnr = f"{cpse}-{code}"
         # A catalogue row that never reached the pipeline has no stock row; fall
         # back to its own snapshot rather than reporting the material as empty.
@@ -352,9 +362,7 @@ def seed_from_catalogue(db, path: Path | None = None, open_po_rate: float = 0.12
         # A minority of materials carry an open purchase order. Those are the
         # records a consolidation must hold back rather than change underneath.
         if rng.random() < open_po_rate:
-            ekpo.append(
-                (f"45{n:08d}", 10, matnr, 100.0, float(rng.randint(1, 80)), value)
-            )
+            ekpo.append((f"45{n:08d}", 10, matnr, 100.0, float(rng.randint(1, 80)), value))
 
     with connect(path) as conn:
         for table in TABLES:
@@ -376,4 +384,315 @@ def seed_from_catalogue(db, path: Path | None = None, open_po_rate: float = 0.12
         "stock_rows": len(mard),
         "valuation_rows": len(mbew),
         "open_po_lines": len(ekpo),
+    }
+
+
+# --------------------------------------------------------------------------
+# The SAP door: BAPIs over RFC (docs/sap-integration.md)
+# --------------------------------------------------------------------------
+
+
+class ErpUnavailable(RuntimeError):
+    """The requested ERP adapter cannot be used on this machine."""
+
+
+#: MATNR is CHAR 18; the two customer fields on the MARA append structure are
+#: CHAR 20 and CHAR 18 in the convention this project documents. BAPI_TE_MARA
+#: is positional, so the widths are part of the contract.
+MATNR_WIDTH = 18
+CNMC_WIDTH = 20
+SUPERSEDES_WIDTH = 18
+#: RFC_READ_TABLE takes its WHERE clause as 72-character lines; one material
+#: per line keeps every line short and every batch bounded.
+RFC_BATCH = 50
+
+
+def _chunks(values: list, size: int):
+    for start in range(0, len(values), size):
+        yield values[start : start + size]
+
+
+def _num(text: str | None) -> float:
+    try:
+        return float((text or "0").replace(",", "").strip() or 0)
+    except ValueError:
+        return 0.0
+
+
+def _value_part(matnr: str, cnmc: str | None, supersedes: str | None, flags: bool) -> str:
+    """One BAPI_TE_MARA (or MARAX) row: material, then the append fields in order.
+
+    With ``flags`` the row is the X-structure: a mark per field that is to be
+    written, so a field can be cleared as well as set."""
+    if flags:
+        return (
+            matnr.ljust(MATNR_WIDTH)
+            + ("X" if cnmc is not None else " ")
+            + ("X" if supersedes is not None else " ")
+        )
+    return (
+        matnr.ljust(MATNR_WIDTH)
+        + (cnmc or "").ljust(CNMC_WIDTH)
+        + (supersedes or "").ljust(SUPERSEDES_WIDTH)
+    )
+
+
+def _raise_on_error(result: dict, matnr: str) -> None:
+    returned = result.get("RETURN") or []
+    messages = returned if isinstance(returned, list) else [returned]
+    for message in messages:
+        if (message or {}).get("TYPE") in ("E", "A"):
+            raise RuntimeError(f"SAP refused {matnr}: {message.get('MESSAGE', '')}".strip())
+
+
+class RfcErpAdapter:
+    """`ErpAdapter` over SAP's RFC interface.
+
+    Reads use RFC_READ_TABLE on the five tables the mock models; writes use
+    BAPI_MATERIAL_SAVEDATA for the deletion flag and, through the BAPI_TE_MARA
+    extension, the two customer fields that carry the national code and the
+    surviving master; every batch ends with BAPI_TRANSACTION_COMMIT. Written
+    against the connector's documented call shapes and tested with a fake
+    connection that records the calls; not yet run against a live SAP system.
+    """
+
+    def __init__(
+        self,
+        connection,
+        cnmc_field: str = "ZZ_CNMC",
+        supersedes_field: str = "ZZ_SUPERSEDES",
+        batch: int = RFC_BATCH,
+    ):
+        self.conn = connection
+        self.cnmc_field = cnmc_field.upper()
+        self.supersedes_field = supersedes_field.upper()
+        self.batch = batch
+
+    @classmethod
+    def from_settings(cls, settings) -> RfcErpAdapter:
+        try:
+            from pyrfc import Connection
+        except ImportError as exc:
+            raise ErpUnavailable("pyrfc (and the SAP NetWeaver RFC SDK) is not installed") from exc
+        if not (settings.sap_ashost and settings.sap_user and settings.sap_passwd):
+            raise ErpUnavailable(
+                "SAP_ASHOST, SAP_USER and SAP_PASSWD must be set for the rfc adapter"
+            )
+        try:
+            connection = Connection(
+                ashost=settings.sap_ashost,
+                sysnr=settings.sap_sysnr,
+                client=settings.sap_client,
+                user=settings.sap_user,
+                passwd=settings.sap_passwd,
+            )
+        except Exception as exc:  # the connector raises its own hierarchy
+            raise ErpUnavailable(
+                f"could not open an RFC connection to {settings.sap_ashost}: {exc}"
+            ) from exc
+        return cls(connection, settings.sap_cnmc_field, settings.sap_supersedes_field)
+
+    # -- reads ------------------------------------------------------------
+
+    @staticmethod
+    def _options(matnrs: list[str], extra: tuple[str, ...] = ()) -> list[dict]:
+        lines = []
+        for i, matnr in enumerate(matnrs):
+            head = "( " if i == 0 else ""
+            tail = " )" if i == len(matnrs) - 1 else " OR"
+            lines.append({"TEXT": f"{head}MATNR EQ '{matnr}'{tail}"})
+        for clause in extra:
+            lines.append({"TEXT": f"AND {clause}"})
+        return lines
+
+    def _read_table(
+        self, table: str, fields: list[str], matnrs: list[str], extra: tuple[str, ...] = ()
+    ) -> list[dict]:
+        rows: list[dict] = []
+        for chunk in _chunks(list(matnrs), self.batch):
+            result = self.conn.call(
+                "RFC_READ_TABLE",
+                QUERY_TABLE=table,
+                DELIMITER="|",
+                FIELDS=[{"FIELDNAME": f} for f in fields],
+                OPTIONS=self._options(chunk, extra),
+            )
+            for entry in result.get("DATA", []):
+                values = entry["WA"].split("|")
+                rows.append({f.lower(): v.strip() for f, v in zip(fields, values, strict=False)})
+        return rows
+
+    def read_masters(self, matnrs: list[str]) -> dict[str, dict]:
+        if not matnrs:
+            return {}
+        fields = ["MATNR", "MTART", "MEINS", "LVORM", self.cnmc_field, self.supersedes_field]
+        out: dict[str, dict] = {}
+        for row in self._read_table("MARA", fields, matnrs):
+            # The mock's column names are the contract's; the customer fields
+            # map onto them whatever a site called them.
+            out[row["matnr"]] = {
+                "matnr": row["matnr"],
+                "mtart": row.get("mtart", ""),
+                "meins": row.get("meins", ""),
+                "lvorm": row.get("lvorm", ""),
+                "zz_cnmc": row.get(self.cnmc_field.lower(), ""),
+                "zz_supersedes": row.get(self.supersedes_field.lower(), ""),
+            }
+        return out
+
+    def read_open_transactions(self, matnrs: list[str]) -> dict[str, OpenTransactions]:
+        if not matnrs:
+            return {}
+        pos: dict[str, tuple[int, float]] = {}
+        # Not deleted and delivery not complete: the lines a consolidation
+        # must not change a material underneath.
+        for row in self._read_table(
+            "EKPO", ["MATNR", "MENGE"], matnrs, extra=("LOEKZ EQ ''", "ELIKZ EQ ''")
+        ):
+            lines, qty = pos.get(row["matnr"], (0, 0.0))
+            pos[row["matnr"]] = (lines + 1, qty + _num(row.get("menge")))
+        stock: dict[str, float] = {}
+        for row in self._read_table("MARD", ["MATNR", "LABST"], matnrs):
+            stock[row["matnr"]] = stock.get(row["matnr"], 0.0) + _num(row.get("labst"))
+        value: dict[str, float] = {}
+        for row in self._read_table("MBEW", ["MATNR", "SALK3"], matnrs):
+            value[row["matnr"]] = value.get(row["matnr"], 0.0) + _num(row.get("salk3"))
+        return {
+            matnr: OpenTransactions(
+                matnr=matnr,
+                open_po_lines=pos.get(matnr, (0, 0.0))[0],
+                open_qty=pos.get(matnr, (0, 0.0))[1],
+                stock_qty=stock.get(matnr, 0.0),
+                total_value=value.get(matnr, 0.0),
+            )
+            for matnr in matnrs
+        }
+
+    # -- writes -----------------------------------------------------------
+
+    def _save(
+        self,
+        matnr: str,
+        del_flag: str | None = None,
+        cnmc: str | None = None,
+        supersedes: str | None = None,
+    ) -> dict:
+        params: dict = {"HEADDATA": {"MATERIAL": matnr, "BASIC_VIEW": "X"}}
+        if del_flag is not None:
+            params["CLIENTDATA"] = {"DEL_FLAG": del_flag}
+            params["CLIENTDATAX"] = {"DEL_FLAG": "X"}
+        if cnmc is not None or supersedes is not None:
+            params["EXTENSIONIN"] = [
+                {
+                    "STRUCTURE": "BAPI_TE_MARA",
+                    "VALUEPART1": _value_part(matnr, cnmc, supersedes, False),
+                }
+            ]
+            params["EXTENSIONINX"] = [
+                {
+                    "STRUCTURE": "BAPI_TE_MARAX",
+                    "VALUEPART1": _value_part(matnr, cnmc, supersedes, True),
+                }
+            ]
+        result = self.conn.call("BAPI_MATERIAL_SAVEDATA", **params)
+        _raise_on_error(result, matnr)
+        return result
+
+    def _commit(self) -> None:
+        self.conn.call("BAPI_TRANSACTION_COMMIT", WAIT="X")
+
+    def write_crossref(self, matnr: str, cnmc: str) -> dict:
+        self._save(matnr, cnmc=cnmc)
+        self._commit()
+        return self.read_masters([matnr]).get(matnr, {})
+
+    def block_material(self, matnr: str, supersedes: str) -> dict:
+        self._save(matnr, del_flag="X", supersedes=supersedes)
+        self._commit()
+        return self.read_masters([matnr]).get(matnr, {})
+
+    def restore(self, matnr: str, before: dict) -> None:
+        self.restore_many([(matnr, before)])
+
+    def write_crossref_many(self, pairs: list[tuple[str, str]]) -> int:
+        for matnr, cnmc in pairs:
+            self._save(matnr, cnmc=cnmc)
+        if pairs:
+            self._commit()
+        return len(pairs)
+
+    def block_material_many(self, pairs: list[tuple[str, str]]) -> int:
+        for matnr, supersedes in pairs:
+            self._save(matnr, del_flag="X", supersedes=supersedes)
+        if pairs:
+            self._commit()
+        return len(pairs)
+
+    def restore_many(self, rows: list[tuple[str, dict]]) -> int:
+        for matnr, before in rows:
+            self._save(
+                matnr,
+                del_flag=before.get("lvorm", ""),
+                cnmc=before.get("zz_cnmc", ""),
+                supersedes=before.get("zz_supersedes", ""),
+            )
+        if rows:
+            self._commit()
+        return len(rows)
+
+
+# --------------------------------------------------------------------------
+# Which door is open on this machine
+# --------------------------------------------------------------------------
+
+_rfc_cache: tuple[str, object, str | None] | None = None
+
+
+def reset_adapter() -> None:
+    global _rfc_cache
+    _rfc_cache = None
+
+
+def get_adapter():
+    """The adapter the settings ask for, or the mock with a reason (§0.4)."""
+    global _rfc_cache
+    settings = get_settings()
+    if (settings.saman_erp_adapter or "mock").strip().lower() != "rfc":
+        return MockErpAdapter()
+    if _rfc_cache is None:
+        try:
+            _rfc_cache = ("rfc", RfcErpAdapter.from_settings(settings), None)
+        except ErpUnavailable as exc:
+            _rfc_cache = ("mock", MockErpAdapter(), str(exc))
+    return _rfc_cache[1]
+
+
+def adapter_status() -> dict:
+    """For /api/health and the Migration screen: what is live, and why."""
+    settings = get_settings()
+    requested = (settings.saman_erp_adapter or "mock").strip().lower()
+    if requested != "rfc":
+        return {
+            "requested": requested,
+            "mode": "mock",
+            "engine": "mock SAP (SQLite: MARA, MAKT, EKPO, MARD, MBEW)",
+            "degraded": False,
+            "note": "The demo's SAP stand-in; set SAMAN_ERP_ADAPTER=rfc for a live system.",
+        }
+    get_adapter()
+    mode, _, reason = _rfc_cache or ("mock", None, "not initialised")
+    if mode == "rfc":
+        return {
+            "requested": "rfc",
+            "mode": "rfc",
+            "engine": f"SAP RFC via pyrfc ({settings.sap_ashost}, client {settings.sap_client})",
+            "degraded": False,
+            "note": "BAPI_MATERIAL_SAVEDATA writes, RFC_READ_TABLE reads, one commit per batch.",
+        }
+    return {
+        "requested": "rfc",
+        "mode": "mock",
+        "engine": "mock SAP (SQLite: MARA, MAKT, EKPO, MARD, MBEW)",
+        "degraded": True,
+        "note": f"SAP RFC requested but unavailable ({reason}); using the mock ERP",
     }
