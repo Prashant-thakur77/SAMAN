@@ -1122,6 +1122,16 @@ every table that outgrows the screen scrolls inside its own container so the
 page itself never scrolls sideways. The front page's hero is one screen tall
 from `sm` up and only as tall as its content below it.
 
+The fort along the foot of that hero is sized by a `short:` height breakpoint
+rather than a width one. It is five and a half times as wide as it is tall and
+fits inside its box, so height is the only thing that decides how big it comes
+out: starved of it on a 768px laptop the drawing shrank to half the screen
+width rather than cropping. Three things give that height back — the sky above
+the drawing is trimmed out of the viewBox, the hero grows rather than squeezing
+it, and above 900px of viewport height the text stands its spacing down. The
+fort now runs the full width of every screen from a phone to 2560px, base flush
+with the hero's edge, entirely above the fold.
+
 ## License
 
 MIT.

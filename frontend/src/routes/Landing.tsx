@@ -213,7 +213,10 @@ function FortSkyline() {
   return (
     <svg
       aria-hidden
-      viewBox="0 0 1440 300"
+      // Trimmed to the drawing: its tallest spire starts at y=44, and carrying
+      // 44px of empty sky made the box 4.8:1 when the fort itself is 5.5:1.
+      // Height is exactly what this drawing is short of, so the sky goes.
+      viewBox="0 40 1440 260"
       preserveAspectRatio="xMidYMax meet"
       fill="currentColor"
       className="h-full w-full"
@@ -700,30 +703,32 @@ export default function Landing() {
           // and then sits at the bottom of whatever height is left. Below `sm`
           // the hero is therefore only as tall as it needs to be and the fort
           // follows the text; from `sm` up it is the one-screen opener again.
-          className="relative flex min-h-[32rem] flex-col overflow-hidden sm:h-[calc(100vh-4rem)] sm:min-h-[36rem]"
+          className="relative flex flex-col overflow-hidden sm:min-h-[calc(100vh-4rem)]"
         >
-          <Band className="relative flex shrink-0 flex-col items-center justify-center py-8 text-center md:py-10">
-            <Item>
+          <Band className="relative flex shrink-0 flex-col items-center justify-center py-8 text-center short:py-4 md:py-10">
+            {/* The ornament is the first thing to go when height is scarce:
+                it is decoration, and the fort below it is not. */}
+            <Item className="short:hidden">
               <Ornament className="mx-auto h-7 w-56 text-earth" />
             </Item>
-            <Item className="pt-4">
+            <Item className="pt-4 short:pt-0">
               <Eyebrow>Standardised Asset &amp; Material Analysis Network</Eyebrow>
             </Item>
             <Item>
-              <h1 className="mx-auto max-w-[16ch] pt-6 text-display font-medium">
+              <h1 className="mx-auto max-w-[16ch] pt-6 text-display font-medium short:pt-3">
                 One Nation, One Material Code
               </h1>
             </Item>
             <Item>
-              <div aria-hidden className="mx-auto mt-6 h-1 w-24 bg-earth" />
+              <div aria-hidden className="mx-auto mt-6 h-1 w-24 bg-earth short:mt-3" />
             </Item>
             <Item>
-              <p className="mx-auto max-w-[44ch] pt-6 text-lead text-muted">
+              <p className="mx-auto max-w-[44ch] pt-6 text-lead text-muted short:pt-3 short:text-base">
                 Every public sector undertaking codes the same part differently. SAMAN works
                 out which rows are one material, and gives it one code.
               </p>
             </Item>
-            <Item className="flex flex-wrap items-center justify-center gap-4 pt-8">
+            <Item className="flex flex-wrap items-center justify-center gap-4 pt-8 short:pt-5">
               <a href="#how">
                 <Button variant="primary">See how it decides</Button>
               </a>
@@ -733,12 +738,14 @@ export default function Landing() {
             </Item>
           </Band>
 
-          {/* The fort, whole, along the foot of the first screen. Its height is
-              a share of the viewport and the drawing fits inside it (`meet`), so
-              on any screen the whole fort is on the first page, towers and all;
-              on a short screen it is a little smaller, never a little cropped.
-              Capped at 1440px so it does not stretch thin on an ultra-wide screen. */}
-          <Backdrop className="relative mx-auto min-h-[5rem] w-full max-w-[1440px] flex-1 text-earth-soft opacity-75">
+          {/* The fort, whole, along the foot of the first screen. The drawing is
+              4.8 times as wide as it is tall and fits inside its box (`meet`),
+              so the box's height is what decides how big it is: starved of
+              height it shrinks away from the edges rather than cropping. Hence
+              a floor of 14rem, a hero that grows rather than squeezing it, and
+              the text above standing down on a short screen. Full width, so it
+              spans the page rather than sitting in the middle of it. */}
+          <Backdrop className="relative flex min-h-[5rem] w-full flex-1 items-end text-earth-soft opacity-90 sm:min-h-[11rem]">
             <FortSkyline />
           </Backdrop>
         </motion.div>

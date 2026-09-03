@@ -48,6 +48,13 @@ export default {
       display: ['clamp(2.75rem, 7vw, 5.5rem)', { lineHeight: '0.98', letterSpacing: '-0.035em' }],
     },
     extend: {
+      screens: {
+        // A height query, not a width one. The front page's opener is sized
+        // against the viewport's *height*: on a 768px laptop the fort at the
+        // foot is squeezed to a sliver by text that fits comfortably at
+        // 900px. `short:` is where that text gives room back.
+        short: { raw: '(max-height: 900px)' },
+      },
       fontFamily: {
         sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
