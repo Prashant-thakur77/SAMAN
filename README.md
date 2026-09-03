@@ -40,7 +40,7 @@ make dev       # API on :8000, UI on :5173
 ```
 
 `make demo` exits non-zero if the §8 M3 gate is not met, so it doubles as the
-quality check. `make check` runs everything CI does: ruff, 902 backend tests,
+quality check. `make check` runs everything CI does: ruff, 947 backend tests,
 69 frontend tests, the type-check and the licence gate. `make demo-snapshot`
 and `make demo-restore` take and reinstate a restore point in under a second,
 for when a demo goes somewhere unplanned.
@@ -110,6 +110,7 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 | M8B | Demo survivability | **Done** |
 | M9 | Motion, accessibility, screenshots | **Done** |
 | M10 | PPRL restricted mode (stretch) | **Done** |
+| M11 | Ground-reality round: UNSPSC/HSN on every class, a learned pairwise model, three SAP doors, data-quality scorecard and ABC, equipment context with engineer-approved substitutes | **Done** |
 
 ---
 
