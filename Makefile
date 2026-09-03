@@ -107,7 +107,12 @@ deploy-logs:  ## Follow the production stack's logs
 	cd deploy && docker compose --env-file .env -f docker-compose.prod.yml --profile llm logs -f --tail=100
 
 tunnel:  ## Temporary public HTTPS link to a local port (default 80) through a Cloudflare quick tunnel; no account needed
-	docker run --rm --network host cloudflare/cloudflared:latest tunnel --url http://localhost:$(or $(PORT),80)
+	# --protocol http2 on purpose. The default is QUIC over UDP, which home and
+	# mobile networks throttle: the link then drops every few minutes and comes
+	# back under the same name, which reads as "the site is down". HTTP/2 rides
+	# TCP 443 like any other request and stays up.
+	docker run --rm --network host cloudflare/cloudflared:latest tunnel \
+	  --url http://localhost:$(or $(PORT),80) --protocol http2 --edge-ip-version 4 --retries 10
 
 screenshots:  ## Regenerate docs/screenshots from the running app (needs make preview)
 	cd backend && ../$(PY) scripts/screenshots.py

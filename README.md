@@ -114,7 +114,10 @@ a laptop that ran `make demo` comes up as it was.
 tunnel to port 80 (`make tunnel PORT=4173` for `make preview`) and prints a
 public HTTPS address. No account, nothing installed beyond Docker. The link
 lives as long as the process does and ends at the laptop, so it is a way to
-show the demo, not a way to run it.
+show the demo, not a way to run it. It is forced onto HTTP/2 rather than
+cloudflared's default QUIC: many home and mobile networks throttle UDP, and the
+tunnel then drops and re-registers every few minutes, which to anyone holding
+the link looks exactly like the site being down.
 
 **Voice and OCR on the server.** The image installs only the core engines.
 `SAMAN_EXTRAS=voice` in `deploy/.env` bakes in local speech recognition and
