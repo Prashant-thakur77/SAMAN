@@ -731,8 +731,9 @@ export default function Landing() {
           {/* The fort, whole, along the foot of the first screen. Its height is
               a share of the viewport and the drawing fits inside it (`meet`), so
               on any screen the whole fort is on the first page, towers and all;
-              on a short screen it is a little smaller, never a little cropped. */}
-          <Backdrop className="relative mx-auto min-h-[5rem] w-full flex-1 text-earth-soft opacity-75">
+              on a short screen it is a little smaller, never a little cropped.
+              Capped at 1440px so it does not stretch thin on an ultra-wide screen. */}
+          <Backdrop className="relative mx-auto min-h-[5rem] w-full max-w-[1440px] flex-1 text-earth-soft opacity-75">
             <FortSkyline />
           </Backdrop>
         </motion.div>
@@ -828,7 +829,7 @@ export default function Landing() {
 
         {/* ---- how it works ---- */}
         <Reveal id="how" className="relative border-t border-hairline">
-          <Band className="relative pb-6 pt-20 md:pt-24">
+          <Band className="relative py-20 md:py-24">
             <Item>
               <Eyebrow>How it works</Eyebrow>
             </Item>
@@ -853,10 +854,6 @@ export default function Landing() {
               ))}
             </ol>
           </Band>
-          {/* The same fort, whole, closing the section. */}
-          <Backdrop className="relative mx-auto mt-6 aspect-[1440/300] w-full max-w-[1440px] text-earth-soft opacity-60">
-            <FortSkyline />
-          </Backdrop>
         </Reveal>
 
         {/* ---- the veto, given the room it deserves ---- */}
