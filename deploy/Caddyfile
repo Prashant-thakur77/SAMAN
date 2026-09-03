@@ -1,0 +1,15 @@
+# One origin for the app and its API. SAMAN_DOMAIN=":80" is plain HTTP; a
+# hostname gets automatic HTTPS from Let's Encrypt.
+{$SAMAN_DOMAIN} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}

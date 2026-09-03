@@ -89,6 +89,51 @@ SAMAN_DISABLE_OPTIONAL=true make demo
 
 ---
 
+## Deploying to a link
+
+SAMAN is a normal web application: one API process and one static frontend.
+The `deploy/` directory holds a production stack that runs anywhere Docker
+runs and needs no internet at runtime except, with a domain, the HTTPS
+certificate.
+
+```bash
+cd deploy && cp .env.example .env    # set SAMAN_SECRET_KEY; set SAMAN_DOMAIN for HTTPS
+make deploy-up                       # Caddy on :80 (and :443 with a domain), the API behind it
+make deploy-up PROFILE=llm           # the same, with the local model running beside the API
+```
+
+Caddy serves the built frontend and proxies `/api` to the backend on the same
+origin, so there is no CORS and no cross-site cookie. Give `SAMAN_DOMAIN` a
+hostname and Caddy obtains and renews the certificate itself. The `data/`
+directory is mounted into the API container: the databases, the learned model
+and any downloaded speech models live there and survive rebuilds. A fresh
+`data/` shows the login page's "Load demo data" button; a `data/` copied from
+a laptop that ran `make demo` comes up as it was.
+
+**A link from a laptop, in a minute.** `make tunnel` opens a Cloudflare quick
+tunnel to port 80 (`make tunnel PORT=4173` for `make preview`) and prints a
+public HTTPS address. No account, nothing installed beyond Docker. The link
+lives as long as the process does and ends at the laptop, so it is a way to
+show the demo, not a way to run it.
+
+**The local model on the link.** The model runs wherever the API runs; the
+browser never talks to it. From a laptop that already runs Ollama, the tunnel
+needs nothing: the API detects it. On a server, `PROFILE=llm` starts Ollama
+beside the API and pulls `qwen2.5:3b` into a volume on first start; the API
+reaches it as `http://ollama:11434`. The 3B model wants about 4 GB of RAM and
+answers in a few seconds on a CPU; without it every screen still works on the
+rule-based tier, and the health page says so.
+
+**What changes for a real deployment, and where it is enforced.** A random
+`SAMAN_SECRET_KEY` (the API logs a warning on the development default when
+secure cookies are on). `SAMAN_SECURE_COOKIES=true` behind HTTPS.
+`SAMAN_DEMO_LOGIN=false`, which turns the account picker into an email field
+and stops advertising the shared password. Real accounts created on the admin
+page. One API process, which is what the compose file runs, because login
+throttling is in memory. SQLite is a single-writer database, right for one
+CPSE's node and wrong for a national multi-writer registry, which is what the
+federation gap in KNOWN_GAPS is about.
+
 ## Build status
 
 Built milestone by milestone against `SAMAN_CLAUDE_CODE_SPEC.md`. Gaps are

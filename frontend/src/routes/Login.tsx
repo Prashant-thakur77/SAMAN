@@ -8,6 +8,7 @@ import { Field, Input } from '../components/primitives/Field'
 import {
   ApiError,
   getDemoUsers,
+  getLoginMode,
   getPipelineStatus,
   loadDemoData,
   login,
@@ -39,12 +40,16 @@ export default function Login() {
   const [seeding, setSeeding] = useState<PipelineStatus | null>(null)
   const [seedError, setSeedError] = useState<string | null>(null)
 
+  // Demo picker or email field: the API decides (SAMAN_DEMO_LOGIN).
+  const [mode, setMode] = useState<{ demo_login: boolean; has_users: boolean } | null>(null)
+
   const loadUsers = useCallback(async () => {
     try {
-      const list = await getDemoUsers()
+      const [list, loginMode] = await Promise.all([getDemoUsers(), getLoginMode()])
       setUsers(list)
+      setMode(loginMode)
       setEmail((current) => current || list[0]?.email || '')
-      return list.length
+      return loginMode.has_users ? Math.max(list.length, 1) : 0
     } catch {
       // No seeded users yet is a normal first-run state, not an error.
       setUsers([])
@@ -131,8 +136,21 @@ export default function Login() {
           <hr />
 
           <form onSubmit={onSubmit} className="space-y-6">
-            <Field label="Sign in as" hint="Seeded demo accounts.">
-              {users.length > 0 ? (
+            <Field
+              label="Sign in as"
+              htmlFor={mode && !mode.demo_login ? 'email' : undefined}
+              hint={mode && !mode.demo_login ? 'Your account email.' : 'Seeded demo accounts.'}
+            >
+              {mode && !mode.demo_login && mode.has_users ? (
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              ) : users.length > 0 ? (
                 <ul className="card divide-y divide-hairline overflow-hidden">
                   {users.map((u) => (
                     <li key={u.email}>
@@ -200,7 +218,11 @@ export default function Login() {
               )}
             </Field>
 
-            <Field label="Password" htmlFor="password" hint="Every seeded account uses “demo”.">
+            <Field
+              label="Password"
+              htmlFor="password"
+              hint={mode && !mode.demo_login ? undefined : 'Every seeded account uses “demo”.'}
+            >
               <Input
                 id="password"
                 type="password"

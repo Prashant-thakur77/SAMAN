@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     #: never be sent at all; any real deployment must turn it on.
     saman_secure_cookies: bool = False
 
+    #: The login page's account picker and the shared password "demo". A
+    #: deployment with real accounts turns it off; the picker then becomes an
+    #: email field and the seeded accounts are no longer advertised.
+    saman_demo_login: bool = True
+
     #: Force the §0.4 fallback engines even when the optional accelerators are
     #: installed. Two uses: exercising the degraded path in CI without
     #: uninstalling anything, and demonstrating graceful degradation live.

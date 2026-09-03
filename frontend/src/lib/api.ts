@@ -94,6 +94,8 @@ export type User = {
 export type DemoUser = Omit<User, 'id'>
 
 export const getDemoUsers = () => api.get<DemoUser[]>('/auth/demo-users')
+export const getLoginMode = () =>
+  api.get<{ demo_login: boolean; has_users: boolean }>('/auth/login-mode')
 export const login = (email: string, password: string) =>
   api.post<User>('/auth/login', { email, password })
 export const logout = () => api.post<{ ok: boolean }>('/auth/logout')

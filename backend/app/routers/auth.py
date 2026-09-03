@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..auth import (
@@ -18,6 +18,7 @@ from ..auth import (
     record_login_failure,
     require_user,
 )
+from ..config import get_settings
 from ..db import get_db
 from ..models import User
 from ..schemas import DemoUser, LoginRequest, UserOut
@@ -91,11 +92,26 @@ def demo_users(db: Session = Depends(get_db)) -> list[DemoUser]:
     `demo`, which is stated on the login screen — this is a local prototype
     with synthetic data, not a deployment.
     """
+    if not get_settings().saman_demo_login:
+        # Real accounts are not a menu. The page asks for an email instead.
+        return []
     users = db.execute(select(User).where(User.active.is_(True)).order_by(User.id)).scalars()
     return [
         DemoUser(
-            email=u.email, name=u.name, role=u.role,
+            email=u.email,
+            name=u.name,
+            role=u.role,
             cpse_code=u.cpse.code if u.cpse else None,
         )
         for u in users
     ]
+
+
+@router.get("/login-mode")
+def login_mode(db: Session = Depends(get_db)) -> dict:
+    """What the login page should offer: the demo picker, or an email field.
+
+    `has_users` lets an empty database still offer the first-run seed when the
+    picker is off, without listing anyone."""
+    has_users = bool(db.execute(select(func.count(User.id))).scalar())
+    return {"demo_login": get_settings().saman_demo_login, "has_users": has_users}

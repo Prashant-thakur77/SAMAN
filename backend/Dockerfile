@@ -5,7 +5,8 @@ WORKDIR /srv
 
 # Dependencies first so the layer caches across code edits.
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Patient on slow links: a read timeout mid-download is a retry, not a failed build.
+RUN pip install --no-cache-dir --timeout 180 --retries 8 -r requirements.txt
 
 COPY backend/ ./backend/
 WORKDIR /srv/backend

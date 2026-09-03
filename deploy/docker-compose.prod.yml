@@ -1,0 +1,88 @@
+# SAMAN, deployed: one API process, one web server, an optional local model.
+#
+#   cd deploy && cp .env.example .env && edit .env
+#   docker compose --env-file .env -f docker-compose.prod.yml up -d --build
+#   docker compose --env-file .env -f docker-compose.prod.yml --profile llm up -d --build   # with Ollama
+#
+# The web service (Caddy) serves the built frontend and proxies /api to the
+# backend on the same origin, so no CORS and no cross-site cookies. Give it a
+# domain in SAMAN_DOMAIN and it obtains and renews HTTPS certificates itself.
+# Nothing here needs the internet at runtime except that certificate.
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    environment:
+      SAMAN_DB_PATH: /srv/data/app.db
+      # Pinned so the engine never depends on what a host happens to have.
+      SAMAN_TIER1_ENGINE: rapidfuzz
+      # Empty means the rule-based Tier 3. With the llm profile, point at the
+      # ollama service; from a laptop, http://host.docker.internal:11434
+      # reaches an Ollama already running on the host.
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      SAMAN_OLLAMA_AUTODETECT: "false"
+    volumes:
+      - ../data:/srv/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "8000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    environment:
+      # ":80" serves plain HTTP on port 80. A hostname such as
+      # saman.example.gov.in turns on automatic HTTPS.
+      SAMAN_DOMAIN: ${SAMAN_DOMAIN:-:80}
+    ports:
+      - "${SAMAN_HTTP_PORT:-80}:80"
+      - "${SAMAN_HTTPS_PORT:-443}:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # The local language model, on the same machine as the API. CPU-only is
+  # fine for the 3B model; allow about 4 GB of RAM for it.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["llm"]
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+  # One-shot: pulls the model into the ollama volume on first start.
+  ollama-pull:
+    image: ollama/ollama:latest
+    profiles: ["llm"]
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "sleep 4 && ollama pull ${OLLAMA_MODEL:-qwen2.5:3b}"]
+    restart: "no"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  ollama:

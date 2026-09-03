@@ -34,3 +34,4 @@ data/snapshot/
 *.tsbuildinfo
 # local model weights (make deps-stt); never committed
 data/models/
+deploy/.env

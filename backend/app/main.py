@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,6 +35,14 @@ from .routers import (
 )
 
 settings = get_settings()
+
+if settings.saman_secret_key == "saman-dev-secret-change-me" and settings.saman_secure_cookies:
+    # Secure cookies mean a real deployment; a known signing key would let
+    # anyone forge a session. Loud, early, and impossible to miss in the logs.
+    logging.getLogger("saman").warning(
+        "SAMAN_SECRET_KEY is the development default. Set a long random value "
+        "in deploy/.env before exposing this instance."
+    )
 
 app = FastAPI(
     title="SAMAN API",

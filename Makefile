@@ -97,6 +97,18 @@ test:  ## Run the backend test suite
 preview:  ## Serve the production build on :4173 against the API on :8000
 	cd frontend && npm run build && npx vite preview
 
+deploy-up:  ## Production stack from deploy/.env: Caddy + API (+ local model with PROFILE=llm)
+	cd deploy && docker compose --env-file .env -f docker-compose.prod.yml $(if $(PROFILE),--profile $(PROFILE),) up -d --build
+
+deploy-down:  ## Stop the production stack
+	cd deploy && docker compose --env-file .env -f docker-compose.prod.yml --profile llm down
+
+deploy-logs:  ## Follow the production stack's logs
+	cd deploy && docker compose --env-file .env -f docker-compose.prod.yml --profile llm logs -f --tail=100
+
+tunnel:  ## Temporary public HTTPS link to a local port (default 80) through a Cloudflare quick tunnel; no account needed
+	docker run --rm --network host cloudflare/cloudflared:latest tunnel --url http://localhost:$(or $(PORT),80)
+
 screenshots:  ## Regenerate docs/screenshots from the running app (needs make preview)
 	cd backend && ../$(PY) scripts/screenshots.py
 

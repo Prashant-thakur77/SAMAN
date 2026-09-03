@@ -127,9 +127,7 @@ class TestSessionExpiry:
     """A signature without a timestamp is a credential that never expires."""
 
     def test_a_session_token_expires_on_its_own(self, client, seeded, monkeypatch):
-        client.post(
-            "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
-        )
+        client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
         assert client.get("/api/auth/me").status_code == 200
 
         # Move the clock past the signature's own lifetime. The cookie is still
@@ -143,9 +141,7 @@ class TestSessionExpiry:
         assert client.get("/api/auth/me").status_code == 401
 
     def test_a_tampered_token_is_rejected(self, client, seeded):
-        client.post(
-            "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
-        )
+        client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
         token = client.cookies.get(auth.SESSION_COOKIE)
         client.cookies.set(auth.SESSION_COOKIE, token[:-2] + "xy")
         assert client.get("/api/auth/me").status_code == 401
@@ -233,12 +229,35 @@ class TestLoginThrottle:
                 json={"email": "steward@cpcl.in", "password": "wrong"},
             )
         real = auth.time.time
-        monkeypatch.setattr(
-            auth.time, "time", lambda: real() + auth.LOGIN_WINDOW_SECONDS + 1
-        )
+        monkeypatch.setattr(auth.time, "time", lambda: real() + auth.LOGIN_WINDOW_SECONDS + 1)
         assert (
             client.post(
                 "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
             ).status_code
             == 200
+        )
+
+
+class TestDeploymentSwitches:
+    def test_demo_login_off_hides_the_picker_but_not_the_door(self, client, seeded, monkeypatch):
+        from app.config import get_settings
+
+        monkeypatch.setenv("SAMAN_DEMO_LOGIN", "false")
+        get_settings.cache_clear()
+        try:
+            assert client.get("/api/auth/demo-users").json() == []
+            mode = client.get("/api/auth/login-mode").json()
+            assert mode == {"demo_login": False, "has_users": True}
+            r = client.post(
+                "/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"}
+            )
+            assert r.status_code == 200
+        finally:
+            monkeypatch.delenv("SAMAN_DEMO_LOGIN")
+            get_settings.cache_clear()
+
+    def test_demo_login_on_lists_the_accounts(self, client, seeded):
+        assert client.get("/api/auth/login-mode").json()["demo_login"] is True
+        assert any(
+            u["email"] == "engineer@cpcl.in" for u in client.get("/api/auth/demo-users").json()
         )
