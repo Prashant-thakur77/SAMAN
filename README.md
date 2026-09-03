@@ -116,6 +116,12 @@ public HTTPS address. No account, nothing installed beyond Docker. The link
 lives as long as the process does and ends at the laptop, so it is a way to
 show the demo, not a way to run it.
 
+**Voice and OCR on the server.** The image installs only the core engines.
+`SAMAN_EXTRAS=voice` in `deploy/.env` bakes in local speech recognition and
+synthesis and the OCR reader; their model files are read from `data/models`,
+fetched once on any machine with `make deps-stt` and `make deps-tts`. Without
+them the assistant falls back to the browser's voices and says so.
+
 **The local model on the link.** The model runs wherever the API runs; the
 browser never talks to it. From a laptop that already runs Ollama, the tunnel
 needs nothing: the API detects it. On a server, `PROFILE=llm` starts Ollama

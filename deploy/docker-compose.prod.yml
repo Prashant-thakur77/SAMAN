@@ -14,6 +14,9 @@ services:
     build:
       context: ..
       dockerfile: backend/Dockerfile
+      args:
+        # "voice" bakes in local speech and OCR (bigger image, longer build).
+        SAMAN_EXTRAS: ${SAMAN_EXTRAS:-none}
     env_file: .env
     environment:
       SAMAN_DB_PATH: /srv/data/app.db
@@ -68,10 +71,14 @@ services:
     image: ollama/ollama:latest
     profiles: ["llm"]
     volumes:
-      - ollama:/root/.ollama
+      # A named volume by default. On a machine that already runs Ollama, point
+      # OLLAMA_MODELS_DIR at its store (/usr/share/ollama/.ollama for the Linux
+      # service, ~/.ollama for a user install) with OLLAMA_MODELS_RO=:ro, and
+      # nothing is downloaded twice.
+      - ${OLLAMA_MODELS_DIR:-ollama}:/root/.ollama${OLLAMA_MODELS_RO:-}
     restart: unless-stopped
 
-  # One-shot: pulls the model into the ollama volume on first start.
+  # One-shot: makes sure the model is present, pulling it only when it is not.
   ollama-pull:
     image: ollama/ollama:latest
     profiles: ["llm"]
@@ -79,7 +86,13 @@ services:
       - ollama
     environment:
       OLLAMA_HOST: http://ollama:11434
-    entrypoint: ["/bin/sh", "-c", "sleep 4 && ollama pull ${OLLAMA_MODEL:-qwen2.5:3b}"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        sleep 4;
+        ollama list | grep -q "^${OLLAMA_MODEL:-qwen2.5:3b}" && echo "model present"
+        || ollama pull ${OLLAMA_MODEL:-qwen2.5:3b}
     restart: "no"
 
 volumes:
