@@ -506,9 +506,7 @@ export function Assistant() {
         }
       } catch (err) {
         pushError(
-          err instanceof ApiError
-            ? err.message
-            : 'I could not reach the API. Is it running on :8000?',
+          err instanceof ApiError ? err.message : 'I could not reach the API. Please try again.',
         )
       } finally {
         setBusy(false)
@@ -554,10 +552,11 @@ export function Assistant() {
       }
       await ask(text, `heard · ${result.engine ?? 'local'}`)
     } catch (err) {
+      // ":8000" was in this message, which is only true while developing:
+      // served from anywhere else the API is on the same origin, so the
+      // advice sent people to look at the wrong thing.
       pushError(
-        err instanceof ApiError
-          ? err.message
-          : 'Transcription failed. Is the API running on :8000?',
+        err instanceof ApiError ? err.message : 'Transcription failed. Please try again.',
       )
     } finally {
       setTranscribing(false)

@@ -43,6 +43,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
+/**
+ * `fetch`, with a dead connection turned into the same ApiError the JSON
+ * client raises. The endpoints below post FormData or read a blob back, so
+ * they cannot go through `request` — but without this they threw a raw
+ * TypeError on an unreachable backend, and every caller's fallback message
+ * had to guess at what went wrong.
+ */
+async function sendRaw(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(path, { credentials: 'include', ...init })
+  } catch (cause) {
+    throw new ApiError(0, 'Cannot reach the SAMAN backend.', cause)
+  }
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, data?: unknown) =>
@@ -688,7 +703,7 @@ export async function ingestCsv(
   form.append('cpse_code', cpseCode)
   form.append('dry_run', String(dryRun))
   if (mapping) form.append('mapping', JSON.stringify(mapping))
-  const res = await fetch('/api/ingest', { method: 'POST', body: form, credentials: 'include' })
+  const res = await sendRaw('/api/ingest', { method: 'POST', body: form })
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
   return body as IngestReport
@@ -726,9 +741,8 @@ export const createUser = (body: {
   cpse_code?: string | null
 }) => api.post<AdminUser>('/users', body)
 export async function patchUser(id: number, body: { role?: string; active?: boolean }) {
-  const res = await fetch(`/api/users/${id}`, {
+  const res = await sendRaw(`/api/users/${id}`, {
     method: 'PATCH',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -955,10 +969,9 @@ export async function smartCreateScan(file: File, uom?: string): Promise<SmartCr
   const form = new FormData()
   form.append('file', file)
   if (uom) form.append('uom', uom)
-  const res = await fetch('/api/smart-create/scan', {
+  const res = await sendRaw('/api/smart-create/scan', {
     method: 'POST',
     body: form,
-    credentials: 'include',
   })
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
@@ -1085,11 +1098,10 @@ export type VoiceStatus = {
 export const getVoice = () => api.get<VoiceStatus>('/assistant/voice')
 /** One reply as a WAV, synthesised on the server. */
 export async function speakText(text: string): Promise<Blob> {
-  const res = await fetch('/api/assistant/speak', {
+  const res = await sendRaw('/api/assistant/speak', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ text }),
-    credentials: 'include',
   })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
@@ -1102,10 +1114,9 @@ export async function transcribeAudio(wav: Blob, language?: string): Promise<Tra
   const form = new FormData()
   form.append('audio', wav, 'question.wav')
   if (language) form.append('language', language)
-  const res = await fetch('/api/assistant/transcribe', {
+  const res = await sendRaw('/api/assistant/transcribe', {
     method: 'POST',
     body: form,
-    credentials: 'include',
   })
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
