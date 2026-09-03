@@ -473,7 +473,14 @@ function GiantWordmark() {
         style={style}
         className="-mb-[0.2em] translate-y-[0.14em] whitespace-nowrap text-center font-semibold uppercase tracking-[0.06em]"
       >
-        <span className="text-[26vw] leading-none md:text-[22vw]" style={{ fontSize: 'clamp(9rem, 22vw, 20rem)' }}>SAMAN</span>
+        {/* Sized in `vw` all the way down. The floor used to be 9rem, which on a
+            phone is wider than the phone: the word is set on one line and the
+            footer clips, so both ends — the S and the N — were sliced off. The
+            word is about 3.5 times as wide as its type size, so 24vw keeps it
+            near the edges without touching them at any width. */}
+        <span className="leading-none" style={{ fontSize: 'clamp(2rem, 24vw, 20rem)' }}>
+          SAMAN
+        </span>
       </p>
     </div>
   )
