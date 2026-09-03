@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
-from .. import inventory, opportunity, smart_create
+from .. import inventory, opportunity, quality, smart_create
 from ..auth import current_user_optional
 from ..db import get_db
 from ..models import (
@@ -54,28 +54,26 @@ def executive(
 
     # A "confirmed duplicate" is a member beyond the first in its cluster: the
     # rows that would collapse if the cluster were adopted.
-    multi = db.execute(
-        select(func.count(ClusterMember.item_id))
-        .select_from(ClusterMember)
-        .group_by(ClusterMember.cluster_id)
-        .having(func.count(ClusterMember.item_id) > 1)
-    ).scalars().all()
+    multi = (
+        db.execute(
+            select(func.count(ClusterMember.item_id))
+            .select_from(ClusterMember)
+            .group_by(ClusterMember.cluster_id)
+            .having(func.count(ClusterMember.item_id) > 1)
+        )
+        .scalars()
+        .all()
+    )
     duplicates_confirmed = sum(size - 1 for size in multi)
 
-    bands = dict(
-        db.execute(select(Pair.band, func.count(Pair.id)).group_by(Pair.band)).all()
-    )
-    run = db.execute(
-        select(MatchRun.stats_json).order_by(MatchRun.id.desc()).limit(1)
-    ).scalar()
+    bands = dict(db.execute(select(Pair.band, func.count(Pair.id)).group_by(Pair.band)).all())
+    run = db.execute(select(MatchRun.stats_json).order_by(MatchRun.id.desc()).limit(1)).scalar()
     if run:
         import json
 
         bands = json.loads(run).get("bands", bands)
     total_pairs = sum(bands.values())
-    automation = (
-        (bands.get("high", 0) + bands.get("low", 0)) / total_pairs if total_pairs else 0.0
-    )
+    automation = (bands.get("high", 0) + bands.get("low", 0)) / total_pairs if total_pairs else 0.0
 
     savings = opportunity.joint_tender_candidates(db, scope, limit=1)
     stock = inventory.stock_totals(db)
@@ -85,18 +83,22 @@ def executive(
     # that carries a code.
     per_cpse = []
     for code, name in db.execute(select(Cpse.code, Cpse.name).order_by(Cpse.code)).all():
-        total = db.execute(
-            select(func.count(RawItem.id)).join(Cpse).where(Cpse.code == code)
-        ).scalar() or 0
-        coded = db.execute(
-            select(func.count(distinct(Item.id)))
-            .join(RawItem, RawItem.id == Item.raw_item_id)
-            .join(Cpse, Cpse.id == RawItem.cpse_id)
-            .join(ClusterMember, ClusterMember.item_id == Item.id)
-            .join(GoldenRecord, GoldenRecord.cluster_id == ClusterMember.cluster_id)
-            .join(Cnmc, Cnmc.golden_id == GoldenRecord.id)
-            .where(Cpse.code == code)
-        ).scalar() or 0
+        total = (
+            db.execute(select(func.count(RawItem.id)).join(Cpse).where(Cpse.code == code)).scalar()
+            or 0
+        )
+        coded = (
+            db.execute(
+                select(func.count(distinct(Item.id)))
+                .join(RawItem, RawItem.id == Item.raw_item_id)
+                .join(Cpse, Cpse.id == RawItem.cpse_id)
+                .join(ClusterMember, ClusterMember.item_id == Item.id)
+                .join(GoldenRecord, GoldenRecord.cluster_id == ClusterMember.cluster_id)
+                .join(Cnmc, Cnmc.golden_id == GoldenRecord.id)
+                .where(Cpse.code == code)
+            ).scalar()
+            or 0
+        )
         per_cpse.append(
             {
                 "cpse": code,
@@ -211,6 +213,8 @@ def executive(
             "pending": dict(pending),
             "decisions_made": decisions_made,
         },
+        # The promised "improved data quality", measured per catalogue.
+        "quality": quality.scorecard(db),
         "trend": trend,
         "inventory": {
             "positions": stock["positions"],

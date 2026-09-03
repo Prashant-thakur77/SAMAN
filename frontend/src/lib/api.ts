@@ -307,6 +307,8 @@ export type ConsolidatedStock = {
 }
 
 export type PurchaseTrend = {
+  /** ABC class at this CPSE by 12-month consumption value; null without purchases. */
+  abc?: 'A' | 'B' | 'C' | null
   orders: number
   history: { po_date: string; unit_price: number; qty: number; vendor: string; cpse: string }[]
   last: { po_date: string; unit_price: number; vendor: string; cpse: string } | null
@@ -385,6 +387,24 @@ export type Kpi = {
   note?: string
 }
 
+export type QualityRate = 'classified' | 'attributes' | 'uom' | 'mpn' | 'unique' | 'active'
+export type QualityRow = {
+  cpse: string
+  name: string
+  items: number
+  internal_duplicates: number
+  stale_rows: number
+  rates: Record<QualityRate, number>
+  score: number
+}
+export type QualityScorecard = {
+  weights: Record<QualityRate, number>
+  stale_months: number
+  cpses: QualityRow[]
+  national: QualityRow | null
+  note: string
+}
+
 export type ExecutiveDashboard = {
   kpis: Kpi[]
   per_cpse: { cpse: string; name: string; items: number; coded: number; progress: number }[]
@@ -395,6 +415,7 @@ export type ExecutiveDashboard = {
     cells: { class_code: string; cpse: string; count: number; intensity: number }[]
   }
   review: { pending: Record<string, number>; decisions_made: number }
+  quality: QualityScorecard
   trend: { date: string; cnmcs_issued: number; cnmcs_total: number; decisions: number }[]
   inventory: {
     positions: number

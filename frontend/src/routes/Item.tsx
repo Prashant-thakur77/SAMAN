@@ -155,6 +155,13 @@ export default function Item() {
                   {detail.purchase_history.last.po_date} · {detail.purchase_history.last.vendor}
                 </p>
               </div>
+              {detail.purchase_history.abc && (
+                <div title="ABC by 12-month consumption value, ranked within this CPSE: A carries 70% of spend, B the next 20%, C the rest.">
+                  <p className="micro-label">ABC class</p>
+                  <p className="font-mono text-lg">{detail.purchase_history.abc}</p>
+                  <p className="micro-label mt-1">consumption at {detail.cpse}</p>
+                </div>
+              )}
               {detail.purchase_history.history.length > 1 && (
                 <div className="ml-auto">
                   <p className="micro-label mb-1">Price per base unit</p>

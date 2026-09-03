@@ -636,6 +636,23 @@ anonymised band for everyone else, "market range ₹1,088–₹96,183, n=3 CPSEs
 while consolidated programme totals stay visible to all, because the aggregate
 is the point and only its attribution is restricted.
 
+### Data quality by CPSE, and ABC
+
+The statement's expected impacts include "improved material master data
+quality". The executive dashboard measures it: six rates per catalogue
+(classified, identity attributes complete, canonical unit, manufacturer part
+number present, no internal duplicates, active in the last 24 months), weighted
+into one score with the weights printed beside the columns, and a national
+row that counts every row once rather than averaging averages. A steward reads
+their own row and knows what to fix; the registrar reads the column and knows
+whose catalogue needs the most work.
+
+Every material also carries an **ABC class** at each CPSE, by 12-month
+consumption value ranked within that CPSE (A carries 70% of spend, B the next
+20%, C the rest). It sits on the item page, on every dead-stock position and
+on every transfer suggestion, so the idle pallet worth chasing first is the
+A-class one.
+
 ### Review and governance
 
 The workbench covers all three confidence bands, not only the uncertain one: an
@@ -944,7 +961,7 @@ are kept honest; partial is marked partial.
 | Mapping of existing CPSE codes to the common national code | mapping block on the item page | **Done.** `/items/:id` lists every CPSE's code under one CNMC |
 | Legacy code rationalization and migration support | `app/migration.py`, `/migration` | **Done.** plan → dry-run → impact → apply → verify → rollback; open POs auto-held, rollback asserted byte-identical |
 | User validation and approval workflow for AI recommendations | `/workbench` + separation of duties | **Done.** keyboard-first workbench over all three bands, role-gated, self-approval refused; every decision trains the pairwise model (`app/learn.py`), which orders the queue and never decides |
-| Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | **Done.** KPIs reconcile with `/api/metrics`; class x CPSE heatmap in grayscale |
+| Dashboard for material master analytics and duplicate detection | `/dashboard/executive`, `/dashboard/opportunity` | **Done.** KPIs reconcile with `/api/metrics`; class x CPSE heatmap in grayscale; a data-quality scorecard per CPSE with stated weights; ABC classes by consumption value |
 | Audit trail and governance mechanism | hash-chained `audit_event` + `/audit` | **Done.** tamper- and reorder-evident, verified from the UI |
 | Integration capability with SAP/ERP | `ErpAdapter`, mock ERP and `RfcErpAdapter` in `app/erp.py`; load files; API-key hook; [docs/sap-integration.md](docs/sap-integration.md) | **Partial.** MARA/MAKT/EKPO/MARD/MBEW written and reversed through a named adapter contract. Three doors built: load files for LSMW/LTMC, an RFC adapter over BAPIs tested against a recorded fake, and an API-key hook for a BAdI at material creation. No live SAP system has been connected |
 | Analysis of historical procurement data | `purchase_history` → aggregation, variance, vendor overlap | **Done.** 12-month demand windows, price-per-base-unit variance, vendor overlap, last-price trend |

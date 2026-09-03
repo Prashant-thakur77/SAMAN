@@ -492,7 +492,11 @@ def get_item(
         "consolidated_stock": (
             inventory.consolidated_stock(db, cluster_id, scope) if cluster_id else None
         ),
-        # §9A(c): last purchase price and its direction.
-        "purchase_history": opportunity.last_purchase_and_trend(db, item_id, scope),
+        # §9A(c): last purchase price and its direction, and the material's
+        # ABC class at this CPSE by 12-month consumption value.
+        "purchase_history": {
+            **opportunity.last_purchase_and_trend(db, item_id, scope),
+            "abc": opportunity.abc_for(db, cluster_id, card["cpse"]),
+        },
         "visibility": scope.as_dict(),
     }

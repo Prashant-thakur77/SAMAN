@@ -7,7 +7,7 @@ import { AXIS_PROPS, CHART_INK, GRID_PROPS, TOOLTIP_PROPS } from '../components/
 import { CountUp, formatRupees } from '../components/charts/CountUp'
 import { EmptyState } from '../components/primitives/EmptyState'
 import { StatusChip } from '../components/primitives/Chip'
-import { ApiError, getExecutive, type ExecutiveDashboard } from '../lib/api'
+import { ApiError, getExecutive, type ExecutiveDashboard, type QualityRate, type QualityScorecard} from '../lib/api'
 import { cn } from '../lib/cn'
 import { listItemVariants, listVariants } from '../lib/motion'
 
@@ -118,6 +118,8 @@ export default function DashExecutive() {
             </p>
           </section>
 
+          <QualityTable quality={data.quality} />
+
           <section className="space-y-4">
             <h2 className="micro-label">Class × CPSE coverage</h2>
             <div className="overflow-x-auto">
@@ -214,5 +216,81 @@ export default function DashExecutive() {
         </>
       )}
     </div>
+  )
+}
+
+const QUALITY_COLUMNS: { key: QualityRate; label: string }[] = [
+  { key: 'classified', label: 'Classified' },
+  { key: 'attributes', label: 'Attributes complete' },
+  { key: 'uom', label: 'UoM canonical' },
+  { key: 'mpn', label: 'MPN present' },
+  { key: 'unique', label: 'No internal duplicates' },
+  { key: 'active', label: 'Active' },
+]
+
+/**
+ * The problem statement promises "improved material master data quality".
+ * This is the promise as a number per catalogue, with the weights shown, so a
+ * steward can see what to fix and a registrar can see whose needs it most.
+ */
+function QualityTable({ quality }: { quality: QualityScorecard }) {
+  const rows = [...quality.cpses, ...(quality.national ? [quality.national] : [])]
+  const pct = (v: number) => `${Math.round(v * 100)}%`
+  return (
+    <section className="space-y-4" data-testid="quality">
+      <h2 className="micro-label">Data quality by CPSE</h2>
+      <div className="overflow-x-auto rounded-xl border border-hairline shadow-card">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-hairline bg-surface">
+              <th className="micro-label px-3 py-2 text-left font-medium">CPSE</th>
+              <th className="micro-label px-3 py-2 text-right font-medium">Rows</th>
+              {QUALITY_COLUMNS.map((c) => (
+                <th key={c.key} className="micro-label px-3 py-2 text-right font-medium">
+                  {c.label}
+                  <span className="ml-1 font-mono text-[10px] text-muted">
+                    ×{quality.weights[c.key].toFixed(2)}
+                  </span>
+                </th>
+              ))}
+              <th className="micro-label px-3 py-2 text-left font-medium">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.cpse}
+                className={cn(
+                  'border-b border-hairline last:border-0',
+                  row.cpse === 'ALL' && 'bg-surface font-medium',
+                )}
+              >
+                <td className="px-3 py-2 font-mono">{row.cpse}</td>
+                <td className="px-3 py-2 text-right font-mono">
+                  {row.items.toLocaleString('en-IN')}
+                </td>
+                {QUALITY_COLUMNS.map((c) => (
+                  <td key={c.key} className="px-3 py-2 text-right font-mono tabular-nums">
+                    {pct(row.rates[c.key])}
+                  </td>
+                ))}
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-24 overflow-hidden rounded-full bg-hairline" aria-hidden>
+                      <span
+                        className="block h-full bg-ink"
+                        style={{ width: `${Math.round(row.score * 100)}%` }}
+                      />
+                    </span>
+                    <span className="font-mono text-xs">{pct(row.score)}</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="max-w-prose text-xs text-muted">{quality.note}</p>
+    </section>
   )
 }

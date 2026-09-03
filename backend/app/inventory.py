@@ -33,6 +33,7 @@ from .models import (
     Item,
     Stock,
 )
+from .opportunity import abc_classes, load_purchases
 from .visibility import Scope
 
 #: No movement for this long counts as slow-moving (§2E).
@@ -136,6 +137,7 @@ def transfer_suggestions(db: Session, scope: Scope, limit: int = 20) -> dict:
     for row in _stock_rows(db):
         by_cluster.setdefault(row[0], []).append(row)
 
+    abc = abc_classes(load_purchases(db))
     suggestions = []
     for cluster_id, rows in by_cluster.items():
         holders = [r for r in rows if (r[3] or 0.0) > 0]
@@ -163,7 +165,12 @@ def transfer_suggestions(db: Session, scope: Scope, limit: int = 20) -> dict:
         suggestions.append(
             {
                 "cluster_id": cluster_id,
-                "from": {"cpse": source[1], "plant": source[2], "available": movable},
+                "from": {
+                    "cpse": source[1],
+                    "plant": source[2],
+                    "available": movable,
+                    "abc": (abc.get((cluster_id, source[1])) or {}).get("abc", "C"),
+                },
                 "to": {
                     "cpse": target[1],
                     "plant": target[2],
@@ -209,6 +216,9 @@ def dead_stock(db: Session, scope: Scope, limit: int = 25) -> dict:
     """Positions with no movement in N months, grouped by material (§2E)."""
     stale_before = _cutoff(DEAD_STOCK_MONTHS)
     by_cluster: dict[int, dict] = {}
+    # Which dead stock to chase first: an A-class material's idle pallet is
+    # money the buyer will spend again next quarter; a C-class one is shelf.
+    abc = abc_classes(load_purchases(db))
 
     for cluster_id, cpse, plant, qty, _reserved, unit_value, moved in _stock_rows(db):
         if moved is None or moved >= stale_before or (qty or 0.0) <= 0:
@@ -224,10 +234,9 @@ def dead_stock(db: Session, scope: Scope, limit: int = 25) -> dict:
                 "cpse": cpse,
                 "plant": plant,
                 "qty": qty,
-                "value": round(value, 2)
-                if (scope.sees_all_prices or scope.owns(cpse))
-                else None,
+                "value": round(value, 2) if (scope.sees_all_prices or scope.owns(cpse)) else None,
                 "last_movement": moved.isoformat(),
+                "abc": (abc.get((cluster_id, cpse)) or {}).get("abc", "C"),
             }
         )
 

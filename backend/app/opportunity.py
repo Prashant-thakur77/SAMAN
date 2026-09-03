@@ -62,6 +62,52 @@ class Purchase:
         return self.qty * max(self.pack_qty or 1.0, 1.0)
 
 
+#: ABC by consumption value: the top of the ranked list that carries 70% of a
+#: CPSE's annual spend is A, the next 20% is B, the long tail is C. Classic
+#: Pareto cut-offs, stated here rather than assumed.
+ABC_A_SHARE = 0.70
+ABC_B_SHARE = 0.90
+
+
+def abc_classes(purchases: list[Purchase]) -> dict[tuple[int, str], dict]:
+    """(cluster_id, cpse) -> ABC class from the purchases in the window.
+
+    Ranked within each CPSE, because a material that is a rounding error for
+    one refinery can be a tenth of another's spend. Materials with no purchase
+    in the window are absent here and read as C where a class is shown.
+    """
+    value: dict[tuple[int, str], float] = {}
+    for purchase in purchases:
+        key = (purchase.cluster_id, purchase.cpse)
+        value[key] = value.get(key, 0.0) + purchase.qty * purchase.unit_price
+    by_cpse: dict[str, list[tuple[float, int]]] = {}
+    for (cluster_id, cpse), total in value.items():
+        by_cpse.setdefault(cpse, []).append((total, cluster_id))
+    out: dict[tuple[int, str], dict] = {}
+    for cpse, rows in by_cpse.items():
+        rows.sort(reverse=True)
+        total = sum(v for v, _ in rows) or 1.0
+        running = 0.0
+        for annual_value, cluster_id in rows:
+            running += annual_value
+            share = running / total
+            klass = "A" if share <= ABC_A_SHARE else "B" if share <= ABC_B_SHARE else "C"
+            out[(cluster_id, cpse)] = {
+                "abc": klass,
+                "annual_value": round(annual_value, 2),
+                "share_of_cpse_spend": round(annual_value / total, 4),
+            }
+    return out
+
+
+def abc_for(db: Session, cluster_id: int | None, cpse: str) -> str | None:
+    """The ABC class of one material at one CPSE, or None without purchases."""
+    if cluster_id is None:
+        return None
+    entry = abc_classes(load_purchases(db)).get((cluster_id, cpse))
+    return entry["abc"] if entry else None
+
+
 def _window_start(today: date | None = None) -> date:
     return (today or date.today()) - timedelta(days=WINDOW_MONTHS * 31)
 
@@ -278,8 +324,13 @@ def vendor_overlap(db: Session, limit: int = 15) -> dict:
 def last_purchase_and_trend(db: Session, item_id: int, scope: Scope) -> dict:
     """Last purchase price and its direction, for the item page (§9A c)."""
     rows = db.execute(
-        select(PurchaseHistory.po_date, PurchaseHistory.unit_price, PurchaseHistory.qty,
-               PurchaseHistory.vendor, Cpse.code)
+        select(
+            PurchaseHistory.po_date,
+            PurchaseHistory.unit_price,
+            PurchaseHistory.qty,
+            PurchaseHistory.vendor,
+            Cpse.code,
+        )
         .join(Cpse, Cpse.id == PurchaseHistory.cpse_id)
         .join(Item, Item.id == PurchaseHistory.item_id)
         .join(RawItem, RawItem.id == Item.raw_item_id)
