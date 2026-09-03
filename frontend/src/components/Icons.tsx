@@ -145,3 +145,17 @@ export const IconSubstitute = (p: IconProps) => (
     <path d="M17 13H5m0 0 3-3m-3 3 3 3" />
   </Svg>
 )
+
+/** Hamburger: opens the navigation drawer on a narrow screen. */
+export const IconMenu = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 5h14M3 10h14M3 15h14" />
+  </Svg>
+)
+
+/** Close: dismisses the navigation drawer. */
+export const IconClose = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 5l10 10M15 5L5 15" />
+  </Svg>
+)

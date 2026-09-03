@@ -695,7 +695,12 @@ export default function Landing() {
           variants={listVariants(reduce)}
           initial="initial"
           animate="animate"
-          className="relative flex h-[calc(100vh-4rem)] min-h-[36rem] flex-col overflow-hidden"
+          // On a phone a full-viewport hero leaves a tall empty band between the
+          // buttons and the fort, because the drawing scales to the narrow width
+          // and then sits at the bottom of whatever height is left. Below `sm`
+          // the hero is therefore only as tall as it needs to be and the fort
+          // follows the text; from `sm` up it is the one-screen opener again.
+          className="relative flex min-h-[32rem] flex-col overflow-hidden sm:h-[calc(100vh-4rem)] sm:min-h-[36rem]"
         >
           <Band className="relative flex shrink-0 flex-col items-center justify-center py-8 text-center md:py-10">
             <Item>

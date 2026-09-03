@@ -1106,6 +1106,19 @@ Motion follows §1.5 throughout: route slides, 20 ms list staggers, a 4 px shake
 on a failed sign-in, and every animation collapses to opacity under
 `prefers-reduced-motion`.
 
+**On a phone** the shell rearranges rather than shrinks. The 240px sidebar of
+§1.3 would leave a 390px screen a strip of content, so below `lg` the same
+markup becomes a drawer: off-screen until the command bar's menu button opens
+it, over a scrim, closed again by the next navigation, by its own close button
+or by Escape. It is hidden with `visibility` and not only a transform, so the
+twelve links it holds are out of the tab order and out of the accessibility
+tree while it is shut. Labels stay in the DOM and are hidden per breakpoint,
+which keeps the drawer readable whatever width the desktop rail was last left
+at. Gutters tighten, the keyboard hint and the engine chip stand down, and
+every table that outgrows the screen scrolls inside its own container so the
+page itself never scrolls sideways. The front page's hero is one screen tall
+from `sm` up and only as tall as its content below it.
+
 ## License
 
 MIT.
