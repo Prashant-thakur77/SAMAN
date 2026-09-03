@@ -195,6 +195,38 @@ export default function Item() {
         </section>
       )}
 
+      {detail.installed_on.length > 0 && (
+        <section className="space-y-3" data-testid="installed-on">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h2 className="micro-label">Installed on</h2>
+            {detail.ved && (
+              <StatusChip tone={detail.ved === 'vital' ? 'danger' : 'neutral'}>
+                {detail.ved} spare
+              </StatusChip>
+            )}
+          </div>
+          <ul className="flex flex-wrap gap-2">
+            {detail.installed_on.map((fit) => (
+              <li
+                key={`${fit.cpse}-${fit.tag}`}
+                className="card px-3 py-1.5 text-xs"
+                title={`${fit.description} · criticality ${fit.criticality} · qty ${fit.qty}`}
+              >
+                <span className="font-mono">{fit.tag}</span>
+                <span className="text-muted"> · {fit.cpse} · </span>
+                <span className={cn('font-mono', fit.criticality === 'A' && 'text-danger')}>
+                  {fit.criticality}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted">
+            The plant's own criticality (A, B, C), read as VED for the material. A substitute
+            for a vital spare needs an engineer's approval before it is fitted.
+          </p>
+        </section>
+      )}
+
       {/* §2B: two separate blocks, deliberately */}
       <section className="space-y-4">
         <h2 className="micro-label">Duplicates: merged into this CNMC</h2>
@@ -237,6 +269,23 @@ export default function Item() {
                   <p className="micro-label mt-1">
                     {entry.basis} · {Math.round(entry.confidence * 100)}%
                   </p>
+                  <div className="mt-2 flex justify-end">
+                    <StatusChip
+                      tone={
+                        entry.status === 'approved'
+                          ? 'ok'
+                          : entry.status === 'rejected'
+                            ? 'danger'
+                            : 'neutral'
+                      }
+                    >
+                      {entry.status === 'approved'
+                        ? `approved by ${entry.approval?.decided_by ?? 'an engineer'}`
+                        : entry.status === 'rejected'
+                          ? 'rejected'
+                          : 'awaiting engineering approval'}
+                    </StatusChip>
+                  </div>
                 </div>
               </li>
             ))}

@@ -28,6 +28,7 @@ from .routers import (
     relations,
     search,
     smart_create,
+    substitutes,
     workbench,
 )
 
@@ -71,6 +72,7 @@ app.include_router(smart_create.router, prefix="/api")
 app.include_router(pprl.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(learn.router, prefix="/api")
+app.include_router(substitutes.router, prefix="/api")
 
 
 @app.on_event("startup")

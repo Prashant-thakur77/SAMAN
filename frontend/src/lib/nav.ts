@@ -19,11 +19,19 @@ import {
   IconRestricted,
   IconSearch,
   IconSmartCreate,
+  IconSubstitute,
   IconUpload,
   IconWorkbench,
 } from '../components/Icons'
 
-export type Role = 'registrar' | 'admin' | 'approver' | 'steward' | 'auditor' | 'viewer'
+export type Role =
+  | 'registrar'
+  | 'admin'
+  | 'approver'
+  | 'steward'
+  | 'engineer'
+  | 'auditor'
+  | 'viewer'
 
 export type NavItem = {
   label: string
@@ -39,6 +47,14 @@ export const NAV: NavItem[] = [
   { label: 'Search', path: '/search', icon: IconSearch, group: 'Overview', roles: null },
 
   { label: 'Workbench', path: '/workbench', icon: IconWorkbench, group: 'Review', roles: null },
+  {
+    label: 'Substitutes',
+    path: '/substitutes',
+    icon: IconSubstitute,
+    group: 'Review',
+    // Everyone may read the queue; only an engineer, registrar or admin signs.
+    roles: null,
+  },
 
   {
     label: 'Executive',

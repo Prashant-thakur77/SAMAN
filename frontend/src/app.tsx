@@ -26,6 +26,7 @@ import Onboard from './routes/Onboard'
 import Search from './routes/Search'
 import Pprl from './routes/Pprl'
 import SmartCreate from './routes/SmartCreate'
+import Substitutes from './routes/Substitutes'
 import Workbench from './routes/Workbench'
 
 /** Every route inside the shell, wrapped in the §1.5 route transition. */
@@ -34,6 +35,7 @@ const SHELL_ROUTES = [
   { path: '/search', element: <Search /> },
   { path: '/items/:id', element: <Item /> },
   { path: '/workbench', element: <Workbench /> },
+  { path: '/substitutes', element: <Substitutes /> },
   { path: '/clusters/:id', element: <Cluster /> },
   { path: '/dashboard/executive', element: <DashExecutive /> },
   { path: '/dashboard/opportunity', element: <DashOpportunity /> },

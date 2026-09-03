@@ -30,7 +30,7 @@ class TestSeedShape:
         # Counted at seed time: the onboarding and admin tests add CPSEs and
         # users to the same database, so a later count would be order-dependent.
         assert seeded["cpses_at_seed"] == seeded["cpses"]
-        assert seeded["users_at_seed"] == 7
+        assert seeded["users_at_seed"] == 8  # incl. the engineer
 
     def test_every_raw_row_produced_an_item(self, seeded):
         assert seeded["raw_items"] == seeded["items"]

@@ -60,62 +60,254 @@ class Route:
 #: One entry per screen. Aliases are what people say, in the two languages the
 #: catalogues themselves arrive in; the label is what the sidebar says.
 ROUTES: tuple[Route, ...] = (
-    Route("/", "Home", ("home", "start page", "dashboard home", "ghar", "shuru", "mukhya"),
-          "Your queue if you are a steward; the national picture if you are a registrar."),
-    Route("/search", "Search",
-          ("search", "find", "look up", "lookup", "catalogue search", "khoj", "khojo",
-           "dhundo", "dhoondo", "talash"),
-          "One field across every organisation's catalogue."),
-    Route("/workbench", "Workbench",
-          ("workbench", "review queue", "review", "queue", "approve", "reject", "grey band",
-           "adjudicate", "adjudication", "decisions", "samiksha", "manzoori",
-           "varkabencha", "varkabench", "varkbench"),
-          "Keyboard-first review of candidate matches, with the evidence beside them."),
-    Route("/dashboard/executive", "Executive dashboard",
-          ("executive", "executive dashboard", "kpi", "kpis", "progress", "analytics",
-           "heatmap", "national picture", "pragati"),
-          "Harmonisation progress across organisations."),
-    Route("/dashboard/opportunity", "Opportunity dashboard",
-          ("opportunity", "savings", "saving", "joint tender", "joint tenders", "price variance",
-           "dead stock", "idle stock", "slow moving", "transfer suggestions", "overpay",
-           "bachat", "kharcha"),
-          "Joint tenders, price variance, idle stock and transfers."),
-    Route("/smart-create", "Smart-Create",
-          ("smart create", "smart-create", "smartcreate", "create material", "new material",
-           "new code", "raise a code", "duplicate check", "check before creating", "camera",
-           "scan", "photo", "nameplate", "naya material", "naya code"),
-          "The duplicate check before a code is raised, camera input included."),
-    Route("/pprl", "Restricted mode",
-          ("restricted mode", "restricted", "pprl", "privacy", "private matching", "bloom",
-           "encodings", "overlap", "compare catalogues", "without sharing", "gupt"),
-          "Measure two organisations' overlap from encodings alone."),
-    Route("/copilot", "Copilot",
-          ("copilot", "co-pilot", "chat", "assistant screen", "ask a question", "sawal"),
-          "Questions about the data, answered with citations and the query behind them."),
-    Route("/onboard", "Onboard",
-          ("onboard", "onboarding", "upload", "upload csv", "csv", "ingest", "import",
-           "import catalogue", "add a cpse", "new cpse", "wizard", "catalogue upload"),
-          "Upload a catalogue, map its columns, read the dry run, ingest."),
-    Route("/migration", "Migration",
-          ("migration", "migrate", "erp", "sap", "dry run", "dryrun", "rollback", "roll back",
-           "apply batch", "journal", "legacy codes", "cross reference"),
-          "Plan, dry run, impact, apply, verify, roll back against the ERP."),
-    Route("/audit", "Audit",
-          ("audit", "audit trail", "ledger", "hash chain", "verify chain", "events", "log",
-           "history", "tamper", "lekha", "jaanch", "odita", "audita"),
-          "Every mutation as a hash-chained event, verifiable from the page."),
-    Route("/admin", "Admin",
-          ("admin", "administration", "users", "roles", "user management", "engine health",
-           "health", "sovereign mode", "settings", "prabandhan"),
-          "Users, roles, engine health, the sovereign-mode toggle."),
-    Route("/welcome", "Front page",
-          ("front page", "landing", "landing page", "welcome", "about page", "homepage",
-           "website home"),
-          "The public page that explains how the system decides."),
-    Route("/login", "Sign in",
-          ("login", "log in", "sign in", "signin", "sign out", "logout", "switch user",
-           "switch account", "change user"),
-          "Pick a seeded account. Every one uses the password demo."),
+    Route(
+        "/",
+        "Home",
+        ("home", "start page", "dashboard home", "ghar", "shuru", "mukhya"),
+        "Your queue if you are a steward; the national picture if you are a registrar.",
+    ),
+    Route(
+        "/search",
+        "Search",
+        (
+            "search",
+            "find",
+            "look up",
+            "lookup",
+            "catalogue search",
+            "khoj",
+            "khojo",
+            "dhundo",
+            "dhoondo",
+            "talash",
+        ),
+        "One field across every organisation's catalogue.",
+    ),
+    Route(
+        "/workbench",
+        "Workbench",
+        (
+            "workbench",
+            "review queue",
+            "review",
+            "queue",
+            "approve",
+            "reject",
+            "grey band",
+            "adjudicate",
+            "adjudication",
+            "decisions",
+            "samiksha",
+            "manzoori",
+            "varkabencha",
+            "varkabench",
+            "varkbench",
+        ),
+        "Keyboard-first review of candidate matches, with the evidence beside them.",
+    ),
+    Route(
+        "/dashboard/executive",
+        "Executive dashboard",
+        (
+            "executive",
+            "executive dashboard",
+            "kpi",
+            "kpis",
+            "progress",
+            "analytics",
+            "heatmap",
+            "national picture",
+            "pragati",
+        ),
+        "Harmonisation progress across organisations.",
+    ),
+    Route(
+        "/dashboard/opportunity",
+        "Opportunity dashboard",
+        (
+            "opportunity",
+            "savings",
+            "saving",
+            "joint tender",
+            "joint tenders",
+            "price variance",
+            "dead stock",
+            "idle stock",
+            "slow moving",
+            "transfer suggestions",
+            "overpay",
+            "bachat",
+            "kharcha",
+        ),
+        "Joint tenders, price variance, idle stock and transfers.",
+    ),
+    Route(
+        "/smart-create",
+        "Smart-Create",
+        (
+            "smart create",
+            "smart-create",
+            "smartcreate",
+            "create material",
+            "new material",
+            "new code",
+            "raise a code",
+            "duplicate check",
+            "check before creating",
+            "camera",
+            "scan",
+            "photo",
+            "nameplate",
+            "naya material",
+            "naya code",
+        ),
+        "The duplicate check before a code is raised, camera input included.",
+    ),
+    Route(
+        "/pprl",
+        "Restricted mode",
+        (
+            "restricted mode",
+            "restricted",
+            "pprl",
+            "privacy",
+            "private matching",
+            "bloom",
+            "encodings",
+            "overlap",
+            "compare catalogues",
+            "without sharing",
+            "gupt",
+        ),
+        "Measure two organisations' overlap from encodings alone.",
+    ),
+    Route(
+        "/copilot",
+        "Copilot",
+        ("copilot", "co-pilot", "chat", "assistant screen", "ask a question", "sawal"),
+        "Questions about the data, answered with citations and the query behind them.",
+    ),
+    Route(
+        "/onboard",
+        "Onboard",
+        (
+            "onboard",
+            "onboarding",
+            "upload",
+            "upload csv",
+            "csv",
+            "ingest",
+            "import",
+            "import catalogue",
+            "add a cpse",
+            "new cpse",
+            "wizard",
+            "catalogue upload",
+        ),
+        "Upload a catalogue, map its columns, read the dry run, ingest.",
+    ),
+    Route(
+        "/substitutes",
+        "Substitutes",
+        (
+            "substitutes",
+            "substitute",
+            "approved substitutes",
+            "engineering approval",
+            "equipment",
+            "installed on",
+            "interchangeable parts",
+            "vikalp",
+            "technical approval",
+        ),
+        "Equivalences awaiting a technical authority, with the equipment they touch.",
+    ),
+    Route(
+        "/migration",
+        "Migration",
+        (
+            "migration",
+            "migrate",
+            "erp",
+            "sap",
+            "dry run",
+            "dryrun",
+            "rollback",
+            "roll back",
+            "apply batch",
+            "journal",
+            "legacy codes",
+            "cross reference",
+        ),
+        "Plan, dry run, impact, apply, verify, roll back against the ERP.",
+    ),
+    Route(
+        "/audit",
+        "Audit",
+        (
+            "audit",
+            "audit trail",
+            "ledger",
+            "hash chain",
+            "verify chain",
+            "events",
+            "log",
+            "history",
+            "tamper",
+            "lekha",
+            "jaanch",
+            "odita",
+            "audita",
+        ),
+        "Every mutation as a hash-chained event, verifiable from the page.",
+    ),
+    Route(
+        "/admin",
+        "Admin",
+        (
+            "admin",
+            "administration",
+            "users",
+            "roles",
+            "user management",
+            "engine health",
+            "health",
+            "sovereign mode",
+            "settings",
+            "prabandhan",
+        ),
+        "Users, roles, engine health, the sovereign-mode toggle.",
+    ),
+    Route(
+        "/welcome",
+        "Front page",
+        (
+            "front page",
+            "landing",
+            "landing page",
+            "welcome",
+            "about page",
+            "homepage",
+            "website home",
+        ),
+        "The public page that explains how the system decides.",
+    ),
+    Route(
+        "/login",
+        "Sign in",
+        (
+            "login",
+            "log in",
+            "sign in",
+            "signin",
+            "sign out",
+            "logout",
+            "switch user",
+            "switch account",
+            "change user",
+        ),
+        "Pick a seeded account. Every one uses the password demo.",
+    ),
 )
 
 #: Deep links the catalogue cannot express: an item, a cluster, a search term.
@@ -142,190 +334,399 @@ class Topic:
 TOPICS: tuple[Topic, ...] = (
     Topic(
         "what_is_saman",
-        ("what is saman", "what does saman do", "about saman", "saman kya hai", "purpose",
-         "what is this", "what is this site", "what is this website", "yeh kya hai",
-         "name of this project", "this project", "about this project", "saman name",
-         "what does saman stand for", "full form", "saman means", "who are you",
-         "what are you", "what can you do", "tell me about saman"),
+        (
+            "what is saman",
+            "what does saman do",
+            "about saman",
+            "saman kya hai",
+            "purpose",
+            "what is this",
+            "what is this site",
+            "what is this website",
+            "yeh kya hai",
+            "name of this project",
+            "this project",
+            "about this project",
+            "saman name",
+            "what does saman stand for",
+            "full form",
+            "saman means",
+            "who are you",
+            "what are you",
+            "what can you do",
+            "tell me about saman",
+        ),
         "SAMAN reads the material catalogues of several public sector undertakings, works "
         "out which rows describe the same material, drafts one clean record for each, and "
         "issues a Common National Material Code, the CNMC. Anything uncertain goes to a "
         "person with the evidence beside it.",
-        "/welcome", "Read the front page",
+        "/welcome",
+        "Read the front page",
     ),
     Topic(
         "learning",
-        ("does it learn", "learned model", "learn from", "does the ai learn", "get better",
-         "train the model", "trained model", "model says", "most informative", "pairwise model",
-         "seekhta hai", "sikhta hai", "fine tune", "fine-tune", "finetune"),
+        (
+            "does it learn",
+            "learned model",
+            "learn from",
+            "does the ai learn",
+            "get better",
+            "train the model",
+            "trained model",
+            "model says",
+            "most informative",
+            "pairwise model",
+            "seekhta hai",
+            "sikhta hai",
+            "fine tune",
+            "fine-tune",
+            "finetune",
+        ),
         "Yes. Every approve or reject in the Workbench is a label, and a small pairwise "
         "model trains on them: fifteen readable weights, saved as JSON. It orders the grey "
         "queue by what it is least sure of and shows its opinion on each card beside the "
         "pipeline's confidence. It never decides. The language model is not fine-tuned; the "
         "labelled pairs export as the corpus that would need.",
-        "/admin", "See the learned model",
+        "/admin",
+        "See the learned model",
     ),
     Topic(
         "cnmc",
-        ("cnmc", "what is the code", "national code", "check digit", "damm", "code format",
-         "code kya hai"),
+        (
+            "cnmc",
+            "what is the code",
+            "national code",
+            "check digit",
+            "damm",
+            "code format",
+            "code kya hai",
+        ),
         "The CNMC is the code SAMAN issues: CCCC-SSS-NNNNNN-K. Four letters for the family, "
         "a three-digit segment, a six-digit serial issued once and never reissued, and a "
         "Damm check digit that catches every single-digit error and every adjacent swap. "
         "Issuing one is registrar-only and a code is immutable once issued.",
-        "/welcome#code", "See a code taken apart",
+        "/welcome#code",
+        "See a code taken apart",
     ),
     Topic(
         "how_it_decides",
-        ("how does it work", "how does matching work", "how it decides", "how does it decide",
-         "tiers", "pipeline", "matching engine", "how are duplicates found", "kaise kaam",
-         "kaise karta"),
+        (
+            "how does it work",
+            "how does matching work",
+            "how it decides",
+            "how does it decide",
+            "tiers",
+            "pipeline",
+            "matching engine",
+            "how are duplicates found",
+            "kaise kaam",
+            "kaise karta",
+        ),
         "Five questions in order of cost. Exact anchors first, a part number or barcode "
         "settles it. Then field-by-field agreement weighted by how surprising it is. Then "
         "meaning, so SS316 lands beside STAINLESS STEEL 316. Then the veto: identity "
         "attributes compared in real units, and any mismatch refuses the pair. What is left "
         "goes to a person.",
-        "/welcome#how", "See the five stages",
+        "/welcome#how",
+        "See the five stages",
     ),
     Topic(
         "veto",
-        ("veto", "refuse", "refusal", "25 mm", "look-alike", "lookalike", "identity critical",
-         "identity-critical", "why not merged", "false merge", "trust"),
+        (
+            "veto",
+            "refuse",
+            "refusal",
+            "25 mm",
+            "look-alike",
+            "lookalike",
+            "identity critical",
+            "identity-critical",
+            "why not merged",
+            "false merge",
+            "trust",
+        ),
         "Two rows can read almost identically and still be different parts. Identity "
         "attributes such as bore, seal type and pressure class are compared in real units, "
         "and a disagreement on any of them refuses the match outright. No similarity score "
         "can overrule it, and the refusal is recorded with its reason.",
-        "/workbench", "See refusals on the workbench",
+        "/workbench",
+        "See refusals on the workbench",
     ),
     Topic(
         "equivalence",
-        ("equivalent", "equivalence", "substitute", "substitution", "interchangeable",
-         "cross reference", "crossref", "directed"),
+        (
+            "equivalent",
+            "equivalence",
+            "substitute",
+            "substitution",
+            "interchangeable",
+            "cross reference",
+            "crossref",
+            "directed",
+        ),
         "Equivalence is a separate, directed relation. A 500 kg bearing can stand in for a "
         "200 kg requirement and not the other way round, so substitutes keep their own "
         "codes and carry a link that records the safe direction. Duplicates merge; "
         "equivalents do not.",
-        "/search", "Find an item and open its equivalents",
+        "/search",
+        "Find an item and open its equivalents",
     ),
     Topic(
         "golden_record",
-        ("golden record", "standardization", "standardisation", "canonical description",
-         "provenance", "template", "fused", "fusion", "where did this description come from"),
+        (
+            "golden record",
+            "standardization",
+            "standardisation",
+            "canonical description",
+            "provenance",
+            "template",
+            "fused",
+            "fusion",
+            "where did this description come from",
+        ),
         "Each class has a description template. The golden record is rendered from it and "
         "the normalised attributes, deterministically, so the same cluster always yields the "
         "same bytes. Every fused field records which member it came from and which rule "
         "chose it, and the cluster page shows that provenance.",
-        "/search", "Open a cluster from search",
+        "/search",
+        "Open a cluster from search",
     ),
     Topic(
         "migration_topic",
-        ("how does migration work", "what is migration", "rollback", "roll back", "open po",
-         "open purchase order", "held", "block", "never deleted", "sap", "sap integration",
-         "how does sap", "load file", "lsmw", "ltmc", "bapi", "rfc", "connect to sap"),
+        (
+            "how does migration work",
+            "what is migration",
+            "rollback",
+            "roll back",
+            "open po",
+            "open purchase order",
+            "held",
+            "block",
+            "never deleted",
+            "sap",
+            "sap integration",
+            "how does sap",
+            "load file",
+            "lsmw",
+            "ltmc",
+            "bapi",
+            "rfc",
+            "connect to sap",
+        ),
         "Plan, dry run, impact, apply, verify, roll back, against the ERP's MARA, MAKT, EKPO, "
         "MARD and MBEW. Records with open purchase orders are held automatically. A "
         "superseded material is blocked, never deleted, and rollback restores the ERP "
         "byte for byte.",
-        "/migration", "Open Migration",
+        "/migration",
+        "Open Migration",
     ),
     Topic(
         "smart_create_topic",
-        ("what is smart create", "prevent duplicates", "before creating", "point of creation",
-         "ocr", "read a nameplate", "photograph", "camera input"),
+        (
+            "what is smart create",
+            "prevent duplicates",
+            "before creating",
+            "point of creation",
+            "ocr",
+            "read a nameplate",
+            "photograph",
+            "camera input",
+        ),
         "Smart-Create runs the same matcher and the same veto layer before a new code is "
         "raised. The requester sees existing candidates ranked with confidence; creating "
         "anyway needs a reason, and the reason is audited. The camera input reads a "
         "material's own marking offline and feeds the reading into the same check.",
-        "/smart-create", "Open Smart-Create",
+        "/smart-create",
+        "Open Smart-Create",
     ),
     Topic(
         "restricted_topic",
-        ("what is restricted mode", "how does pprl work", "bloom filter", "bloom filters",
-         "dice", "without handing over", "privacy preserving"),
+        (
+            "what is restricted mode",
+            "how does pprl work",
+            "bloom filter",
+            "bloom filters",
+            "dice",
+            "without handing over",
+            "privacy preserving",
+        ),
         "Two organisations encode their catalogues locally into keyed Bloom filters and only "
         "the encodings are compared, by Dice coefficient. Neither side learns a description "
         "it did not already hold. The cost is measured against the same ground truth as the "
         "main engine and shown on the screen.",
-        "/pprl", "Open Restricted mode",
+        "/pprl",
+        "Open Restricted mode",
     ),
     Topic(
         "audit_topic",
-        ("how is it audited", "audit chain", "hash chain", "tamper", "tampering", "reorder",
-         "who changed", "verify the ledger"),
+        (
+            "how is it audited",
+            "audit chain",
+            "hash chain",
+            "tamper",
+            "tampering",
+            "reorder",
+            "who changed",
+            "verify the ledger",
+        ),
         "Every mutation is one event in a hash chain, and each hash covers its own sequence "
         "number as well as the previous hash, so reordering breaks the chain as visibly as "
         "editing. Verification re-walks from the genesis event and names the first broken "
         "sequence.",
-        "/audit", "Open the audit trail",
+        "/audit",
+        "Open the audit trail",
     ),
     Topic(
         "roles",
-        ("roles", "who can", "permissions", "registrar", "steward", "approver", "auditor",
-         "viewer", "separation of duties", "kaun kar sakta"),
+        (
+            "roles",
+            "who can",
+            "permissions",
+            "registrar",
+            "steward",
+            "approver",
+            "auditor",
+            "viewer",
+            "separation of duties",
+            "kaun kar sakta",
+        ),
         "Six roles: registrar, admin, approver, steward, auditor, viewer. The API enforces "
         "them; the interface only hides what you cannot do. Whoever proposes or edits a "
         "golden record cannot approve it, and issuing a CNMC is registrar-only. A steward "
         "sees other organisations' prices as an anonymised band, never attributed.",
-        "/admin", "Open Admin",
+        "/admin",
+        "Open Admin",
     ),
     Topic(
         "passwords",
-        ("password", "passwords", "sign in", "login details", "credentials", "which account",
-         "accounts", "demo account", "how do i log in", "kaise login"),
+        (
+            "password",
+            "passwords",
+            "sign in",
+            "login details",
+            "credentials",
+            "which account",
+            "accounts",
+            "demo account",
+            "how do i log in",
+            "kaise login",
+        ),
         "Every seeded account uses the password demo. The sign-in screen lists them: "
         "steward@cpcl.in, registrar@min.gov.in, approver@min.gov.in, auditor@cag.gov.in and "
         "admin@saman.gov.in. Pick one and type demo.",
-        "/login", "Go to sign in",
+        "/login",
+        "Go to sign in",
     ),
     Topic(
         "metrics",
-        ("metrics", "precision", "recall", "accuracy", "how good", "how accurate", "f1",
-         "b-cubed", "results", "evaluation", "kitna sahi"),
+        (
+            "metrics",
+            "precision",
+            "recall",
+            "accuracy",
+            "how good",
+            "how accurate",
+            "f1",
+            "b-cubed",
+            "results",
+            "evaluation",
+            "kitna sahi",
+        ),
         "Measured on a 40% held-out split that the thresholds never saw. Duplicate precision "
         "0.997 and recall 0.960; blocking recall 0.994; every planted trap refused. The full "
         "report, including the naive baseline and the weakest class named, is at "
         "/api/metrics and on the executive dashboard.",
-        "/dashboard/executive", "Open the Executive dashboard",
+        "/dashboard/executive",
+        "Open the Executive dashboard",
     ),
     Topic(
         "offline",
-        ("offline", "internet", "network", "cloud", "sovereign", "on premise", "on-premise",
-         "air gap", "air-gapped", "data leave"),
+        (
+            "offline",
+            "internet",
+            "network",
+            "cloud",
+            "sovereign",
+            "on premise",
+            "on-premise",
+            "air gap",
+            "air-gapped",
+            "data leave",
+        ),
         "Nothing here calls the network at runtime. Fonts are bundled, the models are local "
         "and optional, and each optional component falls back to a bundled one rather than "
         "failing. Whichever is active is stated at /api/health and on the Admin screen.",
-        "/admin", "See engine health",
+        "/admin",
+        "See engine health",
     ),
     Topic(
         "ml",
-        ("machine learning", "ml", "nlp", "ai", "model", "models", "llm", "neural", "embedding",
-         "embeddings", "is it ai", "does it use ai", "artificial intelligence", "deep learning"),
+        (
+            "machine learning",
+            "ml",
+            "nlp",
+            "ai",
+            "model",
+            "models",
+            "llm",
+            "neural",
+            "embedding",
+            "embeddings",
+            "is it ai",
+            "does it use ai",
+            "artificial intelligence",
+            "deep learning",
+        ),
         "Yes, and deliberately in the places where it is checkable. Probabilistic record "
         "linkage (Fellegi-Sunter via splink, or rapidfuzz), character n-gram TF-IDF with "
         "SVD or sentence-transformer embeddings for meaning, rule-based extraction with a "
         "confidence gate, deep-learning OCR for the camera, Bloom-filter linkage for "
         "restricted mode, and thresholds tuned on a held-out split. A local language model "
         "may rephrase a sentence; it never decides which materials are the same.",
-        "/admin", "See which engine is live",
+        "/admin",
+        "See which engine is live",
     ),
     Topic(
         "run",
-        ("how to run", "run it", "install", "setup", "set up", "make demo", "make dev",
-         "docker", "start the app", "kaise chalaye", "kaise chalu"),
+        (
+            "how to run",
+            "run it",
+            "install",
+            "setup",
+            "set up",
+            "make demo",
+            "make dev",
+            "docker",
+            "start the app",
+            "kaise chalaye",
+            "kaise chalu",
+        ),
         "make setup, then make demo, then make dev. The API is on :8000 and the interface on "
         ":5173, or docker compose up for both. The first setup fetches packages; after that "
         "it runs with the cable out.",
-        "/welcome", "Read the front page",
+        "/welcome",
+        "Read the front page",
     ),
     Topic(
         "voice",
-        ("voice", "microphone", "mic", "speak", "speech", "talk to you", "listen", "bol",
-         "bolo", "awaaz"),
+        (
+            "voice",
+            "microphone",
+            "mic",
+            "speak",
+            "speech",
+            "talk to you",
+            "listen",
+            "bol",
+            "bolo",
+            "awaaz",
+        ),
         "Press the microphone in this panel and speak; the browser transcribes and I answer. "
         "Turn the speaker on and I read replies aloud. Both use the browser's own speech "
         "engines, which on some browsers reach the vendor's servers, so an air-gapped "
         "deployment should keep to typing.",
-        None, None,
+        None,
+        None,
     ),
 )
 
@@ -462,8 +863,12 @@ def deep_link(question: str) -> dict[str, Any] | None:
 def _looks_like_data_question(text: str) -> bool:
     return bool(
         copilot.match_template(text)
-        or re.search(r"\b(how many|count|which cpse|top|list|show me the|price|stock|spend|"
-                     r"vendor|tender|kitne|kitna|kaun sa)\b", text, re.IGNORECASE)
+        or re.search(
+            r"\b(how many|count|which cpse|top|list|show me the|price|stock|spend|"
+            r"vendor|tender|kitne|kitna|kaun sa)\b",
+            text,
+            re.IGNORECASE,
+        )
     )
 
 
@@ -471,12 +876,16 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
     """Route one utterance. The order is navigation, knowledge, then the Copilot."""
     question = (question or "").strip()
     if not question:
-        return Reply("answer", "Ask me where to go, what something means, or a question "
-                     "about the data.", suggestions=list(SUGGESTIONS))
+        return Reply(
+            "answer",
+            "Ask me where to go, what something means, or a question " "about the data.",
+            suggestions=list(SUGGESTIONS),
+        )
 
     if _GREETING.match(question):
-        return Reply("answer", GREETING_REPLY, suggestions=list(SUGGESTIONS),
-                     matched={"topic": "greeting"})
+        return Reply(
+            "answer", GREETING_REPLY, suggestions=list(SUGGESTIONS), matched={"topic": "greeting"}
+        )
 
     text = normalise(question)
     topic = match_topic(text)
@@ -499,8 +908,12 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
 
     # 1. A place named outright, with a number or a term.
     if (link := deep_link(question)) and not is_asking:
-        return Reply("navigate", f"Taking you there: {link['label'].lower()}.", action=link,
-                     matched={"deep_link": link["to"]})
+        return Reply(
+            "navigate",
+            f"Taking you there: {link['label'].lower()}.",
+            action=link,
+            matched={"deep_link": link["to"]},
+        )
 
     route, score = match_route(text)
 
@@ -515,8 +928,10 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
     if route_ok and (wants_to_go or not is_asking) and not topic_wins:
         # A bare data question that happens to contain a screen word, such as
         # "how many CNMCs have been issued", belongs to the Copilot.
-        if not wants_to_go and _looks_like_data_question(text) and not (
-            text == route.label.lower() or text in route.aliases
+        if (
+            not wants_to_go
+            and _looks_like_data_question(text)
+            and not (text == route.label.lower() or text in route.aliases)
         ):
             pass
         else:
@@ -526,8 +941,12 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
                 if already_here
                 else f"Opening {route.label}. {route.blurb}"
             )
-            return Reply("navigate", line, action=None if already_here else _navigate(route),
-                         matched={"route": route.path, "score": score})
+            return Reply(
+                "navigate",
+                line,
+                action=None if already_here else _navigate(route),
+                matched={"route": route.path, "score": score},
+            )
 
     # 3. Something about the system itself.
     if topic:
@@ -558,13 +977,15 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
         return Reply(
             "navigate",
             f"I could not answer that directly. {route.label} is the nearest place: {route.blurb}",
-            action=_navigate(route), matched={"route": route.path, "score": score},
+            action=_navigate(route),
+            matched={"route": route.path, "score": score},
         )
     if not useful:
         # Nothing matched anywhere. Say what this system is for, once, in
         # plain words, rather than "no matches found" dressed up five ways.
-        return Reply("answer", OUT_OF_SCOPE, suggestions=list(SUGGESTIONS),
-                     matched={"topic": "out_of_scope"})
+        return Reply(
+            "answer", OUT_OF_SCOPE, suggestions=list(SUGGESTIONS), matched={"topic": "out_of_scope"}
+        )
     return Reply(
         kind,
         result.text,

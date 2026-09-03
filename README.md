@@ -46,7 +46,7 @@ and `make demo-restore` take and reinstate a restore point in under a second,
 for when a demo goes somewhere unplanned.
 
 Sign in with any seeded account: `steward@cpcl.in`, `registrar@min.gov.in`,
-`approver@min.gov.in` and others are listed on the login screen. Every one uses
+`approver@min.gov.in`, `engineer@cpcl.in` and others are listed on the login screen. Every one uses
 the password `demo`.
 
 Or with Docker:
@@ -137,6 +137,8 @@ actually renders.
 | **Restricted mode.** two CPSEs find their common materials without either handing over a catalogue. | **Item.** the raw row beside the golden record it belongs to, its UNSPSC and HSN codes, every CPSE's stock of it, and its price history as a sparkline. |
 | ![Cluster](docs/screenshots/cluster.png) | ![Onboard](docs/screenshots/onboard.png) |
 | **Cluster.** the golden record, the template that rendered it, and which member and rule produced every fused field. | **Onboard.** upload a catalogue, confirm the column mapping, review a dry run, then ingest and watch the pipeline. |
+| ![Substitutes](docs/screenshots/substitutes.png) | |
+| **Substitutes.** every equivalence with the equipment it touches and its criticality; an engineer approves or rejects it with a reason. | |
 | ![Camera input](docs/screenshots/scan.png) | ![Ask SAMAN](docs/screenshots/assistant.png) |
 | **Camera input.** photograph a material's marking and the same duplicate check runs on what the reader saw. | **Ask SAMAN.** the floating assistant on every screen: say where to go and it takes you there, ask what something means and it explains, ask about the data and the Copilot answers with citations. Voice in and out where the browser allows. |
 ---
@@ -521,6 +523,25 @@ Rules are data, not code. A steward reads and edits them through `GET/POST
   substitutable_if: [load_rating_kg >=, temp_max_c >=]   # directed: B substitutes A
   never_if: [material !=]
 ```
+
+### Equipment context and approved substitutes
+
+A functional equivalent is a proposal, not a permission. A maintenance
+engineer will not fit a substitute without knowing where the original is
+installed, and without a technical authority saying so on the record. Both
+now exist.
+
+Every CPSE's estate carries tagged **equipment** with the plant's own
+criticality (A, B, C, read as VED: vital, essential, desirable) and a **bill
+of materials** drawn from its catalogue. The item page shows where a material
+is fitted and the VED class that follows. The **Substitutes** screen lists
+every equivalence the pipeline found, both sides described, the equipment each
+touches, and the highest criticality involved; an **engineer** (a new role,
+`engineer@cpcl.in`), the registrar or the admin approves or rejects it with a
+reason, which lands in the audit chain. Until then the equivalence is labelled
+"awaiting engineering approval" wherever it appears. A transfer suggestion
+whose source holds the material as a spare for A-criticality equipment is
+flagged as a critical spare rather than idle stock.
 
 ### Onboarding a new CPSE
 
@@ -954,7 +975,7 @@ are kept honest; partial is marked partial.
 | PS-stated capability | Where it lives | Status |
 |---|---|---|
 | AI-based matching of descriptions & specifications across CPSEs | tiered engine in `app/match.py` | **Done.** Tier 0 anchors, Tier 1 fuzzy, Tier 2 semantic, all veto-gated |
-| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) | **Done.** duplicates P 0.997 / R 0.960; directed equivalence P 0.927 / R 0.944, direction accuracy 0.990 |
+| Identification of duplicate, near-duplicate and equivalent materials | veto layer (`app/compare.py`) + relation engine (`app/equivalence.py`) + `/substitutes` | **Done.** duplicates P 0.997 / R 0.960; directed equivalence P 0.927 / R 0.944, direction accuracy 0.990; an equivalence is a proposal until an engineer approves it for the equipment it touches |
 | Automated standardization of descriptions and technical attributes | class templates + attribute fusion + provenance | **Done.** deterministic rendering, 4-rule fusion, per-field provenance naming the rule that chose each value; every class carries its UNSPSC code and HSN heading |
 | Intelligent classification and categorization | taxonomy + class assignment with confidence gate | **Done.** 8 classes, confidence gate routes low-confidence rows to an anchor-key-only pool |
 | Generation/recommendation of a Common National Material Code | `app/cnmc.py`, Damm check digit | **Done.** `CCCC-SSS-NNNNNN-K`, registrar-only, immutable once issued |

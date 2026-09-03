@@ -138,6 +138,11 @@ def transfer_suggestions(db: Session, scope: Scope, limit: int = 20) -> dict:
         by_cluster.setdefault(row[0], []).append(row)
 
     abc = abc_classes(load_purchases(db))
+    from .substitutes import critical_sources
+
+    # Surplus held for A-criticality equipment is insurance, not idle stock.
+    # The suggestion stays visible, flagged, so the holder decides.
+    critical = critical_sources(db)
     suggestions = []
     for cluster_id, rows in by_cluster.items():
         holders = [r for r in rows if (r[3] or 0.0) > 0]
@@ -180,6 +185,7 @@ def transfer_suggestions(db: Session, scope: Scope, limit: int = 20) -> dict:
                 "unit_value": source[5],
                 "avoided_purchase_value": avoided,
                 "idle_since": source[6].isoformat() if source[6] else None,
+                "critical_spare_at_source": (cluster_id, source[1]) in critical,
             }
         )
 
@@ -204,6 +210,7 @@ def transfer_suggestions(db: Session, scope: Scope, limit: int = 20) -> dict:
             f"{DEAD_STOCK_MONTHS} months. Distance is out of scope for the "
             "prototype, so suggestions are ranked by value and staleness."
         ),
+        "critical_spares_flagged": sum(1 for s in suggestions if s["critical_spare_at_source"]),
         "surplus_threshold_qty": SURPLUS_QTY,
         "shortage_threshold_qty": SHORTAGE_QTY,
         "suggestions_found": len(suggestions),

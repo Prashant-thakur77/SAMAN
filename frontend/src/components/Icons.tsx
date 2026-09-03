@@ -137,3 +137,11 @@ export const IconChevronRight = (p: IconProps) => (
     <path d="m8 4 5 6-5 6" />
   </Svg>
 )
+
+/** Two materials that can stand in for each other: opposed arrows. */
+export const IconSubstitute = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 7h12m0 0-3-3m3 3-3 3" />
+    <path d="M17 13H5m0 0 3-3m-3 3 3 3" />
+  </Svg>
+)

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import audit, inventory, learn, opportunity, review
+from .. import audit, inventory, learn, opportunity, review, substitutes
 from ..adjudicate import adjudicate
 from ..auth import current_user_optional, require_roles, require_user
 from ..db import get_db
@@ -451,6 +451,8 @@ def get_item(
         .scalars()
         .all()
     )
+    installed = substitutes.installed_on(db, [item_id]).get(item_id, [])
+    approvals = substitutes.approvals_for(db, [r.id for r in relations])
 
     return {
         **card,
@@ -475,10 +477,14 @@ def get_item(
                     db,
                     relation.item_b if relation.item_a == item_id else relation.item_a,
                 ),
+                "relation_id": relation.id,
                 "rel_type": relation.rel_type,
                 "direction": relation.direction,
                 "basis": relation.basis,
                 "confidence": relation.confidence,
+                # A proposal until an engineer approves it for the equipment.
+                "status": relation.status,
+                "approval": approvals.get(relation.id),
                 "substitutes_this": (relation.direction == "a_to_b" and relation.item_b == item_id)
                 or (relation.direction == "b_to_a" and relation.item_a == item_id),
             }
@@ -487,6 +493,9 @@ def get_item(
         "cluster": {"id": cluster_id, "status": db.get(Cluster, cluster_id).status}
         if cluster_id
         else None,
+        # Where this material is fitted, and the VED class that follows.
+        "installed_on": installed,
+        "ved": substitutes.ved_of(installed),
         # §2E: once items share a CNMC, stock held across CPSEs becomes one
         # visible position for the first time.
         "consolidated_stock": (

@@ -277,6 +277,51 @@ class Decision(Base):
 # --------------------------------------------------------------------------
 
 
+class Equipment(Base):
+    """A tagged piece of plant at one CPSE, with the plant's own criticality.
+
+    A, B, C is how a refinery ranks its equipment; SAMAN reads it as VED
+    (vital, essential, desirable) for the materials fitted to it.
+    """
+
+    __tablename__ = "equipment"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cpse_id: Mapped[int] = mapped_column(ForeignKey("cpse.id"), index=True)
+    tag: Mapped[str] = mapped_column(String(32), index=True)
+    description: Mapped[str] = mapped_column(String(128))
+    criticality: Mapped[str] = mapped_column(String(1), default="C")  # A|B|C
+
+
+class EquipmentBom(Base):
+    """Which materials are fitted to which equipment: the bill of materials
+    the maintenance module keeps, and the context a substitute is judged in."""
+
+    __tablename__ = "equipment_bom"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("item.id"), index=True)
+    qty: Mapped[float] = mapped_column(Float, default=1.0)
+
+
+class SubstituteApproval(Base):
+    """A technical authority's decision on an equivalence, with the reason.
+
+    The relation's `status` mirrors the latest decision; this table is the
+    record of who said what and when.
+    """
+
+    __tablename__ = "substitute_approval"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    relation_id: Mapped[int] = mapped_column(ForeignKey("relation.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16))  # approved|rejected
+    decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reason: Mapped[str] = mapped_column(Text)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class PairLabel(Base):
     """A reviewer's answer about one pair, kept as training data.
 

@@ -74,7 +74,14 @@ export type Health = {
 
 export const getHealth = () => api.get<Health>('/health')
 
-export type Role = 'registrar' | 'admin' | 'approver' | 'steward' | 'auditor' | 'viewer'
+export type Role =
+  | 'registrar'
+  | 'admin'
+  | 'approver'
+  | 'steward'
+  | 'engineer'
+  | 'auditor'
+  | 'viewer'
 
 export type User = {
   id: number
@@ -321,13 +328,19 @@ export type ItemDetail = ItemCard & {
   cnmc: { code: string; status: string } | null
   standards: Standards
   cluster: { id: number; status: string } | null
+  /** Where this material is fitted, and the VED class that follows. */
+  installed_on: Installation[]
+  ved: string | null
   duplicates: ItemCard[]
   equivalents: {
     counterpart: ItemCard
+    relation_id: number
     rel_type: string
     direction: string
     basis: string
     confidence: number
+    status: SubstituteStatus
+    approval: SubstituteApproval | null
     substitutes_this: boolean
   }[]
   consolidated_stock: ConsolidatedStock | null
@@ -336,6 +349,65 @@ export type ItemDetail = ItemCard & {
 }
 
 export const getItem = (id: number) => api.get<ItemDetail>(`/items/${id}`)
+
+// ---- equipment context and approved substitutes ----
+
+export type Installation = {
+  tag: string
+  description: string
+  criticality: 'A' | 'B' | 'C'
+  ved: string | null
+  cpse: string
+  qty: number
+}
+export type SubstituteStatus = 'proposed' | 'approved' | 'rejected'
+export type SubstituteApproval = {
+  status: SubstituteStatus
+  decided_by: string | null
+  reason: string
+  ts: string | null
+}
+export type SubstituteSide = {
+  item_id: number
+  normalized?: string
+  class_code?: string
+  legacy_code?: string
+  description?: string
+  cpse?: string
+  cluster_id?: number | null
+  cnmc?: string | null
+  installed_on: Installation[]
+  ved: string | null
+}
+export type SubstituteRow = {
+  id: number
+  rel_type: string
+  direction: string
+  basis: string
+  confidence: number
+  status: SubstituteStatus
+  evidence: Record<string, unknown>
+  a: SubstituteSide
+  b: SubstituteSide
+  approval: SubstituteApproval | null
+  criticality: string
+}
+export type SubstitutesResponse = {
+  status: string
+  total: number
+  offset: number
+  counts: Record<SubstituteStatus, number>
+  relations: SubstituteRow[]
+  note: string
+}
+
+export const getSubstitutes = (status: SubstituteStatus | 'all' = 'proposed', limit = 50) =>
+  api.get<SubstitutesResponse>(`/substitutes?status=${status}&limit=${limit}`)
+export const decideSubstitute = (id: number, decision: 'approved' | 'rejected', reason: string) =>
+  api.post<{ relation_id: number; status: SubstituteStatus; decided_by: string; reason: string }>(
+    `/substitutes/${id}/decide`,
+    { decision, reason },
+  )
 
 // ---- audit (§6.10) ----
 

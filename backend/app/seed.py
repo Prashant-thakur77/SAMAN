@@ -38,6 +38,8 @@ from .models import (
     ClusterMember,
     Cpse,
     Crossref,
+    Equipment,
+    EquipmentBom,
     Item,
     PurchaseHistory,
     RawItem,
@@ -72,67 +74,123 @@ class StyleProfile:
 
 
 _TERSE = {
-    "BEARING": "BRG", "VALVE": "VLV", "GASKET": "GSKT", "PIPE": "PIPE",
-    "BOLT": "BLT", "CABLE": "CBL", "HELMET": "HLMT", "CHEMICAL": "CHEM",
-    "STAINLESS STEEL": "SS", "CARBON STEEL": "CS", "THICKNESS": "THK",
-    "NOMINAL BORE": "NB", "OUTER DIAMETER": "OD", "LENGTH": "LG",
-    "FLANGED": "FLGD", "THREADED": "THRD", "SCHEDULE": "SCH", "GRADE": "GR",
-    "CLASS": "CL", "SEAMLESS": "SMLS", "SPIRAL WOUND": "SW",
+    "BEARING": "BRG",
+    "VALVE": "VLV",
+    "GASKET": "GSKT",
+    "PIPE": "PIPE",
+    "BOLT": "BLT",
+    "CABLE": "CBL",
+    "HELMET": "HLMT",
+    "CHEMICAL": "CHEM",
+    "STAINLESS STEEL": "SS",
+    "CARBON STEEL": "CS",
+    "THICKNESS": "THK",
+    "NOMINAL BORE": "NB",
+    "OUTER DIAMETER": "OD",
+    "LENGTH": "LG",
+    "FLANGED": "FLGD",
+    "THREADED": "THRD",
+    "SCHEDULE": "SCH",
+    "GRADE": "GR",
+    "CLASS": "CL",
+    "SEAMLESS": "SMLS",
+    "SPIRAL WOUND": "SW",
 }
 _MEDIUM = {
-    "BEARING": "BEARING", "VALVE": "VALVE", "GASKET": "GASKET",
-    "STAINLESS STEEL": "S.S.", "CARBON STEEL": "C.S.", "THICKNESS": "THK",
-    "NOMINAL BORE": "NB", "OUTER DIAMETER": "O.D.", "LENGTH": "LG",
-    "FLANGED": "FLANGED", "SCHEDULE": "SCH", "CLASS": "CLASS", "GRADE": "GRADE",
+    "BEARING": "BEARING",
+    "VALVE": "VALVE",
+    "GASKET": "GASKET",
+    "STAINLESS STEEL": "S.S.",
+    "CARBON STEEL": "C.S.",
+    "THICKNESS": "THK",
+    "NOMINAL BORE": "NB",
+    "OUTER DIAMETER": "O.D.",
+    "LENGTH": "LG",
+    "FLANGED": "FLANGED",
+    "SCHEDULE": "SCH",
+    "CLASS": "CLASS",
+    "GRADE": "GRADE",
 }
 _VERBOSE: dict[str, str] = {}  # spells everything out
 
 CPSE_PROFILES: tuple[StyleProfile, ...] = (
     StyleProfile(
-        code="CPCL", name="Chennai Petroleum Corporation Limited",
-        plants=("MANALI", "CAUVERY"), contract=_TERSE, sep=",", order="noun_first",
+        code="CPCL",
+        name="Chennai Petroleum Corporation Limited",
+        plants=("MANALI", "CAUVERY"),
+        contract=_TERSE,
+        sep=",",
+        order="noun_first",
         uom_words={"EA": "NOS", "M": "MTR", "KG": "KG", "L": "LTR"},
-        hindi_rate=0.10, typo_rate=0.08,
+        hindi_rate=0.10,
+        typo_rate=0.08,
     ),
     StyleProfile(
-        code="IOCL", name="Indian Oil Corporation Limited",
-        plants=("PANIPAT", "MATHURA", "HALDIA"), contract=_VERBOSE, sep=" ",
+        code="IOCL",
+        name="Indian Oil Corporation Limited",
+        plants=("PANIPAT", "MATHURA", "HALDIA"),
+        contract=_VERBOSE,
+        sep=" ",
         order="noun_first",
         uom_words={"EA": "EA", "M": "METRE", "KG": "KG", "L": "LITRE"},
-        hindi_rate=0.10, typo_rate=0.08,
+        hindi_rate=0.10,
+        typo_rate=0.08,
     ),
     StyleProfile(
-        code="GAIL", name="GAIL (India) Limited",
-        plants=("VIJAIPUR", "PATA"), contract=_MEDIUM, sep=" - ", order="brand_first",
+        code="GAIL",
+        name="GAIL (India) Limited",
+        plants=("VIJAIPUR", "PATA"),
+        contract=_MEDIUM,
+        sep=" - ",
+        order="brand_first",
         uom_words={"EA": "PC", "M": "M", "KG": "KGS", "L": "LTR"},
-        hindi_rate=0.10, typo_rate=0.08,
+        hindi_rate=0.10,
+        typo_rate=0.08,
     ),
     StyleProfile(
-        code="ONGC", name="Oil and Natural Gas Corporation",
-        plants=("URAN", "HAZIRA", "ANKLESHWAR"), contract=_TERSE, sep=" ",
+        code="ONGC",
+        name="Oil and Natural Gas Corporation",
+        plants=("URAN", "HAZIRA", "ANKLESHWAR"),
+        contract=_TERSE,
+        sep=" ",
         order="attrs_first",
         uom_words={"EA": "NOS", "M": "MTRS", "KG": "KG", "L": "LTR"},
-        hindi_rate=0.10, typo_rate=0.08,
+        hindi_rate=0.10,
+        typo_rate=0.08,
     ),
     StyleProfile(
-        code="HPCL", name="Hindustan Petroleum Corporation Limited",
-        plants=("VISAKH", "MUMBAI"), contract=_MEDIUM, sep=",", order="noun_first",
+        code="HPCL",
+        name="Hindustan Petroleum Corporation Limited",
+        plants=("VISAKH", "MUMBAI"),
+        contract=_MEDIUM,
+        sep=",",
+        order="noun_first",
         uom_words={"EA": "PCS", "M": "MTR", "KG": "KG", "L": "LTR"},
-        hindi_rate=0.10, typo_rate=0.08,
+        hindi_rate=0.10,
+        typo_rate=0.08,
     ),
     StyleProfile(
-        code="SAIL", name="Steel Authority of India Limited",
-        plants=("BHILAI", "ROURKELA", "BOKARO"), contract=_TERSE, sep=" ",
+        code="SAIL",
+        name="Steel Authority of India Limited",
+        plants=("BHILAI", "ROURKELA", "BOKARO"),
+        contract=_TERSE,
+        sep=" ",
         order="attrs_first",
         uom_words={"EA": "NO", "M": "MTR", "KG": "KGS", "L": "LTR"},
-        hindi_rate=0.10, typo_rate=0.08,
+        hindi_rate=0.10,
+        typo_rate=0.08,
     ),
 )
 
 #: Hindi swaps used for the 10% language mix (§7).
 HINDI_NOUNS = {
-    "BEARING": "बेयरिंग", "VALVE": "वाल्व", "GASKET": "गैसकेट", "PIPE": "पाइप",
-    "BOLT": "बोल्ट", "CABLE": "केबल", "HELMET": "हेलमेट",
+    "BEARING": "बेयरिंग",
+    "VALVE": "वाल्व",
+    "GASKET": "गैसकेट",
+    "PIPE": "पाइप",
+    "BOLT": "बोल्ट",
+    "CABLE": "केबल",
+    "HELMET": "हेलमेट",
 }
 
 SEED_USERS = (
@@ -141,6 +199,7 @@ SEED_USERS = (
     ("approver@min.gov.in", "S. Iyer", "approver", None),
     ("steward@cpcl.in", "A. Ramesh", "steward", "CPCL"),
     ("steward@iocl.in", "P. Nair", "steward", "IOCL"),
+    ("engineer@cpcl.in", "V. Subramanian", "engineer", "CPCL"),
     ("auditor@cag.gov.in", "M. Banerjee", "auditor", None),
     ("viewer@min.gov.in", "Public Viewer", "viewer", None),
 )
@@ -178,7 +237,12 @@ class Product:
 
 
 _BEARING_BRAND_SUFFIX = {
-    "SKF": "-2Z", "FAG": "-2ZR", "NSK": "ZZ", "NTN": "ZZ", "TIMKEN": "-2Z", "KOYO": "ZZ",
+    "SKF": "-2Z",
+    "FAG": "-2ZR",
+    "NSK": "ZZ",
+    "NTN": "ZZ",
+    "TIMKEN": "-2Z",
+    "KOYO": "ZZ",
 }
 _SEAL_FOR_SUFFIX = {"-2Z": "ZZ", "-2ZR": "ZZ", "ZZ": "ZZ", "-2RS": "2RS", "2RS": "2RS"}
 
@@ -187,8 +251,13 @@ VALVE_CLASS_BAR = {"150": 19.6, "300": 51.1, "600": 102.1, "900": 153.2}
 PIPE_SIZES = (15, 25, 50, 80, 100, 150, 200, 250, 300)
 CABLE_CSA = (1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95)
 SUBSTANCES = (
-    "SODIUM HYDROXIDE", "HYDROCHLORIC ACID", "SULPHURIC ACID", "NITRIC ACID",
-    "CALCIUM CHLORIDE", "METHANOL", "ISOPROPYL ALCOHOL",
+    "SODIUM HYDROXIDE",
+    "HYDROCHLORIC ACID",
+    "SULPHURIC ACID",
+    "NITRIC ACID",
+    "CALCIUM CHLORIDE",
+    "METHANOL",
+    "ISOPROPYL ALCOHOL",
 )
 
 
@@ -244,12 +313,30 @@ CLASS_SPACES: dict[str, dict[str, tuple]] = {
     },
     "chemical.reagent": {
         "substance": (
-            "SODIUM HYDROXIDE", "HYDROCHLORIC ACID", "SULPHURIC ACID", "NITRIC ACID",
-            "PHOSPHORIC ACID", "ACETIC ACID", "CALCIUM CHLORIDE", "SODIUM CHLORIDE",
-            "SODIUM CARBONATE", "POTASSIUM HYDROXIDE", "METHANOL", "ETHANOL",
-            "ISOPROPYL ALCOHOL", "ACETONE", "TOLUENE", "XYLENE", "HEXANE",
-            "AMMONIUM CHLORIDE", "SODIUM SULPHATE", "POTASSIUM PERMANGANATE",
-            "HYDROGEN PEROXIDE", "CITRIC ACID", "OXALIC ACID", "BORIC ACID",
+            "SODIUM HYDROXIDE",
+            "HYDROCHLORIC ACID",
+            "SULPHURIC ACID",
+            "NITRIC ACID",
+            "PHOSPHORIC ACID",
+            "ACETIC ACID",
+            "CALCIUM CHLORIDE",
+            "SODIUM CHLORIDE",
+            "SODIUM CARBONATE",
+            "POTASSIUM HYDROXIDE",
+            "METHANOL",
+            "ETHANOL",
+            "ISOPROPYL ALCOHOL",
+            "ACETONE",
+            "TOLUENE",
+            "XYLENE",
+            "HEXANE",
+            "AMMONIUM CHLORIDE",
+            "SODIUM SULPHATE",
+            "POTASSIUM PERMANGANATE",
+            "HYDROGEN PEROXIDE",
+            "CITRIC ACID",
+            "OXALIC ACID",
+            "BORIC ACID",
         ),
         "grade": ("LR", "AR", "GR", "TECH"),
         "concentration_pct": (10.0, 20.0, 30.0, 40.0, 50.0, 70.0, 85.0, 99.0),
@@ -308,8 +395,12 @@ def _decode(class_code: str, index: int) -> dict[str, object]:
 
 #: Catalogue-number family prefix per class.
 _MPN_FAMILY = {
-    "valve.gate": "GV", "gasket.spiral_wound": "SW", "pipe.seamless": "SP",
-    "fastener.bolt.hex": "HB", "cable.power": "PW", "chemical.reagent": "CH",
+    "valve.gate": "GV",
+    "gasket.spiral_wound": "SW",
+    "pipe.seamless": "SP",
+    "fastener.bolt.hex": "HB",
+    "cable.power": "PW",
+    "chemical.reagent": "CH",
     "ppe.helmet": "HL",
 }
 
@@ -324,8 +415,10 @@ def bearing_mpn(designation: str, seal: str, brand: str, load_class: str, temp: 
     data-quality conflict.
     """
     suffix = (
-        "-2RS" if seal == "2RS"
-        else "" if seal == "OPEN"
+        "-2RS"
+        if seal == "2RS"
+        else ""
+        if seal == "OPEN"
         else _BEARING_BRAND_SUFFIX.get(brand, "-2Z")
     )
     variant = "" if (load_class == "STD" and temp == 120) else f"/{load_class[0]}{temp}"
@@ -356,93 +449,141 @@ def _finalize(
         base_rating = round(bore * 20 / 50) * 50
         attrs = {
             "designation": designation,
-            "bore_mm": bore, "outer_dia_mm": od, "width_mm": width,
+            "bore_mm": bore,
+            "outer_dia_mm": od,
+            "width_mm": width,
             "seal_type": combo["seal_type"],
             "load_rating_kg": float(base_rating * _LOAD_MULTIPLIER[str(combo["load_class"])]),
             "temp_max_c": combo["temp_max_c"],
         }
         return Product(
-            gid, class_code, attrs, brand,
-            bearing_mpn(designation, str(combo["seal_type"]), brand,
-                        str(combo["load_class"]), int(combo["temp_max_c"])),
-            round(bore * rng.uniform(18, 45), 2), gtin=gtin,
+            gid,
+            class_code,
+            attrs,
+            brand,
+            bearing_mpn(
+                designation,
+                str(combo["seal_type"]),
+                brand,
+                str(combo["load_class"]),
+                int(combo["temp_max_c"]),
+            ),
+            round(bore * rng.uniform(18, 45), 2),
+            gtin=gtin,
         )
 
     if class_code == "valve.gate":
         size = int(combo["size_nb_mm"])
         pclass = str(combo["pressure_class"])
         attrs = {
-            "size_nb_mm": float(size), "pressure_class": pclass,
+            "size_nb_mm": float(size),
+            "pressure_class": pclass,
             "body_material": combo["body_material"],
             "end_connection": combo["end_connection"],
             "pressure_bar": VALVE_CLASS_BAR[pclass],
             "temp_max_c": combo["temp_max_c"],
         }
-        return Product(gid, class_code, attrs, brand, catalogue,
-                       round(size * float(pclass) * rng.uniform(0.9, 1.6), 2), gtin=gtin)
+        return Product(
+            gid,
+            class_code,
+            attrs,
+            brand,
+            catalogue,
+            round(size * float(pclass) * rng.uniform(0.9, 1.6), 2),
+            gtin=gtin,
+        )
 
     if class_code == "gasket.spiral_wound":
         size = int(combo["size_nb_mm"])
         attrs = {
-            "size_nb_mm": float(size), "pressure_class": combo["pressure_class"],
-            "material": combo["material"], "thickness_mm": combo["thickness_mm"],
+            "size_nb_mm": float(size),
+            "pressure_class": combo["pressure_class"],
+            "material": combo["material"],
+            "thickness_mm": combo["thickness_mm"],
             "temp_max_c": combo["temp_max_c"],
         }
-        return Product(gid, class_code, attrs, brand,
-                       catalogue,
-                       round(size * rng.uniform(3, 9), 2), gtin=gtin)
+        return Product(
+            gid, class_code, attrs, brand, catalogue, round(size * rng.uniform(3, 9), 2), gtin=gtin
+        )
 
     if class_code == "pipe.seamless":
         size = int(combo["nps_mm"])
         attrs = {
-            "nps_mm": float(size), "schedule": combo["schedule"],
-            "material": combo["material"], "pressure_bar": combo["pressure_bar"],
+            "nps_mm": float(size),
+            "schedule": combo["schedule"],
+            "material": combo["material"],
+            "pressure_bar": combo["pressure_bar"],
             "length_m": 6.0,
         }
-        return Product(gid, class_code, attrs, brand, catalogue,
-                       round(size * rng.uniform(9, 22), 2), gtin=gtin)
+        return Product(
+            gid, class_code, attrs, brand, catalogue, round(size * rng.uniform(9, 22), 2), gtin=gtin
+        )
 
     if class_code == "fastener.bolt.hex":
         nominal = int(combo["nominal_mm"])
         length = int(combo["length_mm"])
         attrs = {
             "thread": f"M{nominal}X{_THREAD_PITCH[nominal]}",
-            "length_mm": float(length), "grade": combo["grade"],
-            "material": combo["material"], "finish": rng.choice(FINISHES),
+            "length_mm": float(length),
+            "grade": combo["grade"],
+            "material": combo["material"],
+            "finish": rng.choice(FINISHES),
         }
-        return Product(gid, class_code, attrs, brand, catalogue,
-                       round(nominal * length * rng.uniform(0.02, 0.08), 2), gtin=gtin)
+        return Product(
+            gid,
+            class_code,
+            attrs,
+            brand,
+            catalogue,
+            round(nominal * length * rng.uniform(0.02, 0.08), 2),
+            gtin=gtin,
+        )
 
     if class_code == "cable.power":
         cores = int(combo["cores"])
         csa = float(combo["csa_mm2"])
         attrs = {
-            "cores": float(cores), "csa_mm2": csa,
-            "voltage_v": combo["voltage_v"], "conductor": combo["conductor"],
-            "insulation": combo["insulation"], "temp_max_c": combo["temp_max_c"],
+            "cores": float(cores),
+            "csa_mm2": csa,
+            "voltage_v": combo["voltage_v"],
+            "conductor": combo["conductor"],
+            "insulation": combo["insulation"],
+            "temp_max_c": combo["temp_max_c"],
         }
-        return Product(gid, class_code, attrs, brand, catalogue,
-                       round(cores * csa * rng.uniform(9, 20), 2), gtin=gtin)
+        return Product(
+            gid,
+            class_code,
+            attrs,
+            brand,
+            catalogue,
+            round(cores * csa * rng.uniform(9, 20), 2),
+            gtin=gtin,
+        )
 
     if class_code == "chemical.reagent":
         attrs = {
-            "substance": combo["substance"], "grade": combo["grade"],
+            "substance": combo["substance"],
+            "grade": combo["grade"],
             "concentration_pct": combo["concentration_pct"],
         }
-        return Product(gid, class_code, attrs, brand, catalogue,
-                       round(rng.uniform(400, 4500), 2), gtin=gtin)
+        return Product(
+            gid, class_code, attrs, brand, catalogue, round(rng.uniform(400, 4500), 2), gtin=gtin
+        )
 
     if class_code == "ppe.helmet":
         attrs = {
-            "helmet_class": combo["helmet_class"], "standard": combo["standard"],
+            "helmet_class": combo["helmet_class"],
+            "standard": combo["standard"],
             "shell_material": combo["shell_material"],
             "harness_type": combo["harness_type"],
-            "chin_strap": combo["chin_strap"], "ventilation": combo["ventilation"],
-            "brim": combo["brim"], "colour": rng.choice(COLOURS),
+            "chin_strap": combo["chin_strap"],
+            "ventilation": combo["ventilation"],
+            "brim": combo["brim"],
+            "colour": rng.choice(COLOURS),
         }
-        return Product(gid, class_code, attrs, brand,
-                       catalogue,
-                       round(rng.uniform(180, 900), 2), gtin=gtin)
+        return Product(
+            gid, class_code, attrs, brand, catalogue, round(rng.uniform(180, 900), 2), gtin=gtin
+        )
 
     raise ValueError(f"no finalizer for class {class_code!r}")
 
@@ -786,19 +927,36 @@ def _plant_traps(
         if index_a is None or index_b is None:
             continue
         used["bearing.ball.deep_groove"].update({index_a, index_b})
-        a = _finalize("bearing.ball.deep_groove",
-                      _decode("bearing.ball.deep_groove", index_a), rng, gid(), index_a)
-        b = _finalize("bearing.ball.deep_groove",
-                      _decode("bearing.ball.deep_groove", index_b), rng, gid(), index_b)
+        a = _finalize(
+            "bearing.ball.deep_groove",
+            _decode("bearing.ball.deep_groove", index_a),
+            rng,
+            gid(),
+            index_a,
+        )
+        b = _finalize(
+            "bearing.ball.deep_groove",
+            _decode("bearing.ball.deep_groove", index_b),
+            rng,
+            gid(),
+            index_b,
+        )
         a.spread = b.spread = 2
         b.brand = a.brand
         a.tags.append("trap")
         b.tags.append("trap")
         products += [a, b]
         traps.append(
-            TrapSpec(a, b, "performance_out_of_band", "load_rating_kg",
-                     str(a.attrs["load_rating_kg"]), str(b.attrs["load_rating_kg"]),
-                     expect_duplicate=False, equivalence=("a_to_b", "rule"))
+            TrapSpec(
+                a,
+                b,
+                "performance_out_of_band",
+                "load_rating_kg",
+                str(a.attrs["load_rating_kg"]),
+                str(b.attrs["load_rating_kg"]),
+                expect_duplicate=False,
+                equivalence=("a_to_b", "rule"),
+            )
         )
 
     # 3. Cross-brand equivalents: the same ISO designation from three
@@ -818,8 +976,11 @@ def _plant_traps(
             # Same physical bearing, three manufacturers' numbers: the
             # interchangeability case (§2B), not a duplicate.
             product.mpn = bearing_mpn(
-                str(combo["designation"]), str(combo["seal_type"]), brand,
-                str(combo["load_class"]), int(combo["temp_max_c"]),
+                str(combo["designation"]),
+                str(combo["seal_type"]),
+                brand,
+                str(combo["load_class"]),
+                int(combo["temp_max_c"]),
             )
             product.spread = 2
             product.tags.append("crossbrand")
@@ -828,9 +989,16 @@ def _plant_traps(
         for i in range(len(trio)):
             for j in range(i + 1, len(trio)):
                 traps.append(
-                    TrapSpec(trio[i], trio[j], "cross_brand_equivalent", "brand",
-                             trio[i].brand, trio[j].brand, expect_duplicate=False,
-                             equivalence=("bidirectional", "designation"))
+                    TrapSpec(
+                        trio[i],
+                        trio[j],
+                        "cross_brand_equivalent",
+                        "brand",
+                        trio[i].brand,
+                        trio[j].brand,
+                        expect_duplicate=False,
+                        equivalence=("bidirectional", "designation"),
+                    )
                 )
 
     # 4. Directed substitute: a higher pressure class replaces a lower one, but
@@ -858,8 +1026,16 @@ def _plant_traps(
         b.tags.append("trap")
         products += [a, b]
         traps.append(
-            TrapSpec(a, b, "directed_substitute", "pressure_class", "300", "600",
-                     expect_duplicate=False, equivalence=("a_to_b", "rule"))
+            TrapSpec(
+                a,
+                b,
+                "directed_substitute",
+                "pressure_class",
+                "300",
+                "600",
+                expect_duplicate=False,
+                equivalence=("a_to_b", "rule"),
+            )
         )
 
     return products, traps
@@ -967,8 +1143,7 @@ def allocate(demand: int, caps: dict[str, int] | None = None) -> dict[str, int]:
     # with 40 rows produces a number too noisy to act on.
     floor = demand // (2 * len(caps))
     alloc = {
-        cls: min(cap, max(floor, round(demand * cap / total_cap)))
-        for cls, cap in caps.items()
+        cls: min(cap, max(floor, round(demand * cap / total_cap))) for cls, cap in caps.items()
     }
     # Trim proportionally if the floors pushed us over demand.
     while sum(alloc.values()) > demand:
@@ -1089,21 +1264,33 @@ PROFILES = {
     # The demo profile keeps §7's shape exactly: each product is rendered into
     # 1-4 CPSE-specific descriptions. Every demo flow and metric gate uses it.
     "demo": {
-        "cpses": 4, "per_cpse": 3000, "spread": (2, 4),
-        "shared": 2200, "fill_singletons": True, "same_cpse_twice": False,
+        "cpses": 4,
+        "per_cpse": 3000,
+        "spread": (2, 4),
+        "shared": 2200,
+        "fill_singletons": True,
+        "same_cpse_twice": False,
     },
     # Small, fast profile for the test suite — same machinery, fewer rows.
     "test": {
-        "cpses": 2, "per_cpse": 400, "spread": (2, 2),
-        "shared": 250, "fill_singletons": True, "same_cpse_twice": False,
+        "cpses": 2,
+        "per_cpse": 400,
+        "spread": (2, 2),
+        "shared": 250,
+        "fill_singletons": True,
+        "same_cpse_twice": False,
     },
     # The benchmark profile exists only for the §8A performance run. The
     # attribute space cannot express 150k distinct products, so it raises the
     # multiplicity instead and allows the same product to appear twice inside
     # one CPSE — which is itself a real phenomenon in CPSE material masters.
     "large": {
-        "cpses": 6, "per_cpse": 25000, "spread": (6, 16),
-        "shared": None, "fill_singletons": False, "same_cpse_twice": True,
+        "cpses": 6,
+        "per_cpse": 25000,
+        "spread": (6, 16),
+        "shared": None,
+        "fill_singletons": False,
+        "same_cpse_twice": True,
     },
 }
 
@@ -1126,6 +1313,86 @@ def _bulk(db: Session, model, rows: list[dict]) -> None:
     db.commit()
 
 
+#: Tag prefixes as a refinery numbers its plant, with what each one is.
+EQUIPMENT_KINDS = (
+    ("P", "Centrifugal pump"),
+    ("K", "Compressor"),
+    ("E", "Heat exchanger"),
+    ("V", "Pressure vessel"),
+    ("T", "Storage tank"),
+    ("G", "Gas turbine"),
+    ("C", "Distillation column"),
+    ("F", "Fired heater"),
+)
+#: The classes a maintenance BOM is made of.
+BOM_CLASSES = (
+    "bearing.ball.deep_groove",
+    "gasket.spiral_wound",
+    "valve.gate",
+    "fastener.bolt.hex",
+    "pipe.seamless",
+    "cable.power",
+)
+
+
+def seed_equipment(db: Session, per_cpse: int = 30, seed: int = SEED) -> dict:
+    """Tagged equipment per CPSE with a criticality and a bill of materials
+    drawn from that CPSE's own catalogue. Synthetic, like the rest of the
+    estate, and reproducible."""
+    rng = random.Random(seed + 7)
+    db.query(EquipmentBom).delete()
+    db.query(Equipment).delete()
+    db.commit()
+
+    equipment_rows: list[dict] = []
+    for cpse_id, _code in db.execute(select(Cpse.id, Cpse.code).order_by(Cpse.id)).all():
+        for n in range(per_cpse):
+            prefix, kind = EQUIPMENT_KINDS[n % len(EQUIPMENT_KINDS)]
+            tag = f"{prefix}-{101 + n}{rng.choice(('', '', 'A', 'B'))}"
+            equipment_rows.append(
+                {
+                    "cpse_id": cpse_id,
+                    "tag": tag,
+                    "description": f"{kind} {tag}",
+                    # The plant's own ranking: a fifth of it is vital.
+                    "criticality": rng.choices("ABC", weights=(20, 40, 40))[0],
+                }
+            )
+    _bulk(db, Equipment, equipment_rows)
+
+    bom_rows: list[dict] = []
+    for cpse_id, _code in db.execute(select(Cpse.id, Cpse.code).order_by(Cpse.id)).all():
+        pool: dict[str, list[int]] = {}
+        for item_id, class_code in db.execute(
+            select(Item.id, Item.class_code)
+            .join(RawItem, RawItem.id == Item.raw_item_id)
+            .where(RawItem.cpse_id == cpse_id, Item.class_code.in_(BOM_CLASSES))
+            .order_by(Item.id)
+        ).all():
+            pool.setdefault(class_code, []).append(item_id)
+        if not pool:
+            continue
+        classes = sorted(pool)
+        for (equipment_id,) in db.execute(
+            select(Equipment.id).where(Equipment.cpse_id == cpse_id).order_by(Equipment.id)
+        ).all():
+            chosen: set[int] = set()
+            for _ in range(rng.randint(3, 8)):
+                item_id = rng.choice(pool[rng.choice(classes)])
+                if item_id in chosen:
+                    continue
+                chosen.add(item_id)
+                bom_rows.append(
+                    {
+                        "equipment_id": equipment_id,
+                        "item_id": item_id,
+                        "qty": float(rng.choice((1, 1, 2, 2, 4, 6, 8))),
+                    }
+                )
+    _bulk(db, EquipmentBom, bom_rows)
+    return {"equipment": len(equipment_rows), "bom_lines": len(bom_rows)}
+
+
 def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dict:
     """Generate a full synthetic estate with ground truth. Reproducible."""
     if profile not in PROFILES:
@@ -1146,7 +1413,9 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
         insert(User),
         [
             {
-                "email": email, "name": name, "role": role,
+                "email": email,
+                "name": name,
+                "role": role,
                 "password_hash": hash_password("demo"),
                 "cpse_id": cpse_ids.get(cpse_code) if cpse_code else None,
                 "active": True,
@@ -1171,8 +1440,10 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
     else:
         n_shared = min(int(conf["shared"]), capacity)
         n_singleton = (
-            min(max(total_target - round(avg_spread * n_shared) - TRAP_BUDGET * 2, 0),
-                capacity - n_shared - TRAP_BUDGET)
+            min(
+                max(total_target - round(avg_spread * n_shared) - TRAP_BUDGET * 2, 0),
+                capacity - n_shared - TRAP_BUDGET,
+            )
             if conf["fill_singletons"]
             else 0
         )
@@ -1186,8 +1457,7 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
     # Evaluation split, assigned per product and forced to agree across a
     # trap pair so a trap is never split across tuning and held-out.
     splits: dict[str, str] = {
-        p.group_id: (HOLDOUT if rng.random() < HOLDOUT_FRACTION else TUNING)
-        for p in products
+        p.group_id: (HOLDOUT if rng.random() < HOLDOUT_FRACTION else TUNING) for p in products
     }
     for trap in traps:
         split = HOLDOUT if rng.random() < HOLDOUT_FRACTION else TUNING
@@ -1203,7 +1473,8 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
     # source of a sub-tolerance difference. These pairs stay in one truth group
     # and assert that the tolerance band resolves them as duplicates.
     inband_candidates = [
-        p for p in products
+        p
+        for p in products
         if p.spread >= 2 and p.class_code in ("valve.gate", "bearing.ball.deep_groove")
     ]
     inband = set(
@@ -1293,10 +1564,14 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
                 a_id, b_id = raw_id_by_code[code_a], raw_id_by_code[code_b]
                 trap_rows.append(
                     {
-                        "raw_item_a": a_id, "raw_item_b": b_id,
-                        "trap_kind": trap.kind, "offending_attr": trap.attr,
-                        "value_a": trap.value_a, "value_b": trap.value_b,
-                        "expect_duplicate": trap.expect_duplicate, "split": split,
+                        "raw_item_a": a_id,
+                        "raw_item_b": b_id,
+                        "trap_kind": trap.kind,
+                        "offending_attr": trap.attr,
+                        "value_a": trap.value_a,
+                        "value_b": trap.value_b,
+                        "expect_duplicate": trap.expect_duplicate,
+                        "split": split,
                     }
                 )
 
@@ -1331,11 +1606,7 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
             continue
         # A pair is held out if either side is: measuring it otherwise would
         # let a tuning-set product influence a held-out number.
-        split = (
-            HOLDOUT
-            if HOLDOUT in (splits.get(a.group_id), splits.get(b.group_id))
-            else TUNING
-        )
+        split = HOLDOUT if HOLDOUT in (splits.get(a.group_id), splits.get(b.group_id)) else TUNING
         equiv_rows.append(
             {
                 "raw_item_a": raw_id_by_code[codes_a[0]],
@@ -1378,13 +1649,9 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
     item_count = build_items(db)
 
     # --- commercial and inventory facts ---
-    item_rows = db.execute(
-        select(RawItem.id, RawItem.cpse_id, RawItem.price, RawItem.plant)
-    ).all()
+    item_rows = db.execute(select(RawItem.id, RawItem.cpse_id, RawItem.price, RawItem.plant)).all()
     price_by_raw = {rid: (cpse_id, price, plant) for rid, cpse_id, price, plant in item_rows}
-    id_pairs = db.execute(
-        select(Item.id, Item.raw_item_id, Item.pack_qty, Item.class_code)
-    ).all()
+    id_pairs = db.execute(select(Item.id, Item.raw_item_id, Item.pack_qty, Item.class_code)).all()
     plants_by_cpse = {cpse_ids[s.code]: s.plants for s in styles}
     today = date.today()
 
@@ -1434,6 +1701,7 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
 
     _bulk(db, PurchaseHistory, po_rows)
     _bulk(db, Stock, stock_rows)
+    plant = seed_equipment(db, per_cpse={"demo": 60, "test": 12}.get(profile, 80))
 
     return {
         "profile": profile,
@@ -1449,6 +1717,8 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
         "crossrefs": len(crossrefs),
         "purchase_history": len(po_rows),
         "stock": len(stock_rows),
+        "equipment": plant["equipment"],
+        "bom_lines": plant["bom_lines"],
         "users": len(SEED_USERS),
         "holdout_fraction": HOLDOUT_FRACTION,
     }
@@ -1487,15 +1757,19 @@ def seed_registry_activity(db: Session, fraction: float = DEMO_APPROVED_FRACTION
 
     # Deterministic, and biased towards the clusters worth showing: a code on a
     # single-member cluster demonstrates nothing.
-    candidates = db.execute(
-        select(GoldenRecord.id)
-        .join(ClusterMember, ClusterMember.cluster_id == GoldenRecord.cluster_id)
-        .outerjoin(Cnmc, Cnmc.golden_id == GoldenRecord.id)
-        .where(GoldenRecord.status == "draft", Cnmc.id.is_(None))
-        .group_by(GoldenRecord.id)
-        .having(func.count(ClusterMember.id) >= 2)
-        .order_by(func.count(ClusterMember.id).desc(), GoldenRecord.id)
-    ).scalars().all()
+    candidates = (
+        db.execute(
+            select(GoldenRecord.id)
+            .join(ClusterMember, ClusterMember.cluster_id == GoldenRecord.cluster_id)
+            .outerjoin(Cnmc, Cnmc.golden_id == GoldenRecord.id)
+            .where(GoldenRecord.status == "draft", Cnmc.id.is_(None))
+            .group_by(GoldenRecord.id)
+            .having(func.count(ClusterMember.id) >= 2)
+            .order_by(func.count(ClusterMember.id).desc(), GoldenRecord.id)
+        )
+        .scalars()
+        .all()
+    )
 
     wanted = int(len(candidates) * fraction)
     issued = skipped = 0
@@ -1539,9 +1813,7 @@ def seed_smart_create_activity(db: Session, samples: int = DEMO_SMART_CREATE_CHE
     from . import smart_create
     from .models import RawItem, SmartCreateCheck, User
 
-    steward = db.execute(
-        select(User).where(User.email == "steward@cpcl.in")
-    ).scalar_one_or_none()
+    steward = db.execute(select(User).where(User.email == "steward@cpcl.in")).scalar_one_or_none()
     if steward is None:
         return {"checks": 0, "note": "no steward seeded"}
 

@@ -33,7 +33,7 @@ SESSION_COOKIE = "saman_session"
 #: a signature without a timestamp is a credential that never expires.
 SESSION_MAX_AGE = 60 * 60 * 12
 
-ROLES = ("registrar", "admin", "approver", "steward", "auditor", "viewer")
+ROLES = ("registrar", "admin", "approver", "steward", "engineer", "auditor", "viewer")
 
 _PBKDF2_ROUNDS = 120_000
 
