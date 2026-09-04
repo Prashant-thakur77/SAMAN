@@ -157,6 +157,47 @@ def executive(
 
     prevention = smart_create.stats(db)
 
+    # Three disjoint buckets over every catalogue row: carrying a code, waiting
+    # for one with a duplicate found, and waiting for one with none found.
+    coded_items = db.execute(
+        select(func.count(distinct(ClusterMember.item_id)))
+        .join(GoldenRecord, GoldenRecord.cluster_id == ClusterMember.cluster_id)
+        .join(Cnmc, Cnmc.golden_id == GoldenRecord.id)
+    ).scalar() or 0
+    sizes = db.execute(
+        select(ClusterMember.cluster_id, func.count(ClusterMember.item_id)).group_by(
+            ClusterMember.cluster_id
+        )
+    ).all()
+    in_multi = sum(n for _, n in sizes if n > 1)
+    in_single = sum(n for _, n in sizes if n == 1)
+    # Coded rows are spread across both kinds of cluster; take them off the
+    # duplicate pile first, then the singleton pile, so the parts never overlap.
+    from_multi = min(coded_items, in_multi)
+    harmonisation = {
+        "total": items_total,
+        "parts": [
+            {
+                "key": "coded",
+                "label": "Carrying a CNMC",
+                "value": coded_items,
+                "note": "Through review and issued a national code.",
+            },
+            {
+                "key": "duplicate_pending",
+                "label": "Duplicate found, awaiting a code",
+                "value": max(in_multi - from_multi, 0),
+                "note": "Clustered with at least one other row; the code is the next step.",
+            },
+            {
+                "key": "unique_pending",
+                "label": "No duplicate found",
+                "value": max(in_single - (coded_items - from_multi), 0),
+                "note": "The only row describing this material so far.",
+            },
+        ],
+    }
+
     return {
         "kpis": [
             {"key": "items", "label": "Catalogue rows", "value": items_total},
@@ -215,6 +256,10 @@ def executive(
         },
         # The promised "improved data quality", measured per catalogue.
         "quality": quality.scorecard(db),
+        # Where the estate stands, as three disjoint parts of one whole. The
+        # KPIs count things; this says what share of the catalogue is actually
+        # through the process, which is the question the dashboard exists for.
+        "harmonisation": harmonisation,
         "trend": trend,
         "inventory": {
             "positions": stock["positions"],

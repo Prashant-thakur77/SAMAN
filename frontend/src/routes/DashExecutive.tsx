@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
+import { HarmonisationDonut } from '../components/charts/HarmonisationDonut'
 import { PageHeader } from '../components/PageHeader'
 import { AXIS_PROPS, CHART_INK, GRID_PROPS, TOOLTIP_PROPS } from '../components/charts/Chrome'
 import { CountUp, formatRupees } from '../components/charts/CountUp'
@@ -117,6 +118,8 @@ export default function DashExecutive() {
               Rows whose cluster carries an issued CNMC, against the whole catalogue.
             </p>
           </section>
+
+          <HarmonisationDonut harmonisation={data.harmonisation} />
 
           <QualityTable quality={data.quality} />
 

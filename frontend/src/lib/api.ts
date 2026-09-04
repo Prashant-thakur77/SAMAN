@@ -505,6 +505,10 @@ export type ExecutiveDashboard = {
   }
   review: { pending: Record<string, number>; decisions_made: number }
   quality: QualityScorecard
+  harmonisation: {
+    total: number
+    parts: { key: string; label: string; value: number; note: string }[]
+  }
   trend: { date: string; cnmcs_issued: number; cnmcs_total: number; decisions: number }[]
   inventory: {
     positions: number
