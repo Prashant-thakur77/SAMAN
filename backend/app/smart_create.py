@@ -95,10 +95,15 @@ class Suggestion:
     tier_scores: dict
     veto: dict | None
     why: str
+    #: For an interchangeable part: the engineer's decision on the equivalence
+    #: between it and the existing record, when one is on record. A probe has
+    #: no relation row of its own, so this is read off the suggested record's.
+    approval: dict | None = None
 
     def as_dict(self) -> dict:
         return {
             "item_id": self.item_id,
+            "approval": self.approval,
             "confidence": round(self.confidence, 4),
             "band": self.band,
             "verdict": self.verdict,
@@ -233,8 +238,15 @@ def _pool(db: Session, probe: Probe) -> list[MatchCandidate]:
     what separates them is the vector and the attributes, in that order.
     """
     columns = (
-        Item.id, Item.class_code, Item.class_confidence, Item.norm_text, Item.norm_hash,
-        Item.mpn_norm, Item.gtin, Item.attrs_json, Item.embed_vector,
+        Item.id,
+        Item.class_code,
+        Item.class_confidence,
+        Item.norm_text,
+        Item.norm_hash,
+        Item.mpn_norm,
+        Item.gtin,
+        Item.attrs_json,
+        Item.embed_vector,
     )
 
     anchored: dict[int, tuple] = {}
@@ -263,9 +275,7 @@ def _pool(db: Session, probe: Probe) -> list[MatchCandidate]:
                 score += W_PROBE_VECTOR * cosine(probe.vector, unpack(row[8]))
             tokens = content_tokens(row[3] or "")
             if tokens and probe_tokens:
-                score += W_PROBE_TOKENS * (
-                    len(probe_tokens & tokens) / len(probe_tokens | tokens)
-                )
+                score += W_PROBE_TOKENS * (len(probe_tokens & tokens) / len(probe_tokens | tokens))
             if block_value is not None:
                 # Sharing the class's defining attribute (a bearing's bore, a
                 # valve's size) is worth more than sharing three stopwords.
@@ -389,6 +399,7 @@ def check(
     equivalents = equivalents[:limit]
     ruled_out = ruled_out[:NEAR_MISS_SHOWN]
     _decorate(db, suggestions + equivalents + ruled_out)
+    _approvals(db, suggestions, equivalents)
 
     top = suggestions[0].confidence if suggestions else 0.0
     duplicates = [s for s in suggestions if s.verdict == "duplicate"]
@@ -435,7 +446,8 @@ def _veto_reason(veto: dict) -> str:
     blocking = [c for c in veto.get("vetoed_by") or [] if c.get("attr")]
     if not blocking:
         blocking = [
-            c for c in veto.get("per_attr") or []
+            c
+            for c in veto.get("per_attr") or []
             if c.get("result") == "conflict" and c.get("role") == "identity_critical"
         ]
     if not blocking:
@@ -515,6 +527,75 @@ def _decorate(db: Session, suggestions: list[Suggestion]) -> None:
             suggestion.description = row[1] or ""
             suggestion.cpse = row[2]
             suggestion.cnmc = row[3]
+
+
+def _approvals(db: Session, suggestions: list[Suggestion], equivalents: list[Suggestion]) -> None:
+    """Label each interchangeable part with the decision on its equivalence.
+
+    The description being typed is a probe, not an item, so no relation row
+    carries the probe. What does exist is the relation between the existing
+    record the check found and the interchangeable part: if an engineer has
+    approved that one, the requester may fit the part; if it is only
+    proposed, the screen says so rather than implying a decision.
+    """
+    if not equivalents:
+        return
+    if not suggestions:
+        # Nothing existing to be equivalent *to*: the part is interchangeable
+        # with what was typed, and nobody has ruled on that.
+        for e in equivalents:
+            e.approval = {"status": "none", "note": "No equivalence on record yet."}
+        return
+    from . import substitutes
+    from .models import Relation
+
+    records = {s.item_id for s in suggestions}
+    parts = {e.item_id for e in equivalents}
+    relations = (
+        db.execute(
+            select(Relation).where(
+                Relation.rel_type.in_(("equivalent", "supersedes")),
+                Relation.item_a.in_(records | parts),
+                Relation.item_b.in_(records | parts),
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    def joins_record_to_part(r: Relation) -> bool:
+        return (r.item_a in records and r.item_b in parts) or (
+            r.item_b in records and r.item_a in parts
+        )
+
+    relations = [r for r in relations if joins_record_to_part(r)]
+    if not relations:
+        for e in equivalents:
+            e.approval = {"status": "none", "note": "No equivalence on record yet."}
+        return
+    decided = substitutes.approvals_for(db, [r.id for r in relations])
+    rank = {"approved": 0, "proposed": 1, "rejected": 2}
+    best: dict[int, tuple[int, dict]] = {}
+    for r in relations:
+        part = r.item_b if r.item_a in records else r.item_a
+        entry = {
+            "status": r.status,
+            "relation_id": r.id,
+            "with_item_id": r.item_a if part == r.item_b else r.item_b,
+            **(decided.get(r.id) or {}),
+        }
+        score = rank.get(r.status, 9)
+        if part not in best or score < best[part][0]:
+            best[part] = (score, entry)
+    for e in equivalents:
+        e.approval = (
+            best[e.item_id][1]
+            if e.item_id in best
+            else {
+                "status": "none",
+                "note": "No equivalence on record yet.",
+            }
+        )
 
 
 # --------------------------------------------------------------------------

@@ -344,3 +344,37 @@ class TestSmartCreateApi:
         )
         assert reused.status_code == 200 and reused.json()["outcome"] == "prevented"
         assert as_steward.get("/api/smart-create/stats").json()["prevented"] >= 1
+
+
+class TestInterchangeablePartsCarryTheirApproval:
+    """A probe is not an item, so no relation carries it; the decision shown
+    is the one on the equivalence between the record the check found and the
+    interchangeable part. Nothing on record is said as such."""
+
+    def test_every_equivalent_says_where_its_approval_stands(self, as_steward, pipeline_run):
+        from sqlalchemy import select
+
+        from app.db import SessionLocal
+        from app.models import Relation
+
+        with SessionLocal() as db:
+            relation = db.execute(
+                select(Relation).where(Relation.rel_type == "equivalent").limit(1)
+            ).scalar_one_or_none()
+            if relation is None:
+                pytest.skip("no equivalence in this seed")
+            from app.models import Item, RawItem
+
+            description = db.execute(
+                select(RawItem.description)
+                .join(Item, Item.raw_item_id == RawItem.id)
+                .where(Item.id == relation.item_a)
+            ).scalar_one()
+        body = as_steward.post("/api/smart-create/check", json={"description": description}).json()
+        assert body["equivalents"], "the other side of the relation is interchangeable"
+        for part in body["equivalents"]:
+            assert part["approval"] is not None
+            assert part["approval"]["status"] in ("approved", "proposed", "rejected", "none")
+        on_record = [p for p in body["equivalents"] if p["approval"]["status"] != "none"]
+        assert on_record, "the relation the seed planted is on record"
+        assert on_record[0]["approval"]["relation_id"]
