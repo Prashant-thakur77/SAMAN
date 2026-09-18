@@ -66,7 +66,8 @@ class TestDesignationParsing:
         assert d.attrs["seal_type"] == "ZZ"
 
     @pytest.mark.parametrize(
-        ("text", "seal"), [("6205-2Z", "ZZ"), ("6205ZZ", "ZZ"), ("6205-2RS", "2RS"), ("6205", "OPEN")]
+        ("text", "seal"),
+        [("6205-2Z", "ZZ"), ("6205ZZ", "ZZ"), ("6205-2RS", "2RS"), ("6205", "OPEN")],
     )
     def test_manufacturer_seal_suffixes_map_onto_one_enum(self, text, seal):
         assert parse_bearing_designation(text).attrs["seal_type"] == seal
@@ -185,10 +186,7 @@ class TestChemicalGrade:
         assert extract("CHEM,TOLUENE,R GR,40 PCT,RANKEM").attrs["grade"] == "GR"
 
     def test_the_long_form_still_maps(self):
-        assert (
-            extract("CHEMICAL ACETONE LABORATORY REAGENT 99 PCT MERCK").attrs["grade"]
-            == "LR"
-        )
+        assert extract("CHEMICAL ACETONE LABORATORY REAGENT 99 PCT MERCK").attrs["grade"] == "LR"
 
     def test_a_fastener_grade_is_untouched(self):
         """A bare GR in a fastener description means something else entirely,

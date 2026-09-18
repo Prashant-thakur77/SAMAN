@@ -30,12 +30,12 @@ class TestAbsentEngine:
         with pytest.raises(RuntimeError):
             tts.synthesize("hello")
 
-    def test_endpoint_says_503(self, client, monkeypatch, tmp_path):
+    def test_endpoint_says_503(self, as_viewer, monkeypatch, tmp_path):
         monkeypatch.setenv("SAMAN_TTS_VOICE_DIR", str(tmp_path / "nowhere"))
-        response = client.post("/api/assistant/speak", json={"text": "hello"})
+        response = as_viewer.post("/api/assistant/speak", json={"text": "hello"})
         assert response.status_code == 503
         assert "make deps-tts" in response.json()["detail"]
-        voice = client.get("/api/assistant/voice").json()
+        voice = as_viewer.get("/api/assistant/voice").json()
         assert voice["tts"]["available"] is False
 
     def test_health_reports_the_mode(self, client):
@@ -55,12 +55,12 @@ class TestWithVoice:
         samples = struct.unpack(f"<{len(frames) // 2}h", frames)
         assert max(abs(s) for s in samples) > 3000, "a silent file is not speech"
 
-    def test_endpoint_round_trip(self, client):
-        response = client.post("/api/assistant/speak", json={"text": "Opening Workbench."})
+    def test_endpoint_round_trip(self, as_viewer):
+        response = as_viewer.post("/api/assistant/speak", json={"text": "Opening Workbench."})
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("audio/wav")
         assert response.content[:4] == b"RIFF"
 
-    def test_nothing_to_say_is_a_400(self, client):
-        response = client.post("/api/assistant/speak", json={"text": "```"})
+    def test_nothing_to_say_is_a_400(self, as_viewer):
+        response = as_viewer.post("/api/assistant/speak", json={"text": "```"})
         assert response.status_code == 400

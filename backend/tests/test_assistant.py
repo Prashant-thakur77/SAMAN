@@ -152,17 +152,18 @@ class TestCopilotHandoff:
 
 
 class TestEndpoint:
-    def test_query_is_public_and_scoped(self, client, pipeline_run):
-        response = client.post("/api/assistant/query", json={"question": "open the audit trail"})
+    def test_query_is_scoped_to_the_signed_in_role(self, as_viewer, pipeline_run):
+        # A stranger is refused before this endpoint is reached: test_front_door.
+        response = as_viewer.post("/api/assistant/query", json={"question": "open the audit trail"})
         assert response.status_code == 200
         body = response.json()
         assert body["action"]["to"] == "/audit"
         assert body["scope"]["role"] == "viewer"
 
-    def test_suggestions_list_every_route(self, client):
-        body = client.get("/api/assistant/suggestions").json()
+    def test_suggestions_list_every_route(self, as_viewer):
+        body = as_viewer.get("/api/assistant/suggestions").json()
         assert {r["path"] for r in body["routes"]} >= {"/workbench", "/audit", "/migration"}
 
-    def test_overlong_input_is_rejected(self, client):
-        response = client.post("/api/assistant/query", json={"question": "x" * 501})
+    def test_overlong_input_is_rejected(self, as_viewer):
+        response = as_viewer.post("/api/assistant/query", json={"question": "x" * 501})
         assert response.status_code == 422

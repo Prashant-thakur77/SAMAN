@@ -9,10 +9,10 @@ from app.units import UnitError, convert
 @pytest.mark.parametrize(
     ("text", "value"),
     [
-        ("1,200", 1200.0),      # thousand separator
-        ("1/2", 0.5),           # fraction
-        ("1-1/2", 1.5),         # mixed fraction, hyphenated
-        ("1 1/2", 1.5),         # mixed fraction, spaced
+        ("1,200", 1200.0),  # thousand separator
+        ("1/2", 0.5),  # fraction
+        ("1-1/2", 1.5),  # mixed fraction, hyphenated
+        ("1 1/2", 1.5),  # mixed fraction, spaced
         ("25.4", 25.4),
         ("-20", -20.0),
     ],

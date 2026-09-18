@@ -156,21 +156,31 @@ class TestInventorySharing:
         db.execute(delete(Stock).where(Stock.item_id.in_([rich_item, poor_item])))
         db.add_all(
             [
-                Stock(item_id=rich_item, cpse_id=cpse_ids[rich_cpse], plant="P1",
-                      qty_on_hand=500.0, reserved_qty=0.0,
-                      last_movement_date=idle, unit_value=1000.0),
-                Stock(item_id=poor_item, cpse_id=cpse_ids[poor_cpse], plant="P2",
-                      qty_on_hand=1.0, reserved_qty=0.0,
-                      last_movement_date=date.today(), unit_value=1000.0),
+                Stock(
+                    item_id=rich_item,
+                    cpse_id=cpse_ids[rich_cpse],
+                    plant="P1",
+                    qty_on_hand=500.0,
+                    reserved_qty=0.0,
+                    last_movement_date=idle,
+                    unit_value=1000.0,
+                ),
+                Stock(
+                    item_id=poor_item,
+                    cpse_id=cpse_ids[poor_cpse],
+                    plant="P2",
+                    qty_on_hand=1.0,
+                    reserved_qty=0.0,
+                    last_movement_date=date.today(),
+                    unit_value=1000.0,
+                ),
             ]
         )
         db.commit()
         try:
             result = inventory.transfer_suggestions(db, REGISTRAR)
             assert result["suggestions_found"] > 0
-            match = next(
-                s for s in result["suggestions"] if s["from"]["cpse"] == rich_cpse
-            )
+            match = next(s for s in result["suggestions"] if s["from"]["cpse"] == rich_cpse)
             assert match["to"]["cpse"] == poor_cpse
             assert match["qty"] > 0 and match["avoided_purchase_value"] > 0
             assert match["idle_since"]
@@ -216,8 +226,8 @@ class TestInventorySharing:
 
 
 class TestExecutiveEndpoint:
-    def test_the_kpis_spec_6_7_names_are_present(self, client, pipeline_run):
-        keys = {k["key"] for k in client.get("/api/dashboard/executive").json()["kpis"]}
+    def test_the_kpis_spec_6_7_names_are_present(self, as_viewer, pipeline_run):
+        keys = {k["key"] for k in as_viewer.get("/api/dashboard/executive").json()["kpis"]}
         assert {
             "items",
             "clusters",
@@ -227,43 +237,43 @@ class TestExecutiveEndpoint:
             "savings",
         } <= keys
 
-    def test_prevented_duplicates_are_counted_beside_the_cleanup(
-        self, client, pipeline_run
-    ):
+    def test_prevented_duplicates_are_counted_beside_the_cleanup(self, as_viewer, pipeline_run):
         """The rest of this dashboard measures cleaning up; this one measures
         the mess not being made."""
-        kpis = {
-            k["key"]: k for k in client.get("/api/dashboard/executive").json()["kpis"]
-        }
+        kpis = {k["key"]: k for k in as_viewer.get("/api/dashboard/executive").json()["kpis"]}
         assert "prevented" in kpis
         assert kpis["prevented"]["value"] >= 0
         assert kpis["prevented"]["note"]
 
-    def test_kpis_reconcile_with_the_database(self, client, db, pipeline_run):
+    def test_kpis_reconcile_with_the_database(self, as_viewer, db, pipeline_run):
         """§6.7 AC: the numbers must reconcile, not merely look plausible."""
-        body = client.get("/api/dashboard/executive").json()
+        body = as_viewer.get("/api/dashboard/executive").json()
         kpis = {k["key"]: k["value"] for k in body["kpis"]}
         assert kpis["items"] == db.execute(select(func.count(Item.id))).scalar()
         assert kpis["cnmcs"] == db.execute(select(func.count(Cnmc.id))).scalar()
 
-    def test_a_modelled_figure_carries_its_assumption(self, client, pipeline_run):
+    def test_a_modelled_figure_carries_its_assumption(self, as_viewer, pipeline_run):
         savings = next(
-            k for k in client.get("/api/dashboard/executive").json()["kpis"] if k["key"] == "savings"
+            k
+            for k in as_viewer.get("/api/dashboard/executive").json()["kpis"]
+            if k["key"] == "savings"
         )
         assert "capturable" in savings["note"]
 
-    def test_the_heatmap_is_scaled_to_its_busiest_cell(self, client, pipeline_run):
-        heatmap = client.get("/api/dashboard/executive").json()["heatmap"]
+    def test_the_heatmap_is_scaled_to_its_busiest_cell(self, as_viewer, pipeline_run):
+        heatmap = as_viewer.get("/api/dashboard/executive").json()["heatmap"]
         assert heatmap["peak"] > 0
         assert max(c["intensity"] for c in heatmap["cells"]) == pytest.approx(1.0)
         assert len(heatmap["cells"]) == len(heatmap["classes"]) * len(heatmap["cpses"])
 
-    def test_progress_is_a_fraction(self, client, pipeline_run):
-        for row in client.get("/api/dashboard/executive").json()["per_cpse"]:
+    def test_progress_is_a_fraction(self, as_viewer, pipeline_run):
+        for row in as_viewer.get("/api/dashboard/executive").json()["per_cpse"]:
             assert 0.0 <= row["progress"] <= 1.0
             assert row["coded"] <= row["items"]
 
-    def test_the_trend_reflects_what_actually_happened(self, client, as_registrar, db, pipeline_run):
+    def test_the_trend_reflects_what_actually_happened(
+        self, client, as_registrar, db, pipeline_run
+    ):
         """No modelled curve: empty until a code is issued."""
         golden_id = db.execute(
             select(GoldenRecord.id).where(GoldenRecord.status == "draft").limit(1)
@@ -274,25 +284,25 @@ class TestExecutiveEndpoint:
 
 
 class TestOpportunityEndpoint:
-    def test_the_three_blocks_are_present(self, client, pipeline_run):
-        body = client.get("/api/dashboard/opportunity").json()
+    def test_the_three_blocks_are_present(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/dashboard/opportunity").json()
         assert {"joint_tenders", "price_variance", "inventory"} <= set(body)
         assert {"transfers", "dead_stock"} <= set(body["inventory"])
 
-    def test_the_capture_assumption_is_a_parameter(self, client, pipeline_run):
-        low = client.get("/api/dashboard/opportunity?capture=0.4").json()
-        high = client.get("/api/dashboard/opportunity?capture=0.8").json()
+    def test_the_capture_assumption_is_a_parameter(self, as_viewer, pipeline_run):
+        low = as_viewer.get("/api/dashboard/opportunity?capture=0.4").json()
+        high = as_viewer.get("/api/dashboard/opportunity?capture=0.8").json()
         assert (
             high["joint_tenders"]["total_estimated_saving"]
             > low["joint_tenders"]["total_estimated_saving"]
         )
 
-    def test_the_slider_range_is_enforced(self, client, pipeline_run):
-        assert client.get("/api/dashboard/opportunity?capture=0.95").status_code == 422
-        assert client.get("/api/dashboard/opportunity?capture=0.1").status_code == 422
+    def test_the_slider_range_is_enforced(self, as_viewer, pipeline_run):
+        assert as_viewer.get("/api/dashboard/opportunity?capture=0.95").status_code == 422
+        assert as_viewer.get("/api/dashboard/opportunity?capture=0.1").status_code == 422
 
-    def test_the_viewers_scope_is_stated(self, client, pipeline_run):
-        assert client.get("/api/dashboard/opportunity").json()["visibility"]["note"]
+    def test_the_viewers_scope_is_stated(self, as_viewer, pipeline_run):
+        assert as_viewer.get("/api/dashboard/opportunity").json()["visibility"]["note"]
 
 
 class TestVisibilityPolicyIsStated:

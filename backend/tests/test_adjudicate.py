@@ -15,10 +15,22 @@ def evidence(**overrides):
     base = {
         "attributes": {
             "per_attr": [
-                {"attr": "bore_mm", "role": "identity_critical", "result": "match",
-                 "a": 25, "b": 25, "detail": "identical"},
-                {"attr": "seal_type", "role": "identity_critical", "result": "match",
-                 "a": "ZZ", "b": "ZZ", "detail": "identical"},
+                {
+                    "attr": "bore_mm",
+                    "role": "identity_critical",
+                    "result": "match",
+                    "a": 25,
+                    "b": 25,
+                    "detail": "identical",
+                },
+                {
+                    "attr": "seal_type",
+                    "role": "identity_critical",
+                    "result": "match",
+                    "a": "ZZ",
+                    "b": "ZZ",
+                    "detail": "identical",
+                },
             ],
             "agreement": 1.0,
         },
@@ -36,8 +48,13 @@ class TestItNeverContradictsTheVeto:
     def test_a_vetoed_pair_leans_split(self):
         veto = {
             "vetoed_by": [
-                {"attr": "bore_mm", "role": "identity_critical", "a": 25, "b": 30,
-                 "reason": "25 mm vs 30 mm"}
+                {
+                    "attr": "bore_mm",
+                    "role": "identity_critical",
+                    "a": 25,
+                    "b": 30,
+                    "reason": "25 mm vs 30 mm",
+                }
             ]
         }
         result = adjudicate(evidence(), {}, 0.7, "review", veto)
@@ -47,15 +64,20 @@ class TestItNeverContradictsTheVeto:
     def test_a_veto_beats_agreeing_attributes(self):
         """The per-attribute list can look entirely agreeable while §2A has
         already refused the pair on an attribute that is not in it."""
-        veto = {"vetoed_by": [{"attr": "temp_max_c", "role": "performance",
-                               "reason": "outside the 10% band"}]}
+        veto = {
+            "vetoed_by": [
+                {"attr": "temp_max_c", "role": "performance", "reason": "outside the 10% band"}
+            ]
+        }
         assert adjudicate(evidence(), {}, 0.9, "review", veto).recommendation == LEAN_SPLIT
 
     def test_further_vetoed_attributes_are_named(self):
-        veto = {"vetoed_by": [
-            {"attr": "bore_mm", "role": "identity_critical", "reason": "differs"},
-            {"attr": "width_mm", "role": "identity_critical", "reason": "differs"},
-        ]}
+        veto = {
+            "vetoed_by": [
+                {"attr": "bore_mm", "role": "identity_critical", "reason": "differs"},
+                {"attr": "width_mm", "role": "identity_critical", "reason": "differs"},
+            ]
+        }
         result = adjudicate(evidence(), {}, 0.7, "review", veto)
         assert any("width mm" in reason for reason in result.reasons)
 
@@ -92,9 +114,7 @@ class TestThinEvidence:
     def test_it_says_what_did_agree_as_well_as_what_did_not(self):
         """A reviewer needs the positive half too, or the card only argues one
         way."""
-        result = adjudicate(
-            evidence(defining_attribute_compared=False), {}, 0.85
-        )
+        result = adjudicate(evidence(defining_attribute_compared=False), {}, 0.85)
         assert any("agrees" in reason for reason in result.reasons)
 
     def test_partial_coverage_names_the_missing_attribute(self):
@@ -123,8 +143,14 @@ class TestMerge:
     def test_cosmetic_differences_are_named_as_cosmetic(self):
         with_brand = evidence()
         with_brand["attributes"]["per_attr"].append(
-            {"attr": "brand", "role": "cosmetic", "result": "mismatch",
-             "a": "SKF", "b": "FAG", "detail": "differs"}
+            {
+                "attr": "brand",
+                "role": "cosmetic",
+                "result": "mismatch",
+                "a": "SKF",
+                "b": "FAG",
+                "detail": "differs",
+            }
         )
         result = adjudicate(with_brand, {}, 0.84)
         assert any("cosmetic" in reason for reason in result.reasons)

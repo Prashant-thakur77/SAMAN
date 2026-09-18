@@ -33,60 +33,60 @@ def pending_task(pipeline_run, db):
 
 
 class TestQueues:
-    def test_all_three_bands_carry_work(self, client, pipeline_run):
+    def test_all_three_bands_carry_work(self, as_viewer, pipeline_run):
         """§6.5: an automation rate only means something if it can be sampled."""
-        counts = client.get("/api/queues").json()["counts"]
+        counts = as_viewer.get("/api/queues").json()["counts"]
         assert set(counts) == {"high", "grey", "low"}
         assert all(counts[band] > 0 for band in ("high", "grey", "low")), counts
 
-    def test_each_band_explains_what_it_is_asking_for(self, client, pipeline_run):
+    def test_each_band_explains_what_it_is_asking_for(self, as_viewer, pipeline_run):
         for band, phrase in (
             ("high", "automatic merge"),
             ("low", "automatic refusal"),
         ):
-            task = client.get(f"/api/queues?band={band}&limit=1").json()["tasks"][0]
+            task = as_viewer.get(f"/api/queues?band={band}&limit=1").json()["tasks"][0]
             assert phrase in task["reason"]
 
-    def test_a_band_can_be_selected(self, client, pipeline_run):
-        body = client.get("/api/queues?band=grey&limit=5").json()
+    def test_a_band_can_be_selected(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/queues?band=grey&limit=5").json()
         assert body["band"] == "grey"
         assert all(task["band"] == "grey" for task in body["tasks"])
 
-    def test_an_unknown_band_is_refused(self, client, pipeline_run):
-        assert client.get("/api/queues?band=purple").status_code == 422
+    def test_an_unknown_band_is_refused(self, as_viewer, pipeline_run):
+        assert as_viewer.get("/api/queues?band=purple").status_code == 422
 
-    def test_a_card_shows_two_items_side_by_side(self, client, pipeline_run):
+    def test_a_card_shows_two_items_side_by_side(self, as_viewer, pipeline_run):
         """§6.5: the card is a comparison, not a single record."""
-        tasks = client.get("/api/queues?limit=5").json()["tasks"]
+        tasks = as_viewer.get("/api/queues?limit=5").json()["tasks"]
         card = next(t for t in tasks if "items" in t)
         assert len(card["items"]) == 2
         for item in card["items"]:
             assert item["description"] and item["cpse"]
 
-    def test_a_card_carries_the_tier_strip_and_confidence(self, client, pipeline_run):
-        card = next(t for t in client.get("/api/queues?limit=5").json()["tasks"] if "items" in t)
+    def test_a_card_carries_the_tier_strip_and_confidence(self, as_viewer, pipeline_run):
+        card = next(t for t in as_viewer.get("/api/queues?limit=5").json()["tasks"] if "items" in t)
         assert {"tier0_anchor", "tier1_fuzzy", "tier2_semantic"} <= set(card["tier_scores"])
         assert 0 <= card["confidence"] <= 1
 
-    def test_the_attribute_diff_marks_agreement_and_conflict(self, client, pipeline_run):
+    def test_the_attribute_diff_marks_agreement_and_conflict(self, as_viewer, pipeline_run):
         """§6.5: matching attributes plain, conflicting attributes marked."""
-        cards = client.get("/api/queues?limit=25").json()["tasks"]
+        cards = as_viewer.get("/api/queues?limit=25").json()["tasks"]
         with_diff = [c for c in cards if c.get("attribute_diff")]
         assert with_diff
         for entry in with_diff[0]["attribute_diff"]:
             assert isinstance(entry["agrees"], bool)
             assert entry["role"] in {"identity_critical", "performance", "cosmetic"}
 
-    def test_a_refused_pair_explains_itself_in_words(self, client, pipeline_run):
-        """"Not a duplicate: bore 25 mm vs 30 mm" is the demo moment."""
-        cards = client.get("/api/queues?limit=100").json()["tasks"]
+    def test_a_refused_pair_explains_itself_in_words(self, as_viewer, pipeline_run):
+        """ "Not a duplicate: bore 25 mm vs 30 mm" is the demo moment."""
+        cards = as_viewer.get("/api/queues?limit=100").json()["tasks"]
         refused = [c for c in cards if c.get("refused_because")]
         if refused:
             assert all(isinstance(r, str) and r for r in refused[0]["refused_because"])
 
-    def test_pagination_is_stable(self, client, pipeline_run):
-        first = client.get("/api/queues?limit=2&offset=0").json()["tasks"]
-        second = client.get("/api/queues?limit=2&offset=2").json()["tasks"]
+    def test_pagination_is_stable(self, as_viewer, pipeline_run):
+        first = as_viewer.get("/api/queues?limit=2&offset=0").json()["tasks"]
+        second = as_viewer.get("/api/queues?limit=2&offset=2").json()["tasks"]
         assert {t["task_id"] for t in first}.isdisjoint({t["task_id"] for t in second})
 
 
@@ -98,7 +98,8 @@ class TestDecisions:
         if task is None:
             pytest.skip("no pending grey task")
         response = as_steward.post(
-            "/api/decisions", json={"task_id": task.id, "action": "reject", "note": "different bore"}
+            "/api/decisions",
+            json={"task_id": task.id, "action": "reject", "note": "different bore"},
         )
         assert response.status_code == 200
         db.expire_all()
@@ -129,9 +130,12 @@ class TestDecisions:
         assert response.status_code == 422
 
     def test_an_unknown_task_is_404(self, as_steward, pipeline_run):
-        assert as_steward.post(
-            "/api/decisions", json={"task_id": 999999, "action": "reject"}
-        ).status_code == 404
+        assert (
+            as_steward.post(
+                "/api/decisions", json={"task_id": 999999, "action": "reject"}
+            ).status_code
+            == 404
+        )
 
     def test_a_viewer_cannot_decide(self, client, pending_task):
         client.post("/api/auth/login", json={"email": "viewer@min.gov.in", "password": "demo"})
@@ -152,9 +156,7 @@ class TestDecisions:
         ).scalar_one_or_none()
         if task is None:
             pytest.skip("no pending conflict task")
-        response = as_steward.post(
-            "/api/decisions", json={"task_id": task.id, "action": "reject"}
-        )
+        response = as_steward.post("/api/decisions", json={"task_id": task.id, "action": "reject"})
         assert response.status_code == 403
         assert "approver" in response.json()["detail"]
 
@@ -191,9 +193,12 @@ class TestOverturningAutomaticDecisions:
         before = db.execute(
             select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_a)
         ).scalar()
-        assert before == db.execute(
-            select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_b)
-        ).scalar(), "an auto-accepted pair should start out merged"
+        assert (
+            before
+            == db.execute(
+                select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_b)
+            ).scalar()
+        ), "an auto-accepted pair should start out merged"
 
         response = client.post(
             "/api/decisions", json={"task_id": task.id, "action": "reject", "note": "not the same"}
@@ -221,18 +226,19 @@ class TestOverturningAutomaticDecisions:
         if row is None:
             pytest.skip("no pending low-band task")
         task, pair = row
-        response = client.post(
-            "/api/decisions", json={"task_id": task.id, "action": "approve"}
-        )
+        response = client.post("/api/decisions", json={"task_id": task.id, "action": "approve"})
         # Either it merges, or it is refused because a code has been issued.
         assert response.status_code in (200, 409)
         if response.status_code == 200:
             db.expire_all()
-            assert db.execute(
-                select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_a)
-            ).scalar() == db.execute(
-                select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_b)
-            ).scalar()
+            assert (
+                db.execute(
+                    select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_a)
+                ).scalar()
+                == db.execute(
+                    select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_b)
+                ).scalar()
+            )
 
 
 class TestClusterSurgery:
@@ -251,12 +257,16 @@ class TestClusterSurgery:
             # cluster on its own; earlier this fixture relied on another
             # file's merge test having made one, which is an order dependency.
             # Build the precondition here instead: move one member across.
-            pairs = db.execute(
-                select(ClusterMember.cluster_id)
-                .group_by(ClusterMember.cluster_id)
-                .having(func.count() >= 2)
-                .limit(2)
-            ).scalars().all()
+            pairs = (
+                db.execute(
+                    select(ClusterMember.cluster_id)
+                    .group_by(ClusterMember.cluster_id)
+                    .having(func.count() >= 2)
+                    .limit(2)
+                )
+                .scalars()
+                .all()
+            )
             assert len(pairs) == 2, "need two clusters to build a three-member one"
             target, donor = pairs
             member = db.execute(
@@ -270,23 +280,38 @@ class TestClusterSurgery:
     def test_splitting_moves_the_member_into_its_own_cluster(
         self, as_steward, db, multi_member_cluster
     ):
-        item_id = db.execute(
-            select(ClusterMember.item_id).where(ClusterMember.cluster_id == multi_member_cluster)
-        ).scalars().first()
+        item_id = (
+            db.execute(
+                select(ClusterMember.item_id).where(
+                    ClusterMember.cluster_id == multi_member_cluster
+                )
+            )
+            .scalars()
+            .first()
+        )
         response = as_steward.post(
             f"/api/clusters/{multi_member_cluster}/split", json={"item_id": item_id}
         )
         assert response.status_code == 200
         new_cluster = response.json()["new_cluster_id"]
         db.expire_all()
-        assert db.execute(
-            select(ClusterMember.cluster_id).where(ClusterMember.item_id == item_id)
-        ).scalar() == new_cluster
+        assert (
+            db.execute(
+                select(ClusterMember.cluster_id).where(ClusterMember.item_id == item_id)
+            ).scalar()
+            == new_cluster
+        )
 
     def test_a_split_writes_an_audit_event(self, as_steward, db, multi_member_cluster):
-        item_id = db.execute(
-            select(ClusterMember.item_id).where(ClusterMember.cluster_id == multi_member_cluster)
-        ).scalars().first()
+        item_id = (
+            db.execute(
+                select(ClusterMember.item_id).where(
+                    ClusterMember.cluster_id == multi_member_cluster
+                )
+            )
+            .scalars()
+            .first()
+        )
         as_steward.post(f"/api/clusters/{multi_member_cluster}/split", json={"item_id": item_id})
         db.expire_all()
         latest = db.execute(
@@ -304,24 +329,26 @@ class TestClusterSurgery:
         item_id = db.execute(
             select(ClusterMember.item_id).where(ClusterMember.cluster_id == singleton)
         ).scalar()
-        response = as_steward.post(
-            f"/api/clusters/{singleton}/split", json={"item_id": item_id}
-        )
+        response = as_steward.post(f"/api/clusters/{singleton}/split", json={"item_id": item_id})
         assert response.status_code == 422
 
-    def test_merging_moves_every_member_and_drops_the_source(
-        self, as_steward, db, pipeline_run
-    ):
-        clusters = db.execute(
-            select(ClusterMember.cluster_id)
-            .group_by(ClusterMember.cluster_id)
-            .having(func.count() == 1)
-            .limit(2)
-        ).scalars().all()
+    def test_merging_moves_every_member_and_drops_the_source(self, as_steward, db, pipeline_run):
+        clusters = (
+            db.execute(
+                select(ClusterMember.cluster_id)
+                .group_by(ClusterMember.cluster_id)
+                .having(func.count() == 1)
+                .limit(2)
+            )
+            .scalars()
+            .all()
+        )
         source, target = clusters[0], clusters[1]
-        moved = db.execute(
-            select(ClusterMember.item_id).where(ClusterMember.cluster_id == source)
-        ).scalars().all()
+        moved = (
+            db.execute(select(ClusterMember.item_id).where(ClusterMember.cluster_id == source))
+            .scalars()
+            .all()
+        )
 
         response = as_steward.post(
             f"/api/clusters/{target}/merge", json={"source_cluster_id": source}
@@ -330,17 +357,24 @@ class TestClusterSurgery:
         db.expire_all()
         assert db.get(Cluster, source) is None
         for item_id in moved:
-            assert db.execute(
-                select(ClusterMember.cluster_id).where(ClusterMember.item_id == item_id)
-            ).scalar() == target
+            assert (
+                db.execute(
+                    select(ClusterMember.cluster_id).where(ClusterMember.item_id == item_id)
+                ).scalar()
+                == target
+            )
 
     def test_a_merge_writes_an_audit_event(self, as_steward, db, pipeline_run):
-        clusters = db.execute(
-            select(ClusterMember.cluster_id)
-            .group_by(ClusterMember.cluster_id)
-            .having(func.count() == 1)
-            .limit(2)
-        ).scalars().all()
+        clusters = (
+            db.execute(
+                select(ClusterMember.cluster_id)
+                .group_by(ClusterMember.cluster_id)
+                .having(func.count() == 1)
+                .limit(2)
+            )
+            .scalars()
+            .all()
+        )
         as_steward.post(
             f"/api/clusters/{clusters[1]}/merge", json={"source_cluster_id": clusters[0]}
         )
@@ -352,12 +386,16 @@ class TestClusterSurgery:
 
     def test_the_golden_record_is_rebuilt_after_a_merge(self, as_steward, db, pipeline_run):
         """The description must never drift out of step with its cluster."""
-        clusters = db.execute(
-            select(ClusterMember.cluster_id)
-            .group_by(ClusterMember.cluster_id)
-            .having(func.count() == 1)
-            .limit(2)
-        ).scalars().all()
+        clusters = (
+            db.execute(
+                select(ClusterMember.cluster_id)
+                .group_by(ClusterMember.cluster_id)
+                .having(func.count() == 1)
+                .limit(2)
+            )
+            .scalars()
+            .all()
+        )
         as_steward.post(
             f"/api/clusters/{clusters[1]}/merge", json={"source_cluster_id": clusters[0]}
         )
@@ -394,9 +432,11 @@ class TestImmutabilityOfIssuedCodes:
         client.post("/api/auth/login", json={"email": "registrar@min.gov.in", "password": "demo"})
         assert client.post(f"/api/cnmc/issue/{golden.id}").status_code == 200
 
-        item_id = db.execute(
-            select(ClusterMember.item_id).where(ClusterMember.cluster_id == cluster_id)
-        ).scalars().first()
+        item_id = (
+            db.execute(select(ClusterMember.item_id).where(ClusterMember.cluster_id == cluster_id))
+            .scalars()
+            .first()
+        )
         client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
         response = client.post(f"/api/clusters/{cluster_id}/split", json={"item_id": item_id})
         assert response.status_code == 409
@@ -406,9 +446,7 @@ class TestImmutabilityOfIssuedCodes:
 class TestSeparationOfDuties:
     """§0.9 — the proposer of a golden record may not approve it."""
 
-    def test_editing_then_issuing_as_the_same_user_is_refused(
-        self, client, db, pipeline_run
-    ):
+    def test_editing_then_issuing_as_the_same_user_is_refused(self, client, db, pipeline_run):
         golden = db.execute(
             select(GoldenRecord).where(GoldenRecord.status == "draft").limit(1)
         ).scalar_one()
@@ -450,30 +488,30 @@ class TestSeparationOfDuties:
 class TestItemDetail:
     """§6.4 / §2B — duplicates and equivalents as two separate blocks."""
 
-    def test_an_item_returns_its_golden_record_and_siblings(self, client, db, pipeline_run):
+    def test_an_item_returns_its_golden_record_and_siblings(self, as_viewer, db, pipeline_run):
         item_id = db.execute(
             select(ClusterMember.item_id)
             .group_by(ClusterMember.cluster_id)
             .having(func.count() >= 2)
             .limit(1)
         ).scalar()
-        body = client.get(f"/api/items/{item_id}").json()
+        body = as_viewer.get(f"/api/items/{item_id}").json()
         assert body["golden"]["std_description"]
         assert body["duplicates"], "a clustered item should list its duplicates"
 
-    def test_duplicates_and_equivalents_are_separate_blocks(self, client, db, pipeline_run):
+    def test_duplicates_and_equivalents_are_separate_blocks(self, as_viewer, db, pipeline_run):
         from app.models import Relation
 
         relation = db.execute(select(Relation).limit(1)).scalar_one_or_none()
         if relation is None:
             pytest.skip("no relations")
-        body = client.get(f"/api/items/{relation.item_a}").json()
+        body = as_viewer.get(f"/api/items/{relation.item_a}").json()
         assert "duplicates" in body and "equivalents" in body
         duplicate_ids = {d["item_id"] for d in body["duplicates"]}
         equivalent_ids = {e["counterpart"]["item_id"] for e in body["equivalents"]}
         assert duplicate_ids.isdisjoint(equivalent_ids)
 
-    def test_an_equivalent_states_which_way_substitution_runs(self, client, db, pipeline_run):
+    def test_an_equivalent_states_which_way_substitution_runs(self, as_viewer, db, pipeline_run):
         from app.models import Relation
 
         relation = db.execute(
@@ -481,11 +519,11 @@ class TestItemDetail:
         ).scalar_one_or_none()
         if relation is None:
             pytest.skip("no directed relations")
-        body = client.get(f"/api/items/{relation.item_a}").json()
+        body = as_viewer.get(f"/api/items/{relation.item_a}").json()
         entry = next(
             e for e in body["equivalents"] if e["counterpart"]["item_id"] == relation.item_b
         )
         assert isinstance(entry["substitutes_this"], bool)
 
-    def test_an_unknown_item_is_404(self, client, pipeline_run):
-        assert client.get("/api/items/999999").status_code == 404
+    def test_an_unknown_item_is_404(self, as_viewer, pipeline_run):
+        assert as_viewer.get("/api/items/999999").status_code == 404

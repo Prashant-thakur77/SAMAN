@@ -77,10 +77,12 @@ class TestTheCheck:
         from app.models import Item, TruthEquivalence
 
         pair = db.execute(
-            select(TruthEquivalence.raw_item_a, TruthEquivalence.raw_item_b).where(
+            select(TruthEquivalence.raw_item_a, TruthEquivalence.raw_item_b)
+            .where(
                 TruthEquivalence.basis == "designation",
                 TruthEquivalence.rel_type == "equivalent",
-            ).limit(1)
+            )
+            .limit(1)
         ).first()
         assert pair, "the seed must plant cross-brand equivalents"
         description, uom = db.execute(
@@ -132,9 +134,9 @@ class TestTheToken:
     def test_a_token_round_trips(self, db, pipeline_run):
         result = smart_create.check(db, "SOMETHING NEW ENTIRELY 12345")
         probe = smart_create.build_probe(db, "SOMETHING NEW ENTIRELY 12345", None, None)
-        assert smart_create.verify_token(result["create_token"], probe.norm_hash) == result[
-            "check_id"
-        ]
+        assert (
+            smart_create.verify_token(result["create_token"], probe.norm_hash) == result["check_id"]
+        )
 
     def test_a_tampered_token_is_refused(self, db, pipeline_run):
         result = smart_create.check(db, "SOMETHING NEW ENTIRELY 12345")
@@ -185,8 +187,13 @@ class TestOutcomes:
         description, uom = catalogue_row
         result = smart_create.check(db, description, uom=uom, user=steward)
         created = smart_create.create_anyway(
-            db, result["create_token"], "SC-OVERRIDE-1", description, uom,
-            "Separate valuation class at a different plant.", steward,
+            db,
+            result["create_token"],
+            "SC-OVERRIDE-1",
+            description,
+            uom,
+            "Separate valuation class at a different plant.",
+            steward,
         )
         raw = db.get(RawItem, created["raw_item_id"])
         assert raw.legacy_code == "SC-OVERRIDE-1" and raw.cpse_id == steward.cpse_id
@@ -196,8 +203,13 @@ class TestOutcomes:
     def test_a_new_item_needs_no_reason(self, db, pipeline_run, steward):
         result = smart_create.check(db, "ENTIRELY NOVEL WIDGET XR-9000", user=steward)
         created = smart_create.create_anyway(
-            db, result["create_token"], "SC-NOVEL-1", "ENTIRELY NOVEL WIDGET XR-9000",
-            None, None, steward,
+            db,
+            result["create_token"],
+            "SC-NOVEL-1",
+            "ENTIRELY NOVEL WIDGET XR-9000",
+            None,
+            None,
+            steward,
         )
         assert created["outcome"] == "created_anyway"
 
@@ -208,8 +220,13 @@ class TestOutcomes:
         result = smart_create.check(db, "ENTIRELY NOVEL WIDGET XR-9001", user=steward)
         with pytest.raises(ValueError, match="already exists"):
             smart_create.create_anyway(
-                db, result["create_token"], existing, "ENTIRELY NOVEL WIDGET XR-9001",
-                None, None, steward,
+                db,
+                result["create_token"],
+                existing,
+                "ENTIRELY NOVEL WIDGET XR-9001",
+                None,
+                None,
+                steward,
             )
 
     def test_both_outcomes_are_audited(self, db, catalogue_row, steward):
@@ -219,19 +236,27 @@ class TestOutcomes:
         smart_create.reuse(db, first["check_id"], first["suggestions"][0]["item_id"], steward)
         second = smart_create.check(db, "ENTIRELY NOVEL WIDGET XR-9002", user=steward)
         smart_create.create_anyway(
-            db, second["create_token"], "SC-AUDIT-1", "ENTIRELY NOVEL WIDGET XR-9002",
-            None, None, steward,
+            db,
+            second["create_token"],
+            "SC-AUDIT-1",
+            "ENTIRELY NOVEL WIDGET XR-9002",
+            None,
+            None,
+            steward,
         )
         assert len(db.execute(select(AuditEvent.id)).all()) == before + 2
 
-    def test_the_override_row_enters_the_catalogue_like_any_other(
-        self, db, pipeline_run, steward
-    ):
+    def test_the_override_row_enters_the_catalogue_like_any_other(self, db, pipeline_run, steward):
         """An override is a business decision, not an exemption from matching."""
         result = smart_create.check(db, "ENTIRELY NOVEL WIDGET XR-9003", user=steward)
         created = smart_create.create_anyway(
-            db, result["create_token"], "SC-PIPELINE-1", "ENTIRELY NOVEL WIDGET XR-9003",
-            None, None, steward,
+            db,
+            result["create_token"],
+            "SC-PIPELINE-1",
+            "ENTIRELY NOVEL WIDGET XR-9003",
+            None,
+            None,
+            steward,
         )
         from app.pipeline import build_items
 
@@ -273,17 +298,20 @@ class TestSmartCreateApi:
         assert response.json()["suggestions"]
 
     def test_a_viewer_cannot_probe_the_catalogue_by_description(self, as_viewer):
-        assert as_viewer.post(
-            "/api/smart-create/check", json={"description": "BEARING 6205"}
-        ).status_code == 403
+        assert (
+            as_viewer.post(
+                "/api/smart-create/check", json={"description": "BEARING 6205"}
+            ).status_code
+            == 403
+        )
 
     def test_a_viewer_can_still_read_the_counter(self, as_viewer):
         assert as_viewer.get("/api/smart-create/stats").status_code == 200
 
     def test_a_blank_description_is_a_422(self, as_steward):
-        assert as_steward.post(
-            "/api/smart-create/check", json={"description": ""}
-        ).status_code == 422
+        assert (
+            as_steward.post("/api/smart-create/check", json={"description": ""}).status_code == 422
+        )
 
     def test_the_counter_reaches_the_health_panel(self, as_registrar, catalogue_row):
         """§5: the prevented-duplicate counter belongs on the health dashboard."""

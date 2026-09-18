@@ -35,8 +35,12 @@ class TestRefinement:
 
     def _attrs(self, bore):
         return {
-            "bore_mm": bore, "outer_dia_mm": 52, "width_mm": 15,
-            "seal_type": "ZZ", "load_rating_kg": 500, "temp_max_c": 120,
+            "bore_mm": bore,
+            "outer_dia_mm": 52,
+            "width_mm": 15,
+            "seal_type": "ZZ",
+            "load_rating_kg": 500,
+            "temp_max_c": 120,
         }
 
     def test_a_vetoed_pair_is_split_out_of_a_chain(self):
@@ -82,7 +86,12 @@ class TestGoldenDraft:
     def test_the_most_complete_member_is_the_representative(self):
         draft = draft_golden(
             [
-                {"id": 1, "norm_text": "BEARING 6205", "attrs": {"bore_mm": 25}, "class_code": BEARING},
+                {
+                    "id": 1,
+                    "norm_text": "BEARING 6205",
+                    "attrs": {"bore_mm": 25},
+                    "class_code": BEARING,
+                },
                 {
                     "id": 2,
                     "norm_text": "BEARING BALL 6205 ZZ 25MM BORE SKF",
@@ -103,8 +112,12 @@ class TestGoldenDraft:
 
     def test_private_keys_are_not_promoted_into_the_golden_record(self):
         members = [
-            {"id": 1, "norm_text": "X", "attrs": {"bore_mm": 25, "_designation": "6205"},
-             "class_code": BEARING}
+            {
+                "id": 1,
+                "norm_text": "X",
+                "attrs": {"bore_mm": 25, "_designation": "6205"},
+                "class_code": BEARING,
+            }
         ]
         assert "_designation" not in draft_golden(members).attrs
 

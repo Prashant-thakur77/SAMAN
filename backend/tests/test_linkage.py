@@ -85,7 +85,8 @@ class TestTierOneSelection:
     def test_the_waterfall_reaches_the_evidence(self):
         a, b = item(1, "BEARING BALL 6205 ZZ SKF"), item(2, "BEARING BALL 6205 ZZ SKF")
         linkage = LinkageResult(
-            probability={(1, 2): 0.99}, weight={(1, 2): 6.1},
+            probability={(1, 2): 0.99},
+            weight={(1, 2): 6.1},
             levels={(1, 2): {"mpn_norm": 1}},
         )
         scores = match_pair(a, b, linkage).tier_scores

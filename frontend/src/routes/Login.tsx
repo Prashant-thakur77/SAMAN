@@ -1,6 +1,6 @@
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
@@ -36,6 +36,10 @@ export default function Login() {
   const controls = useAnimationControls()
   const reduce = useReducedMotion() ?? false
   const navigate = useNavigate()
+  const location = useLocation()
+  // A visitor sent here from a screen inside the app goes back to it; the
+  // app shell puts that screen in the router state (see App).
+  const cameFrom = (location.state as { from?: string } | null)?.from ?? '/'
   const { refresh } = useSession()
   const [seeding, setSeeding] = useState<PipelineStatus | null>(null)
   const [seedError, setSeedError] = useState<string | null>(null)
@@ -99,7 +103,7 @@ export default function Login() {
     try {
       await login(email, password)
       await refresh()
-      navigate('/')
+      navigate(cameFrom)
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 401

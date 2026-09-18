@@ -202,9 +202,7 @@ class TestMeasuredWorth:
             > severe["by_condition"]["severe"]["mean_ocr_confidence"]
         )
 
-    def test_an_illegible_plate_returns_nothing_rather_than_something_wrong(
-        self, db, pipeline_run
-    ):
+    def test_an_illegible_plate_returns_nothing_rather_than_something_wrong(self, db, pipeline_run):
         """The failure mode that matters: it must not resolve confidently to the
         wrong material."""
         report = ocr_eval.evaluate(db, samples=5, conditions=("severe",))

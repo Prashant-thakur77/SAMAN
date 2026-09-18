@@ -21,12 +21,21 @@ BEARING = get_schema("bearing.ball.deep_groove")
 VALVE = get_schema("valve.gate")
 
 BASE_BEARING = {
-    "bore_mm": 25, "outer_dia_mm": 52, "width_mm": 15, "seal_type": "ZZ",
-    "load_rating_kg": 500, "temp_max_c": 120, "brand": "SKF",
+    "bore_mm": 25,
+    "outer_dia_mm": 52,
+    "width_mm": 15,
+    "seal_type": "ZZ",
+    "load_rating_kg": 500,
+    "temp_max_c": 120,
+    "brand": "SKF",
 }
 BASE_VALVE = {
-    "size_nb_mm": 50, "pressure_class": "300", "body_material": "SS316",
-    "end_connection": "FLANGED", "pressure_bar": 51.1, "temp_max_c": 250,
+    "size_nb_mm": 50,
+    "pressure_class": "300",
+    "body_material": "SS316",
+    "end_connection": "FLANGED",
+    "pressure_bar": 51.1,
+    "temp_max_c": 250,
 }
 
 
@@ -92,9 +101,7 @@ class TestPerformanceBands:
         assert out_of_band.is_veto
 
     def test_equal_values_are_exact_not_merely_in_band(self):
-        comparison = compare_attr(
-            BEARING.attributes["load_rating_kg"], 500, 500
-        )
+        comparison = compare_attr(BEARING.attributes["load_rating_kg"], 500, 500)
         assert comparison.result == MATCH and comparison.detail == "exact"
 
     def test_in_band_difference_is_labelled_in_band(self):
@@ -235,6 +242,6 @@ class TestValuesEqual:
 
         assert equivalence._equal is values_equal
         assert smart_create._same_value(65, 65.0)
-        assert not smart_create._same_value(None, None), (
-            "an absent bore is not a reason to retrieve a row"
-        )
+        assert not smart_create._same_value(
+            None, None
+        ), "an absent bore is not a reason to retrieve a row"

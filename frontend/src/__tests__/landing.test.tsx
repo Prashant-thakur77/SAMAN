@@ -18,6 +18,14 @@ vi.mock('../lib/api', async () => {
   return { ...actual, getVoice: vi.fn(async () => ({ available: false, tts: { available: false } })) }
 })
 
+// The page reads the session only to decide whether to mount the assistant:
+// a visitor gets none (the front page is the one screen a stranger stands
+// on), a signed-in person showing someone the system keeps it.
+let sessionUser: { id: number; email: string; name: string; role: string; cpse_code: string | null } | null = null
+vi.mock('../lib/session', () => ({
+  useSession: () => ({ user: sessionUser, loading: false, can: () => true, signOut: vi.fn() }),
+}))
+
 import Landing from '../routes/Landing'
 import { ThemeProvider } from '../lib/theme'
 
@@ -46,6 +54,19 @@ describe('the landing page', () => {
     ).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /sign in|open the demo/i }).length,
     ).toBeGreaterThan(0)
+  })
+
+  it('offers a stranger no assistant, and a signed-in person one', () => {
+    const { unmount } = renderLanding()
+    expect(screen.queryByLabelText(/ask saman/i)).not.toBeInTheDocument()
+    unmount()
+    sessionUser = { id: 1, email: 'steward@cpcl.in', name: 'A. Ramesh', role: 'steward', cpse_code: 'CPCL' }
+    try {
+      renderLanding()
+      expect(screen.getByLabelText(/ask saman/i)).toBeInTheDocument()
+    } finally {
+      sessionUser = null
+    }
   })
 
   it('asks nothing of the backend', () => {

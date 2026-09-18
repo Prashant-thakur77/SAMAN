@@ -26,8 +26,8 @@ class TestScorecard:
         for row in card["cpses"]:
             assert row["internal_duplicates"] <= row["items"]
 
-    def test_it_rides_with_the_executive_dashboard(self, client, pipeline_run):
-        body = client.get("/api/dashboard/executive").json()
+    def test_it_rides_with_the_executive_dashboard(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/dashboard/executive").json()
         assert body["quality"]["cpses"] and "weights" in body["quality"]
 
 
@@ -50,12 +50,14 @@ class TestAbc:
             assert by_class["A"] / total <= ABC_A_SHARE + 1e-9, cpse
             assert by_class["A"] >= by_class["C"], cpse
 
-    def test_the_item_page_and_dead_stock_carry_the_class(self, client, pipeline_run):
-        item = client.get("/api/items/1").json()
+    def test_the_item_page_and_dead_stock_carry_the_class(self, as_viewer, pipeline_run):
+        item = as_viewer.get("/api/items/1").json()
         assert "abc" in item["purchase_history"]
         assert item["purchase_history"]["abc"] in (None, "A", "B", "C")
-        client.post("/api/auth/login", json={"email": "registrar@min.gov.in", "password": "demo"})
-        dashboard = client.get("/api/dashboard/opportunity").json()
+        as_viewer.post(
+            "/api/auth/login", json={"email": "registrar@min.gov.in", "password": "demo"}
+        )
+        dashboard = as_viewer.get("/api/dashboard/opportunity").json()
         positions = [
             p for row in dashboard["inventory"]["dead_stock"]["rows"] for p in row["positions"]
         ]

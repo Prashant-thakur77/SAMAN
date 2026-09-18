@@ -83,7 +83,8 @@ class TestPackSize:
         assert boxed.uom_base == singles.uom_base == "EA"
 
     @pytest.mark.parametrize(
-        ("uom", "expected"), [("NOS", "EA"), ("PC", "EA"), ("MTR", "M"), ("LTR", "L"), ("KGS", "KG")]
+        ("uom", "expected"),
+        [("NOS", "EA"), ("PC", "EA"), ("MTR", "M"), ("LTR", "L"), ("KGS", "KG")],
     )
     def test_unit_quirks_canonicalize(self, uom, expected):
         assert canonical_uom(uom, None)[0] == expected

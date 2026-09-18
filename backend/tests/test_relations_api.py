@@ -48,35 +48,37 @@ class TestEquivalenceIsNotAMerge:
 
 
 class TestRelationsEndpoint:
-    def test_an_item_with_no_relations_returns_an_empty_list(self, client, pipeline_run):
-        body = client.get("/api/relations?item=999999").json()
+    def test_an_item_with_no_relations_returns_an_empty_list(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/relations?item=999999").json()
         assert body["count"] == 0 and body["relations"] == []
 
-    def test_direction_reads_correctly_from_both_sides(self, client, a_directed_relation):
+    def test_direction_reads_correctly_from_both_sides(self, as_viewer, a_directed_relation):
         """The same relation, phrased for whichever item you are looking at."""
-        left = client.get(f"/api/relations?item={a_directed_relation.item_a}").json()
-        right = client.get(f"/api/relations?item={a_directed_relation.item_b}").json()
+        left = as_viewer.get(f"/api/relations?item={a_directed_relation.item_a}").json()
+        right = as_viewer.get(f"/api/relations?item={a_directed_relation.item_b}").json()
 
         from_a = next(
-            r for r in left["relations"]
+            r
+            for r in left["relations"]
             if r["counterpart"]["item_id"] == a_directed_relation.item_b
         )
         from_b = next(
-            r for r in right["relations"]
+            r
+            for r in right["relations"]
             if r["counterpart"]["item_id"] == a_directed_relation.item_a
         )
         assert from_a["reading"] == "the other item can substitute this one"
         assert from_b["reading"] == "this item can substitute the other"
 
-    def test_every_relation_carries_its_basis_and_evidence(self, client, a_directed_relation):
-        body = client.get(f"/api/relations?item={a_directed_relation.item_a}").json()
+    def test_every_relation_carries_its_basis_and_evidence(self, as_viewer, a_directed_relation):
+        body = as_viewer.get(f"/api/relations?item={a_directed_relation.item_a}").json()
         for relation in body["relations"]:
             assert relation["basis"] in {"designation", "crossref", "rule", "llm"}
             assert relation["evidence"].get("source")
             assert 0 < relation["confidence"] <= 1
 
-    def test_the_counterpart_is_described_not_just_referenced(self, client, a_directed_relation):
-        body = client.get(f"/api/relations?item={a_directed_relation.item_a}").json()
+    def test_the_counterpart_is_described_not_just_referenced(self, as_viewer, a_directed_relation):
+        body = as_viewer.get(f"/api/relations?item={a_directed_relation.item_a}").json()
         counterpart = body["relations"][0]["counterpart"]
         assert counterpart["description"] and counterpart["legacy_code"]
 
@@ -111,8 +113,8 @@ class TestProposingRelations:
 
 
 class TestRulesEndpoint:
-    def test_rules_are_returned_parsed_so_a_steward_can_read_them(self, client, pipeline_run):
-        body = client.get("/api/rules").json()
+    def test_rules_are_returned_parsed_so_a_steward_can_read_them(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/rules").json()
         assert body["count"] > 0
         rule = body["rules"][0]
         assert rule["valid"] and rule["parsed"][0]["equivalent_if"]
@@ -148,9 +150,7 @@ class TestCrossrefImport:
     def test_a_steward_can_upload_an_interchange_table(self, as_steward, pipeline_run):
         response = as_steward.post(
             "/api/crossref/import",
-            files=self._csv(
-                "mpn_a,brand_a,mpn_b,brand_b\nZZ-9001,SKF,ZZ-9002,FAG\n"
-            ),
+            files=self._csv("mpn_a,brand_a,mpn_b,brand_b\nZZ-9001,SKF,ZZ-9002,FAG\n"),
         )
         assert response.status_code == 200 and response.json()["imported"] == 1
 

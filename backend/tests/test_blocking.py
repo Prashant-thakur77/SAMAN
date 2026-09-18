@@ -37,9 +37,7 @@ class TestPasses:
         assert (1, 2) in pairs
 
     def test_shared_gtin_produces_a_candidate(self):
-        pairs, _ = generate_candidates(
-            [key(1, "A", gtin="12345678"), key(2, "B", gtin="12345678")]
-        )
+        pairs, _ = generate_candidates([key(1, "A", gtin="12345678"), key(2, "B", gtin="12345678")])
         assert (1, 2) in pairs
 
     def test_identical_text_produces_a_candidate(self):
@@ -231,6 +229,5 @@ class TestSchemaInvariants:
                 continue
             identity = {spec.name for spec in schema.identity_critical}
             assert schema.block_on in identity, (
-                f"{schema.code} blocks on {schema.block_on}, which is not "
-                "identity-critical"
+                f"{schema.code} blocks on {schema.block_on}, which is not " "identity-critical"
             )

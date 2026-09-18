@@ -152,6 +152,21 @@ reaches it as `http://ollama:11434`. The 3B model wants about 4 GB of RAM and
 answers in a few seconds on a CPU; without it every screen still works on the
 rule-based tier, and the health page says so.
 
+**The front door.** Without a session the API answers sign-in, the health
+page and the empty-database bootstrap, and nothing else: every other router
+is included behind a session dependency, and a test walks every registered
+route to prove a stranger gets 401 everywhere that is not on its short public
+list. Roles then decide which signed-in person may call what. On the client
+the same rule sends a visitor from any inner screen to sign in and back again
+afterwards; the front page is the one screen a stranger stands on, and it
+carries no assistant for them, because the assistant walks people into the
+application. While the shared demo login is on, the seeded accounts are fixed
+(their roles cannot be changed and they cannot be disabled), so one visitor to
+a public link cannot end everyone else's demo; accounts created on the admin
+page remain editable. Every response carries `X-Frame-Options`,
+`X-Content-Type-Options`, a referrer policy and a permissions policy, and HSTS
+once cookies are marked secure.
+
 **What changes for a real deployment, and where it is enforced.** A random
 `SAMAN_SECRET_KEY` (the API logs a warning on the development default when
 secure cookies are on). `SAMAN_SECURE_COOKIES=true` behind HTTPS.

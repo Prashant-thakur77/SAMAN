@@ -119,9 +119,7 @@ class TestNoPlaintextLeaves:
         assert pprl.resolve(KEY, "CPCL", 42) == pprl.resolve(KEY, "CPCL", 42)
         assert pprl.resolve(KEY, "CPCL", 42) != pprl.resolve(KEY, "IOCL", 42)
 
-    def test_the_encoding_is_a_fixed_size_regardless_of_description_length(
-        self, db, pipeline_run
-    ):
+    def test_the_encoding_is_a_fixed_size_regardless_of_description_length(self, db, pipeline_run):
         """A variable-length payload would leak description length."""
         payload = pprl.encode_catalogue(db, "CPCL", KEY, limit=50)
         sizes = {len(base64.b64decode(e["bloom"])) for e in payload["encodings"]}
@@ -183,9 +181,7 @@ class TestMeasuredCost:
         ngram = evaluate(db, "CPCL", "IOCL", mode="ngram", limit=200)
         assert attribute["f1"] > ngram["f1"]
 
-    def test_restricted_mode_costs_recall_against_the_full_matcher(
-        self, db, pipeline_run
-    ):
+    def test_restricted_mode_costs_recall_against_the_full_matcher(self, db, pipeline_run):
         """Honesty, not modesty: the full matcher sees attributes, units and a
         veto layer. Restricted mode sees hashes, and it shows."""
         result = evaluate(db, "CPCL", "IOCL", mode="attribute", limit=200)
@@ -266,6 +262,5 @@ class TestPprlApi:
             json={"email": "registrar@min.gov.in", "password": "demo"},
         )
         assert (
-            as_steward.get("/api/pprl/evaluate?left=CPCL&right=IOCL&limit=120").status_code
-            == 200
+            as_steward.get("/api/pprl/evaluate?left=CPCL&right=IOCL&limit=120").status_code == 200
         )

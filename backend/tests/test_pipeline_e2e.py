@@ -58,9 +58,12 @@ class TestPipelineProducesTheDerivedLayer:
 
     def test_the_automatic_bands_are_sampled_for_confirmation(self, pipeline_run, db):
         for band in ("high", "low"):
-            assert db.execute(
-                select(func.count(ReviewTask.id)).where(ReviewTask.band == band)
-            ).scalar() > 0
+            assert (
+                db.execute(
+                    select(func.count(ReviewTask.id)).where(ReviewTask.band == band)
+                ).scalar()
+                > 0
+            )
 
     def test_review_tasks_explain_themselves(self, pipeline_run, db):
         reasons = db.execute(select(ReviewTask.reason).limit(20)).scalars().all()
@@ -154,7 +157,9 @@ class TestIssuedCodesAreImmutable:
                     .where(GoldenRecord.id == golden_id)
                     .scalar_subquery()
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
 
         reset_status()
@@ -162,9 +167,7 @@ class TestIssuedCodesAreImmutable:
 
         db.expire_all()
         assert db.get(GoldenRecord, golden_id) is not None
-        assert db.execute(
-            select(Cnmc).where(Cnmc.code == code)
-        ).scalar_one_or_none() is not None
+        assert db.execute(select(Cnmc).where(Cnmc.code == code)).scalar_one_or_none() is not None
         members_after = set(
             db.execute(
                 select(ClusterMember.item_id).where(
@@ -173,7 +176,9 @@ class TestIssuedCodesAreImmutable:
                     .where(GoldenRecord.id == golden_id)
                     .scalar_subquery()
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         assert members_after == members_before
 
@@ -181,9 +186,7 @@ class TestIssuedCodesAreImmutable:
 class TestDeterminism:
     """§2D: re-running on unchanged data must not change the outcome."""
 
-    def test_rerunning_the_pipeline_gives_byte_identical_golden_records(
-        self, pipeline_run, db
-    ):
+    def test_rerunning_the_pipeline_gives_byte_identical_golden_records(self, pipeline_run, db):
         """§2D acceptance: unchanged data must produce unchanged descriptions.
 
         A golden record is what an ERP keys against; text that drifts between
@@ -201,9 +204,7 @@ class TestDeterminism:
 
     def test_golden_records_are_rendered_from_the_class_grammar(self, pipeline_run, db):
         """Not "the longest member's text" — a deterministic template (§2D)."""
-        descriptions = db.execute(
-            select(GoldenRecord.std_description).limit(200)
-        ).scalars().all()
+        descriptions = db.execute(select(GoldenRecord.std_description).limit(200)).scalars().all()
         assert descriptions
         assert all("{" not in d for d in descriptions), "unfilled template slot escaped"
         assert all(d == d.upper() for d in descriptions)
@@ -242,9 +243,7 @@ class TestConcurrency:
         pipeline_mod.STAGES.clear()
         pipeline_mod.STAGES["slow"] = slow_stage
         try:
-            first = threading.Thread(
-                target=lambda: pipeline_mod.run_pipeline(db, ["slow"])
-            )
+            first = threading.Thread(target=lambda: pipeline_mod.run_pipeline(db, ["slow"]))
             first.start()
             assert entered.wait(timeout=10), "the first run never started"
 

@@ -91,9 +91,7 @@ class TestTamperDetection:
         first, second = sorted(rows, key=lambda r: r[0])
         for target, source in ((2, second), (3, first)):
             ledger.execute(
-                text(
-                    "UPDATE audit_event SET payload_json=:p, hash=:h, prev_hash=:pv WHERE seq=:s"
-                ),
+                text("UPDATE audit_event SET payload_json=:p, hash=:h, prev_hash=:pv WHERE seq=:s"),
                 {"p": source[1], "h": source[2], "pv": source[3], "s": target},
             )
         ledger.commit()
@@ -104,8 +102,14 @@ class TestTamperDetection:
         forged = '{"n":42}'
         ledger.execute(
             text("UPDATE audit_event SET payload_json=:p, hash=:h WHERE seq=2"),
-            {"p": forged, "h": audit.compute_hash(2, ledger.execute(
-                text("SELECT prev_hash FROM audit_event WHERE seq=2")).scalar(), forged)},
+            {
+                "p": forged,
+                "h": audit.compute_hash(
+                    2,
+                    ledger.execute(text("SELECT prev_hash FROM audit_event WHERE seq=2")).scalar(),
+                    forged,
+                ),
+            },
         )
         ledger.commit()
         result = audit.verify(ledger)
@@ -138,12 +142,12 @@ class TestVoiding:
 
 
 class TestAuditApi:
-    def test_verify_endpoint_reports_a_valid_chain(self, client, pipeline_run):
-        body = client.get("/api/audit/verify").json()
+    def test_verify_endpoint_reports_a_valid_chain(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/audit/verify").json()
         assert body["valid"] is True and body["first_break"] is None
 
-    def test_the_stream_returns_newest_first(self, client, pipeline_run):
-        events = client.get("/api/audit?limit=5").json()["events"]
+    def test_the_stream_returns_newest_first(self, as_viewer, pipeline_run):
+        events = as_viewer.get("/api/audit?limit=5").json()["events"]
         if len(events) > 1:
             assert events[0]["seq"] > events[-1]["seq"]
 
@@ -158,8 +162,8 @@ class TestAuditApi:
         assert body["total"] >= 1
         assert all(e["entity"].startswith("cnmc") for e in body["events"])
 
-    def test_every_event_exposes_its_links(self, client, pipeline_run):
-        for event in client.get("/api/audit?limit=3").json()["events"]:
+    def test_every_event_exposes_its_links(self, as_viewer, pipeline_run):
+        for event in as_viewer.get("/api/audit?limit=3").json()["events"]:
             assert len(event["hash"]) == 64 and len(event["prev_hash"]) == 64
 
 
@@ -212,9 +216,7 @@ class TestAuditFiltering:
         assert filtered["total"] == everything["actions"][action]
         assert all(event["action"].startswith(action) for event in filtered["events"])
 
-    def test_the_action_counts_add_up_to_the_whole_stream(
-        self, as_registrar, pipeline_run
-    ):
+    def test_the_action_counts_add_up_to_the_whole_stream(self, as_registrar, pipeline_run):
         body = as_registrar.get("/api/audit").json()
         assert sum(body["actions"].values()) == body["total"]
 
@@ -227,8 +229,6 @@ class TestAuditFiltering:
         assert narrowed["total"] >= 1
         assert all(e["user"] == event["user"] for e in narrowed["events"])
 
-    def test_an_action_nobody_performed_returns_an_empty_stream(
-        self, as_registrar, pipeline_run
-    ):
+    def test_an_action_nobody_performed_returns_an_empty_stream(self, as_registrar, pipeline_run):
         body = as_registrar.get("/api/audit?action=nobody.did.this").json()
         assert body["total"] == 0 and body["events"] == []

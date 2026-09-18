@@ -17,8 +17,13 @@ from app.match import (
 
 BEARING = "bearing.ball.deep_groove"
 ATTRS = {
-    "bore_mm": 25, "outer_dia_mm": 52, "width_mm": 15, "seal_type": "ZZ",
-    "load_rating_kg": 500, "temp_max_c": 120, "brand": "SKF",
+    "bore_mm": 25,
+    "outer_dia_mm": 52,
+    "width_mm": 15,
+    "seal_type": "ZZ",
+    "load_rating_kg": 500,
+    "temp_max_c": 120,
+    "brand": "SKF",
 }
 
 
@@ -57,9 +62,7 @@ class TestTierZero:
 
 class TestTierOne:
     def test_abbreviated_and_spelled_out_forms_score_high(self):
-        score = tier1_fuzzy(
-            item(1, "BEARING BALL 6205 ZZ SKF"), item(2, "BEARING BALL 6205ZZ SKF")
-        )
+        score = tier1_fuzzy(item(1, "BEARING BALL 6205 ZZ SKF"), item(2, "BEARING BALL 6205ZZ SKF"))
         assert score > 0.8
 
     def test_unrelated_text_scores_low(self):
@@ -156,8 +159,12 @@ class TestThinEvidenceIsHeldBack:
 
     CABLE = "cable.power"
     FULL_CABLE: ClassVar[dict] = {
-        "cores": 3.0, "csa_mm2": 4.0, "voltage_v": 11000.0,
-        "conductor": "AL", "insulation": "XLPE", "temp_max_c": 70.0,
+        "cores": 3.0,
+        "csa_mm2": 4.0,
+        "voltage_v": 11000.0,
+        "conductor": "AL",
+        "insulation": "XLPE",
+        "temp_max_c": 70.0,
     }
 
     def _cable(self, item_id, attrs, text="CABLE POWER 3C X 4.0 SQMM ALUMINIUM XLPE 11000V"):
@@ -191,8 +198,13 @@ class TestThinEvidenceIsHeldBack:
         """An exact anchor is exempt: the manufacturer has already asserted it."""
         damaged = {k: v for k, v in self.FULL_CABLE.items() if k not in ("cores", "csa_mm2")}
         result = match_pair(
-            item(1, "CABLE POWER 3C X 4.0 SQMM", attrs=dict(self.FULL_CABLE),
-                 mpn="KEIPW00987", cls=self.CABLE),
+            item(
+                1,
+                "CABLE POWER 3C X 4.0 SQMM",
+                attrs=dict(self.FULL_CABLE),
+                mpn="KEIPW00987",
+                cls=self.CABLE,
+            ),
             item(2, "CABLE POWER QMM", attrs=damaged, mpn="KEIPW00987", cls=self.CABLE),
         )
         assert result.band == "high"
@@ -200,8 +212,10 @@ class TestThinEvidenceIsHeldBack:
 
 class TestBandsAndConfidence:
     def test_identical_items_land_in_the_high_band(self):
-        result = match_pair(item(1, "BEARING BALL 6205 ZZ SKF", mpn="62052Z"),
-                            item(2, "BEARING BALL 6205 ZZ SKF", mpn="62052Z"))
+        result = match_pair(
+            item(1, "BEARING BALL 6205 ZZ SKF", mpn="62052Z"),
+            item(2, "BEARING BALL 6205 ZZ SKF", mpn="62052Z"),
+        )
         assert result.band == "high" and result.verdict == "duplicate"
         assert result.confidence >= T_HIGH
 
@@ -215,25 +229,37 @@ class TestBandsAndConfidence:
     def test_a_grey_pair_is_routed_to_review_not_decided(self):
         result = match_pair(
             item(1, "BEARING BALL 6205 ZZ SKF"),
-            item(2, "BEARING DEEP GROOVE ALTERNATE WORDING SKF",
-                 attrs={"seal_type": "ZZ"},
-                 vector=np.array([0.7, 0.714], dtype=np.float32)),
+            item(
+                2,
+                "BEARING DEEP GROOVE ALTERNATE WORDING SKF",
+                attrs={"seal_type": "ZZ"},
+                vector=np.array([0.7, 0.714], dtype=np.float32),
+            ),
         )
         assert result.band == "grey" and result.verdict == "review" and result.needs_review
 
     @pytest.mark.parametrize("band", ["high", "grey", "low"])
     def test_every_band_is_reachable(self, band):
         pairs = {
-            "high": (item(1, "BEARING BALL 6205 ZZ SKF", mpn="62052Z"),
-                     item(2, "BEARING BALL 6205 ZZ SKF", mpn="62052Z")),
+            "high": (
+                item(1, "BEARING BALL 6205 ZZ SKF", mpn="62052Z"),
+                item(2, "BEARING BALL 6205 ZZ SKF", mpn="62052Z"),
+            ),
             # Reworded, no anchor key, only partial attribute evidence: the
             # shape of pair a human should look at rather than the engine
             # deciding alone.
-            "grey": (item(1, "BEARING BALL 6205 ZZ SKF"),
-                     item(2, "BEARING DEEP GROOVE ALTERNATE WORDING SKF",
-                          attrs={"seal_type": "ZZ"},
-                          vector=np.array([0.7, 0.714], dtype=np.float32))),
-            "low": (item(1, "BEARING BALL 6205 ZZ SKF"),
-                    item(2, "BEARING BALL 6205", attrs={**ATTRS, "bore_mm": 30})),
+            "grey": (
+                item(1, "BEARING BALL 6205 ZZ SKF"),
+                item(
+                    2,
+                    "BEARING DEEP GROOVE ALTERNATE WORDING SKF",
+                    attrs={"seal_type": "ZZ"},
+                    vector=np.array([0.7, 0.714], dtype=np.float32),
+                ),
+            ),
+            "low": (
+                item(1, "BEARING BALL 6205 ZZ SKF"),
+                item(2, "BEARING BALL 6205", attrs={**ATTRS, "bore_mm": 30}),
+            ),
         }
         assert match_pair(*pairs[band]).band == band

@@ -94,8 +94,15 @@ class TestReportShape:
     def test_report_contains_every_required_section(self, pipeline_run):
         report = pipeline_run["metrics"]
         for key in (
-            "duplicate", "baseline_exact_text", "blocking", "veto",
-            "equivalence", "per_class", "worst_class", "automation", "gate",
+            "duplicate",
+            "baseline_exact_text",
+            "blocking",
+            "veto",
+            "equivalence",
+            "per_class",
+            "worst_class",
+            "automation",
+            "gate",
         ):
             assert key in report, f"missing section: {key}"
 

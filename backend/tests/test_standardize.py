@@ -30,8 +30,13 @@ BEARING = get_schema("bearing.ball.deep_groove")
 VALVE = get_schema("valve.gate")
 
 FULL = {
-    "bore_mm": 25, "outer_dia_mm": 52, "width_mm": 15,
-    "seal_type": "ZZ", "load_rating_kg": 500, "temp_max_c": 120, "brand": "SKF",
+    "bore_mm": 25,
+    "outer_dia_mm": 52,
+    "width_mm": 15,
+    "seal_type": "ZZ",
+    "load_rating_kg": 500,
+    "temp_max_c": 120,
+    "brand": "SKF",
 }
 
 
@@ -229,8 +234,12 @@ class TestDeterminism:
 class TestValveTemplate:
     def test_a_second_class_renders_from_its_own_grammar(self):
         attrs = {
-            "size_nb_mm": 150, "pressure_class": "150", "body_material": "CI",
-            "end_connection": "THREADED", "pressure_bar": 19.6, "temp_max_c": 200,
+            "size_nb_mm": 150,
+            "pressure_class": "150",
+            "body_material": "CI",
+            "end_connection": "THREADED",
+            "pressure_bar": 19.6,
+            "temp_max_c": 200,
         }
         text = render_description(attrs, VALVE, mpn="FLO-GV01634")
         assert text == "VALVE, GATE, 150NB, CLASS 150, CI, THREADED, FLO-GV01634"

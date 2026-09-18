@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 
 from . import __version__
 from .audit import ensure_genesis
+from .auth import require_user
 from .config import get_settings
 from .db import SessionLocal, init_db
 from .routers import (
@@ -58,6 +59,30 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """The response headers a public link should carry.
+
+    The frontend is same-origin and never framed, so framing is refused; the
+    browser must not sniff a type we did not declare; referrers stop at the
+    origin; the camera and microphone are for this origin only (Smart-Create's
+    scan and the assistant's voice). HSTS only once cookies are marked secure,
+    which is the deployment's way of saying HTTPS is in front.
+    """
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), payment=()"
+    )
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    if settings.saman_secure_cookies:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -66,26 +91,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# The front door. Three routers answer without a session: the health page,
+# sign-in itself, and the empty-database bootstrap (which refuses once anyone
+# exists). Everything else is behind a session, whatever the individual
+# endpoint says: the roles an endpoint names decide *which* signed-in user may
+# call it, never whether a stranger may. A catalogue is a CPSE's commercial
+# record, and even the aggregate dashboards are a ministry's, not the public's.
 app.include_router(health.router, prefix="/api")
 app.include_router(bootstrap.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
-app.include_router(ingest.router, prefix="/api")
-app.include_router(pipeline.router, prefix="/api")
-app.include_router(metrics.router, prefix="/api")
-app.include_router(cnmc.router, prefix="/api")
-app.include_router(clusters.router, prefix="/api")
-app.include_router(relations.router, prefix="/api")
-app.include_router(workbench.router, prefix="/api")
-app.include_router(dashboard.router, prefix="/api")
-app.include_router(copilot.router, prefix="/api")
-app.include_router(search.router, prefix="/api")
-app.include_router(admin.router, prefix="/api")
-app.include_router(migration.router, prefix="/api")
-app.include_router(smart_create.router, prefix="/api")
-app.include_router(pprl.router, prefix="/api")
-app.include_router(assistant.router, prefix="/api")
-app.include_router(learn.router, prefix="/api")
-app.include_router(substitutes.router, prefix="/api")
+
+SIGNED_IN = [Depends(require_user)]
+for signed_in_router in (
+    ingest.router,
+    pipeline.router,
+    metrics.router,
+    cnmc.router,
+    clusters.router,
+    relations.router,
+    workbench.router,
+    dashboard.router,
+    copilot.router,
+    search.router,
+    admin.router,
+    migration.router,
+    smart_create.router,
+    pprl.router,
+    assistant.router,
+    learn.router,
+    substitutes.router,
+):
+    app.include_router(signed_in_router, prefix="/api", dependencies=SIGNED_IN)
 
 
 @app.on_event("startup")

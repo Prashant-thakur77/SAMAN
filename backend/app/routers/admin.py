@@ -15,6 +15,10 @@ from ..capabilities import detect, refresh
 from ..config import get_settings, set_sovereign_mode, sovereign_mode
 from ..db import get_db
 from ..models import Cpse, RawItem, User
+from ..seed import SEED_USERS
+
+#: The accounts the seed creates, by email: the demo's fixtures.
+SEED_EMAILS = frozenset(email for email, *_ in SEED_USERS)
 
 router = APIRouter(tags=["admin"])
 
@@ -121,6 +125,16 @@ def update_user(
         # sign in cannot undo it either.
         raise HTTPException(
             status.HTTP_409_CONFLICT, "You cannot disable the account you are signed in with."
+        )
+    if get_settings().saman_demo_login and user.email in SEED_EMAILS:
+        # With the shared demo login on, every visitor to the link is an
+        # admin. The seeded accounts are the demo's fixtures, and one visitor
+        # demoting the registrar would end everyone else's demo until the next
+        # deploy. Accounts created here remain editable.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Demo accounts are fixed while the shared demo login is on. Create an "
+            "account to change roles, or turn off SAMAN_DEMO_LOGIN.",
         )
 
     before = {"role": user.role, "active": user.active}
@@ -242,7 +256,8 @@ def health_panel(
         "cnmcs": db.execute(select(func.count(Cnmc.id))).scalar() or 0,
         "pending_review": db.execute(
             select(func.count(ReviewTask.id)).where(ReviewTask.state == "pending")
-        ).scalar() or 0,
+        ).scalar()
+        or 0,
         "audit_events": db.execute(select(func.count(AuditEvent.id))).scalar() or 0,
     }
     prevention = smart_create.stats(db)

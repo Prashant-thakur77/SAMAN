@@ -1,6 +1,6 @@
 import { AnimatePresence } from 'framer-motion'
 import { Suspense, lazy } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 
 import { useSession } from './lib/session'
 import { RequireRole } from './components/RequireRole'
@@ -90,6 +90,15 @@ export default function App() {
         </RouteTransition>
       </AnimatePresence>
     )
+  }
+
+  // Everything inside the shell needs a session. The API refuses a stranger
+  // on every one of these screens' requests anyway; this is so they meet the
+  // sign-in page rather than a shell full of "could not load", and come back
+  // to the screen they asked for once they have signed in.
+  if (loading) return <div className="min-h-screen bg-bg" />
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   }
 
   return (

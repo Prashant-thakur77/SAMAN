@@ -51,8 +51,8 @@ SECTIONS = (
 
 
 @pytest.fixture
-def body(client, pipeline_run):
-    return client.get("/api/dashboard/executive").json()
+def body(as_viewer, pipeline_run):
+    return as_viewer.get("/api/dashboard/executive").json()
 
 
 def _part(parts, key):
@@ -292,10 +292,10 @@ class TestPipelineLadder:
         assert names == [name for name in order if name in names]
 
     def test_without_a_run_the_section_is_null_and_the_page_still_answers(
-        self, client, pipeline_run, monkeypatch
+        self, as_viewer, pipeline_run, monkeypatch
     ):
         monkeypatch.setattr(analytics, "latest_run", lambda db: None)
-        response = client.get("/api/dashboard/executive")
+        response = as_viewer.get("/api/dashboard/executive")
         assert response.status_code == 200
         body = response.json()
         assert body["pipeline"] is None
@@ -458,14 +458,14 @@ class TestEvaluation:
             assert section["per_class"][0]["class_code"] == section["worst_class"]
 
     def test_without_a_snapshot_the_section_is_null_not_a_constant(
-        self, client, pipeline_run, db, monkeypatch
+        self, as_viewer, pipeline_run, db, monkeypatch
     ):
         run = analytics.latest_run(db)
         older = analytics.Run(
             run.id, run.ts, {k: v for k, v in run.stats.items() if k != "evaluation"}
         )
         monkeypatch.setattr(analytics, "latest_run", lambda db: older)
-        response = client.get("/api/dashboard/executive")
+        response = as_viewer.get("/api/dashboard/executive")
         assert response.status_code == 200
         body = response.json()
         assert body["evaluation"] is None
@@ -473,7 +473,7 @@ class TestEvaluation:
         assert body["pipeline"] is not None
 
     def test_a_run_over_data_with_no_planted_truth_has_no_scorecard(
-        self, client, pipeline_run, db, monkeypatch
+        self, as_viewer, pipeline_run, db, monkeypatch
     ):
         """A CPSE's own upload carries no truth groups. The snapshot then scores
         nothing against nothing, and the honest section is none at all — never
@@ -483,7 +483,7 @@ class TestEvaluation:
         snapshot["counts"] = {**snapshot["counts"], "truth_groups_holdout": 0, "items_holdout": 0}
         untested = analytics.Run(run.id, run.ts, {**run.stats, "evaluation": snapshot})
         monkeypatch.setattr(analytics, "latest_run", lambda db: untested)
-        body = client.get("/api/dashboard/executive").json()
+        body = as_viewer.get("/api/dashboard/executive").json()
         assert body["evaluation"] is None
 
     def test_the_cli_records_a_fresh_snapshot_without_reseeding(self, pipeline_run, db):

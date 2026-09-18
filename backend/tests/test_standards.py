@@ -34,13 +34,13 @@ class TestSchema:
 
 
 class TestServed:
-    def test_the_item_carries_its_codes(self, client, pipeline_run):
-        item = client.get("/api/items/1").json()
+    def test_the_item_carries_its_codes(self, as_viewer, pipeline_run):
+        item = as_viewer.get("/api/items/1").json()
         assert "standards" in item
         if item["class_code"] != "unclassified":
             assert item["standards"]["unspsc"]["level"] in UNSPSC_LEVELS
 
-    def test_the_cluster_carries_its_codes(self, client, pipeline_run):
-        cluster_id = client.get("/api/items/1").json()["cluster_id"]
-        body = client.get(f"/api/clusters/{cluster_id}").json()
-        assert body["standards"] == client.get("/api/items/1").json()["standards"]
+    def test_the_cluster_carries_its_codes(self, as_viewer, pipeline_run):
+        cluster_id = as_viewer.get("/api/items/1").json()["cluster_id"]
+        body = as_viewer.get(f"/api/clusters/{cluster_id}").json()
+        assert body["standards"] == as_viewer.get("/api/items/1").json()["standards"]

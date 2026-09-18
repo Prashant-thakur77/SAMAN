@@ -34,9 +34,9 @@ class TestContext:
         assert substitutes.ved_of([]) is None
         assert substitutes.ved_of([{"criticality": "C"}, {"criticality": "A"}]) == "vital"
 
-    def test_the_item_page_says_where_it_is_fitted(self, client, pipeline_run, db):
+    def test_the_item_page_says_where_it_is_fitted(self, as_viewer, pipeline_run, db):
         item_id = db.execute(select(EquipmentBom.item_id).limit(1)).scalar_one()
-        body = client.get(f"/api/items/{item_id}").json()
+        body = as_viewer.get(f"/api/items/{item_id}").json()
         assert body["installed_on"] and body["ved"] in ("vital", "essential", "desirable")
         for entry in body["equivalents"]:
             assert entry["status"] in substitutes.STATUSES

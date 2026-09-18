@@ -19,13 +19,15 @@ def _wav(samples: list[float], rate: int = 16_000, channels: int = 1, width: int
         w.setsampwidth(width)
         w.setframerate(rate)
         if width == 2:
-            frames = struct.pack(f"<{len(samples) * channels}h", *[
-                int(max(-1, min(1, s)) * 32767) for s in samples for _ in range(channels)
-            ])
+            frames = struct.pack(
+                f"<{len(samples) * channels}h",
+                *[int(max(-1, min(1, s)) * 32767) for s in samples for _ in range(channels)],
+            )
         else:
-            frames = struct.pack(f"<{len(samples) * channels}B", *[
-                int((max(-1, min(1, s)) + 1) * 127.5) for s in samples for _ in range(channels)
-            ])
+            frames = struct.pack(
+                f"<{len(samples) * channels}B",
+                *[int((max(-1, min(1, s)) + 1) * 127.5) for s in samples for _ in range(channels)],
+            )
         w.writeframes(frames)
     return buf.getvalue()
 
@@ -71,15 +73,15 @@ class TestAbsentEngine:
         with pytest.raises(RuntimeError):
             stt.transcribe(_wav(_tone(0.5, 16_000)))
 
-    def test_endpoint_says_503_not_nonsense(self, client, monkeypatch, tmp_path):
+    def test_endpoint_says_503_not_nonsense(self, as_viewer, monkeypatch, tmp_path):
         monkeypatch.setenv("SAMAN_STT_MODEL_DIR", str(tmp_path / "nowhere"))
-        response = client.post(
+        response = as_viewer.post(
             "/api/assistant/transcribe",
             files={"audio": ("q.wav", _wav(_tone(0.5, 16_000)), "audio/wav")},
         )
         assert response.status_code == 503
         assert "make deps-stt" in response.json()["detail"]
-        voice = client.get("/api/assistant/voice").json()
+        voice = as_viewer.get("/api/assistant/voice").json()
         assert voice["available"] is False
 
     def test_health_reports_the_mode(self, client):
@@ -98,8 +100,8 @@ class TestWithWeights:
         assert result["text"] == ""
         assert "short" in result["note"].lower()
 
-    def test_endpoint_round_trip(self, client):
-        response = client.post(
+    def test_endpoint_round_trip(self, as_viewer):
+        response = as_viewer.post(
             "/api/assistant/transcribe",
             files={"audio": ("q.wav", _wav([0.0] * 16_000), "audio/wav")},
             data={"language": "en"},

@@ -44,8 +44,12 @@ VALVE_RULES = parse_rules(
 )
 
 BASE = {
-    "bore_mm": 25, "outer_dia_mm": 52, "width_mm": 15,
-    "seal_type": "ZZ", "load_rating_kg": 500, "temp_max_c": 120,
+    "bore_mm": 25,
+    "outer_dia_mm": 52,
+    "width_mm": 15,
+    "seal_type": "ZZ",
+    "load_rating_kg": 500,
+    "temp_max_c": 120,
 }
 
 
@@ -55,8 +59,12 @@ def bearing(item_id, text="BEARING BALL 6205 ZZ", mpn=None, **overrides):
 
 def valve(item_id, text="VALVE GATE 50NB CLASS 300 SS316 FLANGED", **overrides):
     attrs = {
-        "size_nb_mm": 50, "pressure_class": "300", "body_material": "SS316",
-        "end_connection": "FLANGED", "pressure_bar": 51.1, "temp_max_c": 250,
+        "size_nb_mm": 50,
+        "pressure_class": "300",
+        "body_material": "SS316",
+        "end_connection": "FLANGED",
+        "pressure_bar": 51.1,
+        "temp_max_c": 250,
     }
     return Candidate(item_id, "valve.gate", text, None, {**attrs, **overrides})
 
@@ -77,9 +85,7 @@ class TestRuleDsl:
         assert parse_rules(text) == []
 
     def test_a_malformed_condition_is_skipped_not_fatal(self):
-        rules = parse_rules(
-            "- class: x\n  equivalent_if: [bore_mm ==, nonsense, width_mm ==]"
-        )
+        rules = parse_rules("- class: x\n  equivalent_if: [bore_mm ==, nonsense, width_mm ==]")
         assert [str(c) for c in rules[0].equivalent_if] == ["bore_mm ==", "width_mm =="]
 
     def test_a_single_mapping_is_accepted_as_well_as_a_list(self):
@@ -90,9 +96,12 @@ class TestConditions:
     @pytest.mark.parametrize(
         ("op", "a", "b", "expected"),
         [
-            ("==", 25, 25.0, True), ("==", 25, 30, False),
-            ("!=", 25, 30, True), ("!=", "ZZ", "zz", False),
-            (">=", 200, 500, True), (">=", 500, 200, False),
+            ("==", 25, 25.0, True),
+            ("==", 25, 30, False),
+            ("!=", 25, 30, True),
+            ("!=", "ZZ", "zz", False),
+            (">=", 200, 500, True),
+            (">=", 500, 200, False),
             ("<=", 500, 200, True),
         ],
     )
@@ -143,10 +152,20 @@ class TestDesignation:
 
     def test_a_designation_is_not_evidence_about_what_it_does_not_encode(self):
         """A metric thread says nothing about a bolt's grade or material."""
-        a = Candidate(1, "fastener.bolt.hex", "HEX BOLT M10X1.5 30MM LG GRADE 4.6 SS304",
-                      None, {"thread": "M10X1.5", "length_mm": 30, "grade": "4.6", "material": "SS304"})
-        b = Candidate(2, "fastener.bolt.hex", "HEX BOLT M10X1.5 30MM LG GRADE 12.9 SS304",
-                      None, {"thread": "M10X1.5", "length_mm": 30, "grade": "12.9", "material": "SS304"})
+        a = Candidate(
+            1,
+            "fastener.bolt.hex",
+            "HEX BOLT M10X1.5 30MM LG GRADE 4.6 SS304",
+            None,
+            {"thread": "M10X1.5", "length_mm": 30, "grade": "4.6", "material": "SS304"},
+        )
+        b = Candidate(
+            2,
+            "fastener.bolt.hex",
+            "HEX BOLT M10X1.5 30MM LG GRADE 12.9 SS304",
+            None,
+            {"thread": "M10X1.5", "length_mm": 30, "grade": "12.9", "material": "SS304"},
+        )
         assert by_designation(a, b, FASTENER) is None
         assert evaluate(a, b, FASTENER, [], {}) is None
 
@@ -187,8 +206,11 @@ class TestDirectionIsSettledByRatings:
     def test_a_shared_designation_with_unequal_ratings_is_directed(self):
         """The bug this guards: designation agreement is not interchangeability."""
         verdict = evaluate(
-            bearing(1, load_rating_kg=200), bearing(2, load_rating_kg=500),
-            BEARING, BEARING_RULES, {},
+            bearing(1, load_rating_kg=200),
+            bearing(2, load_rating_kg=500),
+            BEARING,
+            BEARING_RULES,
+            {},
         )
         assert verdict.rel_type == "supersedes" and verdict.direction == "a_to_b"
 
@@ -200,7 +222,9 @@ class TestDirectionIsSettledByRatings:
         verdict = evaluate(
             valve(1),
             valve(2, pressure_class="600", pressure_bar=102.1),
-            VALVE, VALVE_RULES, {},
+            VALVE,
+            VALVE_RULES,
+            {},
         )
         assert verdict.rel_type == "supersedes" and verdict.direction == "a_to_b"
 
@@ -214,8 +238,11 @@ class TestDirectionIsSettledByRatings:
 class TestRowNormalisation:
     def test_direction_flips_when_the_pair_is_stored_the_other_way_round(self):
         verdict = evaluate(
-            bearing(9, load_rating_kg=200), bearing(2, load_rating_kg=500),
-            BEARING, BEARING_RULES, {},
+            bearing(9, load_rating_kg=200),
+            bearing(2, load_rating_kg=500),
+            BEARING,
+            BEARING_RULES,
+            {},
         )
         row = verdict.as_row(9, 2)
         assert (row["item_a"], row["item_b"]) == (2, 9)
@@ -296,12 +323,8 @@ class TestRatingBasis:
     def test_it_is_the_last_source_consulted(self):
         """A crossref, a designation or a steward's rule all outrank a
         direction inferred from the schema."""
-        assert equivalence.BASIS_PRIORITY.index("rating") > equivalence.BASIS_PRIORITY.index(
-            "rule"
-        )
-        assert (
-            equivalence.BASIS_CONFIDENCE["rating"] < equivalence.BASIS_CONFIDENCE["rule"]
-        )
+        assert equivalence.BASIS_PRIORITY.index("rating") > equivalence.BASIS_PRIORITY.index("rule")
+        assert equivalence.BASIS_CONFIDENCE["rating"] < equivalence.BASIS_CONFIDENCE["rule"]
 
     def test_the_evidence_names_what_agreed_and_what_differed(self):
         comparison, schema = self._compare(

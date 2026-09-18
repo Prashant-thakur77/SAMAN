@@ -17,7 +17,14 @@ class TestColumnMapping:
         mapping, unmapped = guess_mapping(
             ["legacy_code", "description", "uom", "plant", "price", "qty_on_hand"]
         )
-        assert set(mapping) == {"legacy_code", "description", "uom", "plant", "price", "qty_on_hand"}
+        assert set(mapping) == {
+            "legacy_code",
+            "description",
+            "uom",
+            "plant",
+            "price",
+            "qty_on_hand",
+        }
         assert unmapped == []
 
     def test_sap_style_headers_map(self):
@@ -54,7 +61,7 @@ class TestIngest:
         r = as_steward.post(
             "/api/ingest",
             data={"cpse_code": "CPCL", "dry_run": "true"},
-            files=csv_bytes("legacy_code,description,uom\nS1,\"BRG,BALL,6205ZZ,SKF\",NOS\n"),
+            files=csv_bytes('legacy_code,description,uom\nS1,"BRG,BALL,6205ZZ,SKF",NOS\n'),
         )
         sample = r.json()["samples"][0]
         assert sample["normalized"] == "BEARING BALL 6205ZZ SKF"
@@ -142,8 +149,8 @@ class TestIngest:
 
 
 class TestPipelineEndpoint:
-    def test_status_is_available_without_running_anything(self, client):
-        r = client.get("/api/pipeline/status")
+    def test_status_is_available_without_running_anything(self, as_viewer):
+        r = as_viewer.get("/api/pipeline/status")
         assert r.status_code == 200
         assert r.json()["state"] in {"idle", "running", "done", "error"}
 

@@ -102,8 +102,12 @@ class TestAssistantIntegration:
         # A question no topic card covers and no Copilot template matches, so
         # only the documents can answer it.
         # Number-free on purpose: the figure check is the subject of another test.
-        model_up["reply"] = "Sub-blocking bought very little recall for a tenth more run time and was reverted."
-        reply = assistant.answer(db, "what did the sub-blocking experiment on oversized buckets find", REGISTRAR)
+        model_up["reply"] = (
+            "Sub-blocking bought very little recall for a tenth more run time and was reverted."
+        )
+        reply = assistant.answer(
+            db, "what did the sub-blocking experiment on oversized buckets find", REGISTRAR
+        )
         assert reply.mode == "llm"
         assert reply.kind == "answer"
         assert reply.matched and "sources" in reply.matched

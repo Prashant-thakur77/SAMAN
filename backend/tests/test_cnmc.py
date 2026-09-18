@@ -144,7 +144,7 @@ class TestIssuanceEndpoint:
     def test_unknown_golden_record_is_404(self, as_registrar, pipeline_run):
         assert as_registrar.post("/api/cnmc/issue/999999").status_code == 404
 
-    def test_validate_endpoint_is_public(self, client):
+    def test_validate_endpoint_is_public(self, as_viewer):
         code = format_code("BRNG", "010", 7)
-        assert client.get(f"/api/cnmc/validate/{code}").json()["valid"] is True
-        assert client.get("/api/cnmc/validate/BRNG-010-000007-0").json()["valid"] is False
+        assert as_viewer.get(f"/api/cnmc/validate/{code}").json()["valid"] is True
+        assert as_viewer.get("/api/cnmc/validate/BRNG-010-000007-0").json()["valid"] is False

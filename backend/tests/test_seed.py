@@ -46,12 +46,15 @@ class TestSeedShape:
 
     def test_seeding_is_reproducible(self, db, seeded):
         """§2D determinism depends on the generator being deterministic."""
-        descriptions = db.execute(
-            select(RawItem.description).order_by(RawItem.id).limit(20)
-        ).scalars().all()
-        assert descriptions == db.execute(
-            select(RawItem.description).order_by(RawItem.id).limit(20)
-        ).scalars().all()
+        descriptions = (
+            db.execute(select(RawItem.description).order_by(RawItem.id).limit(20)).scalars().all()
+        )
+        assert (
+            descriptions
+            == db.execute(select(RawItem.description).order_by(RawItem.id).limit(20))
+            .scalars()
+            .all()
+        )
 
 
 class TestCorruptionModel:
@@ -77,9 +80,7 @@ class TestCorruptionModel:
 
     def test_mpn_coverage_is_around_sixty_percent(self, db, seeded):
         total = db.execute(select(func.count(Item.id))).scalar()
-        with_mpn = db.execute(
-            select(func.count(Item.id)).where(Item.mpn_norm.isnot(None))
-        ).scalar()
+        with_mpn = db.execute(select(func.count(Item.id)).where(Item.mpn_norm.isnot(None))).scalar()
         assert 0.45 < with_mpn / total < 0.75
 
     def test_pack_basis_variation_exists(self, db, seeded):
@@ -91,24 +92,18 @@ class TestGroundTruth:
         assert seeded["raw_without_truth"] == 0
 
     def test_duplicate_pairs_exist_to_be_found(self, db, seeded):
-        sizes = collections.Counter(
-            db.execute(select(TruthGroup.group_id)).scalars().all()
-        )
+        sizes = collections.Counter(db.execute(select(TruthGroup.group_id)).scalars().all())
         assert sum(1 for n in sizes.values() if n > 1) > 50
 
     def test_holdout_split_is_close_to_forty_percent(self, db, seeded):
         """§0.6: thresholds are tuned on 60%, every reported number is the 40%."""
-        splits = collections.Counter(
-            db.execute(select(TruthGroup.split)).scalars().all()
-        )
+        splits = collections.Counter(db.execute(select(TruthGroup.split)).scalars().all())
         share = splits["holdout"] / sum(splits.values())
         assert abs(share - HOLDOUT_FRACTION) < 0.08
 
     def test_a_group_never_straddles_the_split(self, db, seeded):
         by_group = collections.defaultdict(set)
-        for gid, split in db.execute(
-            select(TruthGroup.group_id, TruthGroup.split)
-        ).all():
+        for gid, split in db.execute(select(TruthGroup.group_id, TruthGroup.split)).all():
             by_group[gid].add(split)
         assert all(len(s) == 1 for s in by_group.values())
 
@@ -149,9 +144,7 @@ class TestPlantedTraps:
                 assert gid[a] != gid[b], "a refusal trap must be two products"
 
     def test_directed_equivalence_truth_records_a_direction(self, db, seeded):
-        rows = db.execute(
-            select(TruthEquivalence.direction, TruthEquivalence.rel_type)
-        ).all()
+        rows = db.execute(select(TruthEquivalence.direction, TruthEquivalence.rel_type)).all()
         assert rows
         directions = {d for d, _ in rows}
         assert "a_to_b" in directions, "directed substitution must be represented"
@@ -169,9 +162,7 @@ class TestLearnability:
 
         sizes = collections.Counter(gid.values())
         positive_pairs = sum(n * (n - 1) // 2 for n in sizes.values())
-        unresolvable = sum(
-            len(g) * (len(g) - 1) // 2 for g in by_hash.values() if len(g) > 1
-        )
+        unresolvable = sum(len(g) * (len(g) - 1) // 2 for g in by_hash.values() if len(g) > 1)
         # A handful is tolerable; a few percent would cap achievable precision.
         assert unresolvable / max(positive_pairs, 1) < 0.01
 
@@ -210,9 +201,7 @@ class TestExtractionQuality:
 
     def test_identity_critical_attributes_are_recovered(self, db, seeded):
         found = missing = 0
-        for class_code, attrs_json in db.execute(
-            select(Item.class_code, Item.attrs_json)
-        ).all():
+        for class_code, attrs_json in db.execute(select(Item.class_code, Item.attrs_json)).all():
             if class_code == "unclassified":
                 continue
             attrs = json.loads(attrs_json)

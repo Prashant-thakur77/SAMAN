@@ -22,7 +22,9 @@ def test_ocr_absence_is_not_counted_as_a_degraded_tier(monkeypatch):
     """OCR is an optional input to one screen, and the screen says so itself.
     Counting it as a degraded tier would make the chip cry wolf on an otherwise
     complete install."""
-    monkeypatch.setattr(capabilities, "_importable", lambda module: module != "rapidocr_onnxruntime")
+    monkeypatch.setattr(
+        capabilities, "_importable", lambda module: module != "rapidocr_onnxruntime"
+    )
     monkeypatch.setattr(capabilities, "get_settings", lambda: Settings(ollama_url="http://x"))
 
     caps = capabilities.detect().as_dict()
