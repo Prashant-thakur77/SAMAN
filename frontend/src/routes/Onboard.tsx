@@ -18,6 +18,7 @@ import {
   type PipelineStatus,
 } from '../lib/api'
 import { cn } from '../lib/cn'
+import { guessMapping } from '../lib/columnAliases'
 import { EASE } from '../lib/motion'
 import { useSession } from '../lib/session'
 
@@ -69,15 +70,10 @@ export default function Onboard() {
     const first = text.split(/\r?\n/)[0] ?? ''
     const parsed = first.split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
     setHeaders(parsed)
-    // Pre-fill the obvious ones; the API guesses too, this just shows the guess.
-    const guessed: Record<string, string> = {}
-    for (const field of FIELDS) {
-      const hit = parsed.find(
-        (h) => h.toLowerCase().replace(/[_ ]/g, '') === field.replace(/_/g, ''),
-      )
-      if (hit) guessed[field] = hit
-    }
-    setMapping(guessed)
+    // Pre-fill with the same guess the API will make, so what this screen
+    // shows is what the dry run does: an SAP header row (MATNR, MAKTX …) is
+    // read here as it is there.
+    setMapping(guessMapping(parsed))
   }
 
   async function dryRun() {
