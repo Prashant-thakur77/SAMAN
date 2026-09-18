@@ -54,3 +54,7 @@ the API refuses with `402 Payment Required` and only static Spaces are allowed.
 `render.yaml` generates one. `SAMAN_SECURE_COOKIES=true` behind HTTPS, which
 every host above terminates for you. `SAMAN_DEMO_LOGIN=false` if you would
 rather the login page did not offer the accounts and print the shared password.
+`SAMAN_LLM_URL`, `SAMAN_LLM_KEY` and `SAMAN_LLM_MODEL` to give the link a
+language model through a free OpenAI-compatible API (Groq, Gemini); the health
+page then says the model is remote. Without them the assistant answers from
+the documents in template mode and says so.

@@ -167,6 +167,22 @@ page remain editable. Every response carries `X-Frame-Options`,
 `X-Content-Type-Options`, a referrer policy and a permissions policy, and HSTS
 once cookies are marked secure.
 
+**The model on a host with no room for one.** A three-billion-parameter
+model wants about 4 GB of memory; a free plan has 512 MB. The same client
+that speaks to Ollama on an installation can speak to an OpenAI-compatible
+endpoint instead: set `SAMAN_LLM_URL` (the base URL up to `/v1`),
+`SAMAN_LLM_KEY` and `SAMAN_LLM_MODEL` in the host's environment, and the
+assistant, the Copilot's prose and Tier 3's wording use it. Groq's free tier
+(`https://api.groq.com/openai/v1`, `llama-3.1-8b-instant`) and Google's
+(`https://generativelanguage.googleapis.com/v1beta/openai`,
+`gemini-2.0-flash`) both fit. `/api/health` then reports the model as
+**remote**, in that word, because a question sent to it leaves the machine;
+that is a fact about the demo link and not about an installation, which runs
+the model on the premises and never needs the internet. Nothing about the
+guards changes with the path: the model words a sentence and answers from
+retrieved passages, every figure it produces is checked against what was
+computed, and sovereign mode switches both paths off.
+
 **What changes for a real deployment, and where it is enforced.** A random
 `SAMAN_SECRET_KEY` (the API logs a warning on the development default when
 secure cookies are on). `SAMAN_SECURE_COOKIES=true` behind HTTPS.
