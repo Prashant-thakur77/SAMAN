@@ -274,7 +274,9 @@ export default function Workbench() {
                   {task.adjudication.note}
                   {task.adjudication.prose_by === 'ollama'
                     ? ' Wording by the local model; the recommendation is not.'
-                    : ''}
+                    : task.adjudication.prose_by === 'remote'
+                      ? ' Wording by a remote model; the recommendation is not.'
+                      : ''}
                 </p>
               </section>
             )}

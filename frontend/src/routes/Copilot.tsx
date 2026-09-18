@@ -71,12 +71,16 @@ export default function Copilot() {
         description="Ask about the material master in plain language. Answers cite their sources and show the query behind them; free-form SQL is never generated or run."
         actions={
           suggestions && (
-            <StatusChip tone={suggestions.mode === 'ollama' ? 'ok' : 'neutral'}>
+            <StatusChip
+              tone={suggestions.mode === 'ollama' || suggestions.mode === 'remote' ? 'ok' : 'neutral'}
+            >
               {suggestions.sovereign_mode
                 ? 'LOCAL MODE'
                 : suggestions.mode === 'ollama'
                   ? 'local model active'
-                  : 'template mode'}
+                  : suggestions.mode === 'remote'
+                    ? 'remote model active'
+                    : 'template mode'}
             </StatusChip>
           )
         }
