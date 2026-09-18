@@ -3,6 +3,9 @@
 FROM node:22-slim AS build
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json* ./
+# `npm ci` runs the postinstall that copies the browser OCR engine into
+# public/ocr, so the script has to be here before the packages are.
+COPY frontend/scripts ./scripts
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
