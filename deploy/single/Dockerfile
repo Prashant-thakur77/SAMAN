@@ -1,9 +1,10 @@
 # SAMAN as one container, for any host that runs a single image on a single
 # port and keeps it running without a laptop: Render, Koyeb, Cloud Run, a VM.
-# The frontend is built and served by Caddy, the API sits behind it on the
-# loopback, and the demo database is generated at build time so the container
-# answers the moment it starts and needs no volume. Anything written at runtime
-# (decisions, uploads) lives only as long as the container does.
+# One process: the API serves the built frontend itself (SAMAN_STATIC_DIR), so
+# there is no web server binary for a host's sandbox to refuse — Render's did,
+# with Caddy. The demo database is generated at build time so the container
+# answers the moment it starts and needs no volume. Anything written at
+# runtime (decisions, uploads) lives only as long as the container does.
 #
 #   make image        # docker build -f deploy/single/Dockerfile -t saman-one .
 #   make image-run    # on :7860
@@ -23,7 +24,7 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-# --- app: API + Caddy + baked demo data (as backend/Dockerfile) ---
+# --- app: API, the built frontend, and the baked demo data (as backend/Dockerfile) ---
 FROM python:3.12-slim
 
 WORKDIR /srv
@@ -45,21 +46,15 @@ RUN if [ "$SAMAN_EXTRAS" = "voice" ]; then \
           faster-whisper==1.2.1 piper-tts==1.7.0 rapidocr-onnxruntime==1.4.4 ; \
     fi
 
-COPY --from=caddy:2-alpine /usr/bin/caddy /usr/bin/caddy
-
 # Hosts such as Hugging Face run the container as uid 1000; everything it must
 # write is owned by that user from the start.
-RUN useradd -m -u 1000 saman && mkdir -p /srv/data /srv/caddy /etc/caddy \
-    && chown -R saman:saman /srv /etc/caddy
+RUN useradd -m -u 1000 saman && mkdir -p /srv/data && chown -R saman:saman /srv
 
 COPY --chown=saman:saman backend/ ./backend/
 # The assistant answers from the project's own documents.
 COPY --chown=saman:saman README.md KNOWN_GAPS.md SAMAN_CLAUDE_CODE_SPEC.md ./
 COPY --chown=saman:saman docs/*.md ./docs/
 COPY --from=build --chown=saman:saman /src/dist /srv/www
-COPY --chown=saman:saman deploy/single/Caddyfile /etc/caddy/Caddyfile
-COPY --chown=saman:saman deploy/single/start.sh /srv/start.sh
-RUN chmod +x /srv/start.sh
 
 USER saman
 ENV PYTHONUNBUFFERED=1 \
@@ -68,8 +63,7 @@ ENV PYTHONUNBUFFERED=1 \
     SAMAN_TIER1_ENGINE=rapidfuzz \
     SAMAN_OLLAMA_AUTODETECT=false \
     SAMAN_SECURE_COOKIES=true \
-    XDG_DATA_HOME=/srv/caddy \
-    XDG_CONFIG_HOME=/srv/caddy \
+    SAMAN_STATIC_DIR=/srv/www \
     PORT=7860
 WORKDIR /srv/backend
 
@@ -85,4 +79,8 @@ RUN if [ "$SAMAN_EXTRAS" = "voice" ]; then \
 RUN python -m app.cli demo --profile demo
 
 EXPOSE 7860
-CMD ["/srv/start.sh"]
+# Shell form so $PORT is read at start: the host sets it, 7860 when none does.
+# --proxy-headers: the host terminates HTTPS; the request's scheme is what the
+# visitor's browser saw, not the loopback hop.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860} --proxy-headers --forwarded-allow-ips='*'
+

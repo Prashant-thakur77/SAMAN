@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
 
 from . import __version__
 from .audit import ensure_genesis
@@ -95,6 +98,46 @@ def _startup() -> None:
         ensure_genesis(db)
 
 
-@app.get("/", include_in_schema=False)
-def root() -> dict:
+#: Where the built frontend lives when this process serves it itself, which
+#: is how the single-container image runs: one process, one port, no web
+#: server in front. Unset in development (Vite serves and proxies) and in the
+#: compose stack (Caddy does), where this API answers only under /api.
+FRONTEND_DIR = Path(settings.saman_static_dir).resolve() if settings.saman_static_dir else None
+if FRONTEND_DIR is not None:
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+def _frontend_file(path: str) -> Path | None:
+    """The built file for a path, or the app shell for a client-side route.
+
+    The shell answers every path that is not a file, because the router in
+    the browser owns those routes and a reload on /workbench must not 404.
+    Anything under /api that reached here matched no endpoint and is a real
+    404, never the shell dressed up as a page.
+    """
+    if FRONTEND_DIR is None or path == "api" or path.startswith("api/"):
+        return None
+    candidate = (FRONTEND_DIR / path).resolve() if path else FRONTEND_DIR / "index.html"
+    if candidate.is_relative_to(FRONTEND_DIR) and candidate.is_file():
+        return candidate
+    index = FRONTEND_DIR / "index.html"
+    return index if index.is_file() else None
+
+
+@app.get("/", include_in_schema=False, response_model=None)
+def root() -> FileResponse | dict:
+    if (page := _frontend_file("")) is not None:
+        return FileResponse(page)
     return {"app": settings.app_name, "tagline": settings.tagline, "docs": "/api/docs"}
+
+
+@app.get("/{path:path}", include_in_schema=False, response_model=None)
+def frontend(path: str) -> FileResponse:
+    page = _frontend_file(path)
+    if page is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
+    # Hashed assets may be cached for good; the shell must always be fresh,
+    # or a redeploy leaves a browser asking for assets that no longer exist.
+    if page.name == "index.html":
+        return FileResponse(page, headers={"Cache-Control": "no-cache"})
+    return FileResponse(page, headers={"Cache-Control": "public, max-age=31536000, immutable"})

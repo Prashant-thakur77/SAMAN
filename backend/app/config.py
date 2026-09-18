@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     #: Machine access for the SAP-side hook: "email=key,email2=key2". A key acts
     #: as the named user, so every call is attributed and scoped like a person's.
     saman_api_keys: str = ""
+    #: A directory holding the built frontend for this process to serve
+    #: itself (the single-container image). Empty: the API answers only /api.
+    saman_static_dir: str = ""
 
     cors_origins: list[str] = [
         "http://localhost:5173",

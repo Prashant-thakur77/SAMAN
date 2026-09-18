@@ -6,7 +6,7 @@ model beside the API. It runs wherever you run it, which for most of this
 project has meant a laptop and a tunnel — and the link dies when the lid closes.
 
 This directory is the other shape: **one image, one port, no volume**. The
-frontend is built into it, the API sits behind Caddy on the loopback, and the
+frontend is built into it and served by the API process itself, and the
 demo estate is generated during the build, so the container answers the moment
 it starts. That is what a free host can keep running.
 
