@@ -2,9 +2,18 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
+import { EvaluationTable } from '../components/charts/EvaluationTable'
+import { HarmonisationByClass } from '../components/charts/HarmonisationByClass'
 import { HarmonisationDonut } from '../components/charts/HarmonisationDonut'
+import { HeldForReview } from '../components/charts/HeldForReview'
+import { MaterialsByCpseCount } from '../components/charts/MaterialsByCpseCount'
+import { PipelineLadder } from '../components/charts/PipelineLadder'
+import { SavingsLadder } from '../components/charts/SavingsLadder'
+import { StockAge } from '../components/charts/StockAge'
+import { VetoAttributes } from '../components/charts/VetoAttributes'
 import { PageHeader } from '../components/PageHeader'
 import { AXIS_PROPS, CHART_INK, GRID_PROPS, TOOLTIP_PROPS } from '../components/charts/Chrome'
+import { formatDay } from '../components/charts/ChartParts'
 import { CountUp, formatRupees } from '../components/charts/CountUp'
 import { EmptyState } from '../components/primitives/EmptyState'
 import { StatusChip } from '../components/primitives/Chip'
@@ -18,6 +27,12 @@ import { listItemVariants, listVariants } from '../lib/motion'
  * Every figure is computed from the database and reconciles with
  * `/api/metrics`; nothing here is a constant. The heatmap uses grayscale
  * intensity because §1.1 rations colour to two semantic tones.
+ *
+ * Read top to bottom as one argument: where the estate stands (KPIs, progress,
+ * the donut and its per-family and per-company breakdowns, the heatmap), how
+ * the machine decided (the pipeline ladder, the vetoing attributes, what waits
+ * for a human, the held-out scorecard), what it is worth (codes over time, the
+ * savings ladder, inventory and stock age), and data quality to close.
  */
 export default function DashExecutive() {
   const [data, setData] = useState<ExecutiveDashboard | null>(null)
@@ -51,6 +66,10 @@ export default function DashExecutive() {
   }
 
   const hasData = data.kpis.some((k) => k.value > 0)
+  const codesIssued = data.kpis.find((k) => k.key === 'cnmcs')?.value
+  const baselineRecall = data.evaluation?.rows.find((r) => r.key === 'recall')?.baseline ?? null
+  // Every day on which a code was issued; one day means one seeded batch.
+  const issueDays = data.trend.filter((t) => t.cnmcs_issued > 0).map((t) => t.date)
 
   return (
     <div className="space-y-8">
@@ -121,7 +140,9 @@ export default function DashExecutive() {
 
           <HarmonisationDonut harmonisation={data.harmonisation} />
 
-          <QualityTable quality={data.quality} />
+          <HarmonisationByClass byClass={data.by_class} codesIssued={codesIssued} />
+
+          <MaterialsByCpseCount data={data.by_cpse_count} />
 
           <section className="space-y-4">
             <h2 className="micro-label">Class × CPSE coverage</h2>
@@ -171,6 +192,14 @@ export default function DashExecutive() {
             </p>
           </section>
 
+          <PipelineLadder pipeline={data.pipeline} baselineRecall={baselineRecall} />
+
+          <VetoAttributes data={data.veto_attributes} />
+
+          <HeldForReview data={data.held_for_review} />
+
+          <EvaluationTable evaluation={data.evaluation} />
+
           <section className="space-y-4">
             <h2 className="micro-label">Codes issued over time</h2>
             {data.trend.length === 0 ? (
@@ -199,7 +228,16 @@ export default function DashExecutive() {
                 </ResponsiveContainer>
               </div>
             )}
+            {data.trend.length > 0 && (
+              <p className="text-xs text-muted">
+                {issueDays.length === 1 && codesIssued !== undefined
+                  ? `All ${codesIssued.toLocaleString('en-IN')} codes were issued in one seeded batch on ${formatDay(issueDays[0])}; the line is that single step.`
+                  : 'Cumulative CNMCs issued, by day.'}
+              </p>
+            )}
           </section>
+
+          <SavingsLadder data={data.savings_ladder} />
 
           <section className="grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3">
             {[
@@ -216,6 +254,10 @@ export default function DashExecutive() {
               </div>
             ))}
           </section>
+
+          <StockAge data={data.stock_age} />
+
+          <QualityTable quality={data.quality} />
         </>
       )}
     </div>

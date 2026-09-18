@@ -1,6 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 
 import type { ExecutiveDashboard } from '../../lib/api'
+import { RAMP } from './ramp'
 
 /**
  * Where the estate stands, as three disjoint parts of one whole.
@@ -13,7 +14,7 @@ import type { ExecutiveDashboard } from '../../lib/api'
  * every segment is directly labelled and legended; identity is never carried by
  * the fill alone.
  */
-const STEPS = ['rgb(var(--ink))', 'rgb(var(--ink) / 0.62)', 'rgb(var(--ink) / 0.34)']
+const STEPS = RAMP
 
 export function HarmonisationDonut({
   harmonisation,

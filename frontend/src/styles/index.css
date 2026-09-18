@@ -53,6 +53,29 @@
   }
 }
 
+/* Hand-drawn bar charts (components/charts/BarRows.tsx) draw in once: a clip
+   rectangle over the plot scales open from the baseline, so the bars are
+   revealed rather than stretched and their rounded ends never distort. The
+   reduced-motion block below collapses it, and the component also drops the
+   class when framer's useReducedMotion says so. */
+@keyframes chart-reveal {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.chart-reveal {
+  animation: chart-reveal 700ms var(--ease-out-quint) both;
+}
+
+/* The whole row band is the hover target; a faint wash says it responded. */
+.chart-row:hover .chart-band {
+  fill: rgb(var(--ink) / 0.05);
+}
+
 /* Respect prefers-reduced-motion globally; framer-motion variants additionally
    collapse to opacity-only via lib/motion.ts (spec §1.5). */
 @media (prefers-reduced-motion: reduce) {

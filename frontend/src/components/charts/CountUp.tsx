@@ -43,7 +43,11 @@ export function formatValue(value: number, format?: 'percent' | 'currency'): str
 /** Indian numbering, abbreviated — ₹7.2 Cr reads better than ₹71,80,92,548. */
 export function formatRupees(value: number): string {
   const abs = Math.abs(value)
-  if (abs >= 1e7) return `₹${(value / 1e7).toFixed(2)} Cr`
-  if (abs >= 1e5) return `₹${(value / 1e5).toFixed(2)} L`
+  if (abs >= 1e7) return `₹${twoPlaces(value / 1e7)} Cr`
+  if (abs >= 1e5) return `₹${twoPlaces(value / 1e5)} L`
   return `₹${Math.round(value).toLocaleString('en-IN')}`
 }
+
+// Grouped as well as rounded: ₹1,635.33 Cr, not ₹1635.33 Cr.
+const twoPlaces = (v: number) =>
+  v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
