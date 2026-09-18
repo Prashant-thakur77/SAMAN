@@ -1084,6 +1084,53 @@ whether it is present, and without it Smart-Create still takes typed
 descriptions. Weights ship inside the wheel, so nothing is downloaded and the
 offline guarantee holds.
 
+### Scanning a part, and printing its label
+
+The person holding a part on the plant floor, or a box at the store gate, has
+one question: *what is this, do we already have it under any name in any
+CPSE, and what is its code?* They have a phone or a barcode gun, and what they
+can give the platform is a string. **Scan** (`/scan`, every signed-in role)
+takes that string three ways and answers it once: a code typed or fired in by
+a barcode gun (a gun types the code and presses Enter into whatever has
+focus, so the field keeps focus and selects its text after every answer); a
+barcode or QR read continuously through the phone's camera; or a nameplate
+photographed and read on the device itself.
+
+`GET /api/scan/lookup?code=` resolves by exact key in a fixed order: the
+national code, whose shape is unmistakable and whose check digit says whether
+it was read correctly; a CPSE's own material code; a GTIN, check digit
+verified; and a manufacturer's part number, normalised the way the matcher
+normalises it. It resolves, it does not guess. A part number may name several
+materials: the seeded `6304-2RS` bearings carry one number across eleven load
+and temperature ratings, and the veto layer kept them apart for a reason, so
+all eleven come back with the attributes that separate them and the person
+chooses by what they can read off the part. The answer carries the code, the
+names the material has elsewhere, its stock in every CPSE (valuations
+withheld from a steward exactly as on the dashboards), the equipment it is
+fitted to with its criticality, and the substitutes an engineer has approved.
+Nothing found is an honest answer with a next step: Smart-Create, with the
+scanned text as the description.
+
+The nameplate reader runs on the server when `make deps-ocr` installed it, and
+otherwise in the browser: tesseract.js and its English model are served from
+the application's own origin (`frontend/public/ocr`, copied from the installed
+packages on `npm install`, the model kept in the repository), loaded only when
+the Scan screen asks for them, so the free host with no OCR engine still reads
+a plate on the phone, and nothing is fetched from the internet. The same
+honesty applies as to the server reader: it reads the marking, it does not
+recognise the part, and its score is measured on drawn plates.
+
+**Labels close the loop.** `/labels/<code>` prints a QR and a Code 128 of the
+CNMC with the standardised description and every CPSE's legacy code beside it,
+on a 100 × 60 mm label; the cluster page links to it once a code is issued.
+Stick it on the bin, and the next scan is the code itself, check digit and
+all. The round trip, from the label's QR through the camera path to the
+lookup, is tested end to end in a real browser.
+
+The gaps and the plan from here are in [`docs/ROADMAP.md`](docs/ROADMAP.md):
+who each screen is for, what a deployment would still need, and the order in
+which to close it.
+
 ---
 
 ## Problem-statement traceability
@@ -1142,6 +1189,8 @@ file-scoped copyleft on a CA bundle we do not modify.
 | [React](https://react.dev/) · [Vite](https://vite.dev/) · [Tailwind CSS](https://tailwindcss.com/) · [framer-motion](https://www.framer.com/motion/) | MIT | frontend |
 | [IBM Plex](https://github.com/IBM/plex) via @fontsource | OFL-1.1 | self-hosted typography |
 | [Ollama](https://ollama.com) + Qwen 2.5 | Apache-2.0 | optional local LLM tier |
+| [tesseract.js](https://github.com/naptha/tesseract.js) + [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) `eng` | Apache-2.0 | the nameplate reader in the browser, served from our own origin; the model is committed at `frontend/public/ocr` |
+| [@zxing/browser](https://github.com/zxing-js/browser) · [qrcode](https://github.com/soldair/node-qrcode) · [JsBarcode](https://github.com/lindell/JsBarcode) | MIT / Apache-2.0 / MIT | barcode and QR reading through the camera; QR and Code 128 on printed labels |
 
 **Deliberately excluded:** `zingg` (AGPL-3.0), capable entity resolution, but
 copyleft would encumber a government handover.
