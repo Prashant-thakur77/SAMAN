@@ -378,3 +378,41 @@ class TestInterchangeablePartsCarryTheirApproval:
         on_record = [p for p in body["equivalents"] if p["approval"]["status"] != "none"]
         assert on_record, "the relation the seed planted is on record"
         assert on_record[0]["approval"]["relation_id"]
+
+
+class TestTheProbeSharesThePipelinesFit:
+    """A probe must be projected into the space the stored vectors live in.
+    The pipeline keeps its fit; Smart-Create loads it rather than refitting,
+    which is the difference between a tenth of a second and minutes on a
+    small host — and, more to the point, the same space by construction."""
+
+    def test_the_pipeline_keeps_its_fit_and_the_probe_reuses_it(self, pipeline_run, db, tmp_path):
+        import time
+
+        from sqlalchemy import select
+
+        from app import smart_create
+        from app.embed import cosine, embedder_path, unpack
+        from app.models import Item
+
+        path = embedder_path()
+        assert path.exists(), "the embed stage saves its fit beside the other models"
+
+        # Earlier tests may have added rows since the pipeline ran; the
+        # pipeline's fit is still the one the stored vectors were made with.
+        smart_create.reset_embedder_cache()
+        started = time.time()
+        embedder = smart_create.probe_embedder(db)
+        assert time.time() - started < 2.0, "loaded, not refitted"
+
+        # The same space: an item's own text projects onto its stored vector.
+        item = db.execute(select(Item).where(Item.embed_vector.is_not(None)).limit(1)).scalar_one()
+        probe = embedder.transform([item.norm_text])[0]
+        assert cosine(probe, unpack(item.embed_vector)) > 0.999
+
+    def test_no_saved_fit_means_a_fit(self, tmp_path):
+        from app.embed import Embedder
+
+        assert Embedder.load(tmp_path / "missing.joblib") is None
+        (tmp_path / "broken.joblib").write_bytes(b"not a model")
+        assert Embedder.load(tmp_path / "broken.joblib") is None

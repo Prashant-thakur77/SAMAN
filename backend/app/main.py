@@ -160,12 +160,17 @@ def warm_dashboards():
 
         return run
 
+    from .smart_create import probe_embedder
+
     return cache.warm(
         [
             ("executive (visitor)", job(executive_for, ANONYMOUS)),
             ("executive (registrar)", job(executive_for, registrar)),
             ("metrics", job(metrics_for)),
             ("opportunity (registrar)", job(opportunity_for, registrar)),
+            # Smart-Create's probe embedder: the pipeline's saved fit, loaded
+            # once here rather than on the first requester's click.
+            ("smart-create embedder", job(probe_embedder)),
         ]
     )
 

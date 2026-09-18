@@ -73,13 +73,9 @@ class PipelineStatus:
             "stages_done": list(self.stages_done),
             "rows_done": self.rows_done,
             "rows_total": self.rows_total,
-            "percent": round(100 * self.rows_done / self.rows_total, 1)
-            if self.rows_total
-            else 0.0,
+            "percent": round(100 * self.rows_done / self.rows_total, 1) if self.rows_total else 0.0,
             "eta_seconds": self.eta_seconds,
-            "elapsed_seconds": round(time.time() - self.started_at, 1)
-            if self.started_at
-            else None,
+            "elapsed_seconds": round(time.time() - self.started_at, 1) if self.started_at else None,
             "error": self.error,
         }
 
@@ -98,7 +94,6 @@ def reset_status() -> None:
         _status = PipelineStatus()
 
 
-
 # --------------------------------------------------------------------------
 # Stage: normalize + extract
 # --------------------------------------------------------------------------
@@ -114,9 +109,11 @@ def build_items(
     Resumable by construction: it only processes raw rows with no item yet, so a
     crashed run restarts where it stopped rather than from zero (spec §8A).
     """
-    stmt = select(RawItem.id, RawItem.description, RawItem.uom).outerjoin(
-        Item, Item.raw_item_id == RawItem.id
-    ).where(Item.id.is_(None))
+    stmt = (
+        select(RawItem.id, RawItem.description, RawItem.uom)
+        .outerjoin(Item, Item.raw_item_id == RawItem.id)
+        .where(Item.id.is_(None))
+    )
     if raw_item_ids is not None:
         stmt = stmt.where(RawItem.id.in_(raw_item_ids))
 
@@ -194,9 +191,15 @@ def register_stage(name: str):
 
 @register_stage("normalize+extract")
 def _stage_normalize_extract(db: Session, status: PipelineStatus) -> None:
-    pending = db.execute(
-        select(RawItem.id).outerjoin(Item, Item.raw_item_id == RawItem.id).where(Item.id.is_(None))
-    ).scalars().all()
+    pending = (
+        db.execute(
+            select(RawItem.id)
+            .outerjoin(Item, Item.raw_item_id == RawItem.id)
+            .where(Item.id.is_(None))
+        )
+        .scalars()
+        .all()
+    )
     status.rows_total = len(pending)
     status.rows_done = 0
     build_items(db, pending, on_progress=lambda n: setattr(status, "rows_done", n))
@@ -257,7 +260,7 @@ def _stage_embed(db: Session, status: PipelineStatus) -> None:
     """Fit the embedder over the whole corpus and persist one vector per item."""
     from sqlalchemy import update
 
-    from .embed import Embedder, pack
+    from .embed import Embedder, embedder_path, pack
     from .models import Item as ItemModel
 
     rows = db.execute(select(ItemModel.id, ItemModel.norm_text).order_by(ItemModel.id)).all()
@@ -266,8 +269,13 @@ def _stage_embed(db: Session, status: PipelineStatus) -> None:
     if not rows:
         return
 
-    result = Embedder().fit_transform([text or "" for _, text in rows])
+    embedder = Embedder()
+    result = embedder.fit_transform([text or "" for _, text in rows])
     status.stage = f"embed ({result.mode})"
+    # The same fit, kept for Smart-Create: a probe must be projected into the
+    # space these vectors live in, and refitting it on demand costs minutes
+    # on a small host (see Embedder.save).
+    embedder.save(embedder_path(), (len(rows), int(rows[-1][0])))
 
     updates = [
         {"id": item_id, "embed_vector": pack(result.vectors[i])}
@@ -484,9 +492,7 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
     ordered_ids = [c.id for c in candidates.values()]
     index_by_id = {item_id: i for i, item_id in enumerate(ordered_ids)}
     first = candidates[ordered_ids[0]].vector
-    vectors = (
-        np.vstack([candidates[i].vector for i in ordered_ids]) if first is not None else None
-    )
+    vectors = np.vstack([candidates[i].vector for i in ordered_ids]) if first is not None else None
 
     pairs, blocking_stats = generate_candidates(keys, vectors, index_by_id)
 
@@ -621,9 +627,7 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
         "items": len(candidates),
         **tally.as_stats(),
     }
-    db.execute(
-        insert(MatchRun), [{"stats_json": json.dumps(stats, sort_keys=True, default=str)}]
-    )
+    db.execute(insert(MatchRun), [{"stats_json": json.dumps(stats, sort_keys=True, default=str)}])
     db.commit()
 
 
@@ -684,18 +688,21 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     # graph. Without this, re-running the pipeline would try to delete golden
     # records that codes already point at.
     frozen_clusters = set(
-        db.execute(
-            select(GoldenRecord.cluster_id)
-            .join(Cnmc, Cnmc.golden_id == GoldenRecord.id)
-        ).scalars().all()
+        db.execute(select(GoldenRecord.cluster_id).join(Cnmc, Cnmc.golden_id == GoldenRecord.id))
+        .scalars()
+        .all()
     )
-    frozen_items = set(
-        db.execute(
-            select(ClusterMember.item_id).where(
-                ClusterMember.cluster_id.in_(frozen_clusters)
+    frozen_items = (
+        set(
+            db.execute(
+                select(ClusterMember.item_id).where(ClusterMember.cluster_id.in_(frozen_clusters))
             )
-        ).scalars().all()
-    ) if frozen_clusters else set()
+            .scalars()
+            .all()
+        )
+        if frozen_clusters
+        else set()
+    )
 
     accepted = [
         (a, b)
@@ -740,9 +747,9 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     db.query(ReviewTask).delete()
     frozen_goldens = (
         set(
-            db.execute(
-                select(GoldenRecord.id).where(GoldenRecord.cluster_id.in_(frozen_clusters))
-            ).scalars().all()
+            db.execute(select(GoldenRecord.id).where(GoldenRecord.cluster_id.in_(frozen_clusters)))
+            .scalars()
+            .all()
         )
         if frozen_clusters
         else set()
@@ -754,12 +761,12 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     else:
         db.query(GoldenFieldProvenance).delete()
     if frozen_clusters:
-        db.query(GoldenRecord).filter(
-            GoldenRecord.cluster_id.notin_(frozen_clusters)
-        ).delete(synchronize_session=False)
-        db.query(ClusterMember).filter(
-            ClusterMember.cluster_id.notin_(frozen_clusters)
-        ).delete(synchronize_session=False)
+        db.query(GoldenRecord).filter(GoldenRecord.cluster_id.notin_(frozen_clusters)).delete(
+            synchronize_session=False
+        )
+        db.query(ClusterMember).filter(ClusterMember.cluster_id.notin_(frozen_clusters)).delete(
+            synchronize_session=False
+        )
         db.query(Cluster).filter(Cluster.id.notin_(frozen_clusters)).delete(
             synchronize_session=False
         )
@@ -831,9 +838,7 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     # an automation rate only means something if a human can sample what was
     # automated. Grey tasks must be decided; high and low tasks are there to be
     # confirmed or overturned.
-    cluster_of = dict(
-        db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all()
-    )
+    cluster_of = dict(db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all())
 
     def _task(pair_id, item_a, band, verdict, role, reason):
         return {
@@ -909,9 +914,7 @@ def _stage_relations(db: Session, status: PipelineStatus) -> None:
     ).all():
         rules_by_class.setdefault(class_code, []).extend(parse_rules(rule_yaml))
 
-    crossrefs = build_crossref_index(
-        db.execute(select(Crossref.mpn_a, Crossref.mpn_b)).all()
-    )
+    crossrefs = build_crossref_index(db.execute(select(Crossref.mpn_a, Crossref.mpn_b)).all())
 
     items = {
         item_id: Candidate(
@@ -920,9 +923,7 @@ def _stage_relations(db: Session, status: PipelineStatus) -> None:
             norm_text=norm_text or "",
             mpn_norm=mpn,
             attrs={
-                k: v
-                for k, v in json.loads(attrs_json or "{}").items()
-                if not k.startswith("_")
+                k: v for k, v in json.loads(attrs_json or "{}").items() if not k.startswith("_")
             },
         )
         for item_id, class_code, norm_text, mpn, attrs_json in db.execute(
@@ -945,9 +946,7 @@ def _stage_relations(db: Session, status: PipelineStatus) -> None:
     # "interchangeable with" link between them says nothing. This catches the
     # transitive case: a pair the matcher refused can still be merged through a
     # third item, and §2B is explicit that an equivalence is never a merge.
-    cluster_of = dict(
-        db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all()
-    )
+    cluster_of = dict(db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all())
     status.rows_total = len(candidate_pairs)
     status.rows_done = 0
 

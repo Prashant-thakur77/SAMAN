@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -55,6 +56,8 @@ class Embedder:
         self._model = None
         self._vectorizer = None
         self._svd = None
+        #: (rows, highest id) of the corpus a loaded fit was made on.
+        self.fitted_on: tuple[int, ...] = ()
 
     # -- sentence-transformers -------------------------------------------
 
@@ -94,6 +97,56 @@ class Embedder:
         self._svd = TruncatedSVD(n_components=components, random_state=0)
         return _l2_normalize(self._svd.fit_transform(sparse).astype(np.float32))
 
+    # -- persistence --------------------------------------------------------
+
+    def save(self, path: Path, signature: tuple[int, int]) -> None:
+        """Keep the fitted vectoriser and projection beside the other models.
+
+        Fitting takes seconds on a laptop and minutes on the tenth of a CPU a
+        free host gives away, and Smart-Create needs the *same* fit the
+        pipeline used, or a probe lands in a different space from the vectors
+        it is compared with. The corpus signature (row count, highest id)
+        says which corpus the fit belongs to. Sentence-transformer mode loads
+        its weights from the cache and has nothing to keep.
+        """
+        if self.mode != "tfidf" or self._vectorizer is None or self._svd is None:
+            return
+        import joblib
+
+        # Components in float32: half the file, and a probe's cosine does not
+        # need the second half of the mantissa.
+        self._svd.components_ = self._svd.components_.astype(np.float32)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(
+            {"signature": signature, "vectorizer": self._vectorizer, "svd": self._svd},
+            path,
+            compress=3,
+        )
+
+    @classmethod
+    def load(cls, path: Path) -> Embedder | None:
+        """The pipeline's last fit, or None when there is none.
+
+        It is used even when rows have been added since: the vectors in the
+        database were made by *this* fit, and a probe compared with them must
+        be projected by the same one. A refit over a bigger corpus is a
+        slightly different basis, and 0.95 of cosine with itself is the
+        symptom. The next pipeline run re-embeds every row and rewrites this.
+        """
+        if not path.exists():
+            return None
+        import joblib
+
+        try:
+            payload = joblib.load(path)
+        except Exception:
+            return None
+        embedder = cls(mode="tfidf")
+        embedder._vectorizer = payload["vectorizer"]
+        embedder._svd = payload["svd"]
+        embedder.fitted_on = tuple(payload.get("signature", ()))
+        return embedder
+
     # -- public -----------------------------------------------------------
 
     def fit_transform(self, texts: list[str]) -> EmbeddingResult:
@@ -115,7 +168,6 @@ class Embedder:
 
         vectors = self._fit_tfidf(texts)
         return EmbeddingResult(vectors, "tfidf", vectors.shape[1])
-
 
     def transform(self, texts: list[str]) -> np.ndarray:
         """Embed new text with the already-fitted model.
@@ -161,3 +213,15 @@ def cosine(a: np.ndarray | None, b: np.ndarray | None) -> float:
         return 0.0
     value = float(np.dot(a, b))  # both are already L2-normalized
     return max(0.0, min(1.0, value))
+
+
+def embedder_path() -> Path:
+    """Beside the other local models; overridable so tests never touch it."""
+    import os
+
+    from .config import get_settings
+
+    override = os.environ.get("SAMAN_EMBEDDER_PATH")
+    if override:
+        return Path(override)
+    return Path(get_settings().db_file).resolve().parent / "models" / "embedder.joblib"

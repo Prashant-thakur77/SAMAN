@@ -38,7 +38,7 @@ from . import audit
 from .blocking import content_tokens
 from .compare import values_equal
 from .config import get_settings
-from .embed import Embedder, cosine, unpack
+from .embed import Embedder, cosine, embedder_path, unpack
 from .extract import extract
 from .match import MatchCandidate, match_pair
 from .models import (
@@ -172,9 +172,15 @@ def probe_embedder(db: Session) -> Embedder | None:
     if _FITTED is not None and _FITTED[0] == signature:
         return _FITTED[1]
 
-    texts = db.execute(select(Item.norm_text).order_by(Item.id)).scalars().all()
-    embedder = Embedder()
-    embedder.fit_transform([t or "" for t in texts])
+    # The pipeline kept its fit; loading it is a tenth of a second where a
+    # refit is seconds on a laptop and minutes on a small host, and it is the
+    # fit the stored vectors were made with, whatever has been added since.
+    embedder = Embedder.load(embedder_path())
+    if embedder is None:
+        texts = db.execute(select(Item.norm_text).order_by(Item.id)).scalars().all()
+        embedder = Embedder()
+        embedder.fit_transform([t or "" for t in texts])
+        embedder.save(embedder_path(), signature)
     _FITTED = (signature, embedder)
     return embedder
 
