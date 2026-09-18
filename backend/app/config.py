@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     #: `/v1`, the model name, and a key. The health page calls it remote; an
     #: installation leaves these unset and runs the model on the machine.
     saman_llm_url: str | None = None
-    saman_llm_model: str = "llama-3.1-8b-instant"
+    saman_llm_model: str = "qwen/qwen3.8-27b"
     saman_llm_key: str | None = None
 
     # ERP adapter (docs/sap-integration.md). "mock" ships with the demo; "rfc"

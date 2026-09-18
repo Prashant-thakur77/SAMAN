@@ -173,7 +173,8 @@ that speaks to Ollama on an installation can speak to an OpenAI-compatible
 endpoint instead: set `SAMAN_LLM_URL` (the base URL up to `/v1`),
 `SAMAN_LLM_KEY` and `SAMAN_LLM_MODEL` in the host's environment, and the
 assistant, the Copilot's prose and Tier 3's wording use it. Groq's free tier
-(`https://api.groq.com/openai/v1`, `llama-3.1-8b-instant`) and Google's
+(`https://api.groq.com/openai/v1`, `qwen/qwen3.8-27b`, the same model family as
+the local one) and Google's
 (`https://generativelanguage.googleapis.com/v1beta/openai`,
 `gemini-2.0-flash`) both fit. `/api/health` then reports the model as
 **remote**, in that word, because a question sent to it leaves the machine;
