@@ -26,10 +26,10 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-import httpx
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from . import llm
 from .config import get_settings
 from .visibility import Scope, price_band
 
@@ -291,8 +291,11 @@ TEMPLATES: tuple[Template, ...] = (
         example="which CPSE overpays for gaskets",
         patterns=(
             _kw(
-                r"overpay", r"pays? (the )?most", r"most expensive",
-                r"paying more", r"highest price",
+                r"overpay",
+                r"pays? (the )?most",
+                r"most expensive",
+                r"paying more",
+                r"highest price",
             ),
         ),
         needs_class=True,
@@ -400,8 +403,12 @@ TEMPLATES: tuple[Template, ...] = (
         example="which items could we tender jointly",
         patterns=(
             _kw(
-                r"joint(ly)? tender", r"tender (jointly|together)", r"buy together",
-                r"aggregate demand", r"combined volume", r"consolidat",
+                r"joint(ly)? tender",
+                r"tender (jointly|together)",
+                r"buy together",
+                r"aggregate demand",
+                r"combined volume",
+                r"consolidat",
             ),
         ),
         price_sensitive=True,
@@ -429,8 +436,11 @@ TEMPLATES: tuple[Template, ...] = (
         key="items_by_class",
         description="How the catalogue breaks down by class",
         example="how many items per class",
-        patterns=(_kw(r"(items?|rows?|materials?).*(by|per)\s+class", r"class breakdown",
-                      r"what classes"),),
+        patterns=(
+            _kw(
+                r"(items?|rows?|materials?).*(by|per)\s+class", r"class breakdown", r"what classes"
+            ),
+        ),
         sql="""
             SELECT class_code, COUNT(*) AS items
             FROM item GROUP BY class_code ORDER BY items DESC
@@ -469,13 +479,10 @@ def retrieve(db: Session, question: str, limit: int = 5) -> list[dict]:
 
     rows = [dict(row._mapping) for row in db.execute(text(RETRIEVAL_SQL))]
     scored = [
-        (fuzz.token_set_ratio(question.upper(), row["std_description"] or ""), row)
-        for row in rows
+        (fuzz.token_set_ratio(question.upper(), row["std_description"] or ""), row) for row in rows
     ]
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [
-        {**row, "score": round(score / 100, 3)} for score, row in scored[:limit] if score >= 55
-    ]
+    return [{**row, "score": round(score / 100, 3)} for score, row in scored[:limit] if score >= 55]
 
 
 # --------------------------------------------------------------------------
@@ -548,7 +555,7 @@ def answer(db: Session, question: str, scope: Scope, use_llm: bool = False) -> A
             return Answer(
                 text=(
                     "Which material class do you mean? Try one of: "
-                    + ", ".join(sorted({v.split('.')[0] for v in CLASS_SYNONYMS.values()}))
+                    + ", ".join(sorted({v.split(".")[0] for v in CLASS_SYNONYMS.values()}))
                     + "."
                 ),
                 template=template.key,
@@ -668,27 +675,16 @@ def compose_with_llm(question: str, draft: str, rows: list[dict]) -> tuple[str, 
     """
     settings = get_settings()
     if not settings.llm_enabled:
-        return draft, "no local model configured"
+        return draft, "no model configured"
 
     facts = "\n".join(f"- {row}" for row in rows[:12]) or "- (no rows)"
     prompt = _PROSE_PROMPT.format(question=question, facts=facts, draft=draft)
 
     try:
-        response = httpx.post(
-            f"{settings.ollama_url.rstrip('/')}/api/generate",
-            json={
-                "model": settings.ollama_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.2},
-            },
-            timeout=20.0,
-        )
-        response.raise_for_status()
-        candidate = (response.json().get("response") or "").strip()
+        candidate = llm.generate(prompt, temperature=0.2, timeout=20.0, max_tokens=300)
     except Exception as exc:
         # A local model being down must never cost the user their answer.
-        return draft, f"local model unavailable ({type(exc).__name__})"
+        return draft, f"model unavailable ({type(exc).__name__})"
 
     if not candidate:
         return draft, "the model returned nothing"

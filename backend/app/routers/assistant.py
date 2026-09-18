@@ -9,10 +9,9 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import assistant, knowledge, stt, tts
+from .. import assistant, knowledge, llm, stt, tts
 from ..auth import current_user_optional
 from ..capabilities import detect
-from ..config import get_settings
 from ..db import get_db
 from ..models import User
 from ..visibility import scope_for
@@ -35,7 +34,8 @@ def suggestions() -> dict:
         "engine": detect().llm_mode,
         "model": {
             "available": knowledge.available(),
-            "name": get_settings().ollama_model if knowledge.available() else None,
+            "name": llm.model_name() if knowledge.available() else None,
+            "remote": llm.provider() == llm.REMOTE,
             "grounded_on": [label for label, _ in knowledge.SOURCES],
         },
     }

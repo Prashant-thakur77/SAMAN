@@ -21,9 +21,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-import httpx
-
-from .config import REPO_ROOT, get_settings
+from . import llm
+from .config import REPO_ROOT
 
 #: Documents worth reading, in the order a reader would.
 SOURCES: tuple[tuple[str, Path], ...] = (
@@ -77,27 +76,8 @@ class Grounded:
 
 
 def available() -> bool:
-    """A model is configured and reachable. Cheap: one probe, cached per process."""
-    settings = get_settings()
-    if not settings.llm_enabled:
-        return False
-    return _reachable(settings.ollama_url or "", settings.ollama_model)
-
-
-@lru_cache(maxsize=4)
-def _reachable(url: str, model: str) -> bool:
-    try:
-        response = httpx.get(f"{url.rstrip('/')}/api/tags", timeout=2.0)
-        response.raise_for_status()
-        names = {m.get("name", "") for m in response.json().get("models", [])}
-    except Exception:
-        return False
-    return model in names or f"{model}:latest" in names or any(n.startswith(model) for n in names)
-
-
-# --------------------------------------------------------------------------
-# Corpus
-# --------------------------------------------------------------------------
+    """A model is configured and reachable (see `llm`)."""
+    return llm.available()
 
 
 def _chunk_markdown(source: str, text: str) -> list[Chunk]:
@@ -187,25 +167,18 @@ def _numbers(text: str) -> set[str]:
 
 
 def _call_model(question: str, passages: list[tuple[Chunk, float]]) -> str:
-    settings = get_settings()
     context = "\n\n".join(
         f"[{i + 1}] ({c.source} · {c.heading}) {c.text}" for i, (c, _) in enumerate(passages)
     )
-    response = httpx.post(
-        f"{(settings.ollama_url or '').rstrip('/')}/api/chat",
-        json={
-            "model": settings.ollama_model,
-            "stream": False,
-            "options": {"temperature": 0.1, "num_predict": 260},
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT.format(dont_know=DONT_KNOW)},
-                {"role": "user", "content": f"Passages:\n{context}\n\nQuestion: {question}"},
-            ],
-        },
+    return llm.chat(
+        [
+            {"role": "system", "content": SYSTEM_PROMPT.format(dont_know=DONT_KNOW)},
+            {"role": "user", "content": f"Passages:\n{context}\n\nQuestion: {question}"},
+        ],
+        temperature=0.1,
         timeout=60.0,
+        max_tokens=260,
     )
-    response.raise_for_status()
-    return (response.json().get("message", {}).get("content") or "").strip()
 
 
 def answer(question: str) -> Grounded | None:

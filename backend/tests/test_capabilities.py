@@ -18,6 +18,14 @@ def clear_caches():
     capabilities.detect.cache_clear()
 
 
+def _settings(monkeypatch, factory):
+    """The capability report and the model client each read the settings."""
+    from app import llm
+
+    monkeypatch.setattr(capabilities, "get_settings", factory)
+    monkeypatch.setattr(llm, "get_settings", factory)
+
+
 def test_ocr_absence_is_not_counted_as_a_degraded_tier(monkeypatch):
     """OCR is an optional input to one screen, and the screen says so itself.
     Counting it as a degraded tier would make the chip cry wolf on an otherwise
@@ -25,7 +33,7 @@ def test_ocr_absence_is_not_counted_as_a_degraded_tier(monkeypatch):
     monkeypatch.setattr(
         capabilities, "_importable", lambda module: module != "rapidocr_onnxruntime"
     )
-    monkeypatch.setattr(capabilities, "get_settings", lambda: Settings(ollama_url="http://x"))
+    _settings(monkeypatch, lambda: Settings(ollama_url="http://x"))
 
     caps = capabilities.detect().as_dict()
     assert caps["ocr"]["available"] is False
@@ -34,9 +42,8 @@ def test_ocr_absence_is_not_counted_as_a_degraded_tier(monkeypatch):
 
 def test_all_optional_present_upgrades_every_tier(monkeypatch):
     monkeypatch.setattr(capabilities, "_importable", lambda _module: True)
-    monkeypatch.setattr(
-        capabilities,
-        "get_settings",
+    _settings(
+        monkeypatch,
         lambda: Settings(ollama_url="http://localhost:11434", saman_sovereign_mode=False),
     )
 
@@ -50,7 +57,7 @@ def test_all_optional_present_upgrades_every_tier(monkeypatch):
 
 def test_nothing_present_degrades_every_tier(monkeypatch):
     monkeypatch.setattr(capabilities, "_importable", lambda _module: False)
-    monkeypatch.setattr(capabilities, "get_settings", lambda: Settings(ollama_url=None))
+    _settings(monkeypatch, lambda: Settings(ollama_url=None))
 
     caps = capabilities.detect()
     assert caps.linkage_mode == "rapidfuzz"

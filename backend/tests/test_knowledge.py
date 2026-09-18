@@ -4,7 +4,7 @@ is only ever given passages, and its answer is checked back against them."""
 import httpx
 import pytest
 
-from app import assistant, knowledge
+from app import assistant, knowledge, llm
 from app.visibility import Scope
 
 REGISTRAR = Scope("registrar", None)
@@ -51,7 +51,7 @@ def model_up(monkeypatch):
     from app import config
 
     config.get_settings.cache_clear()
-    knowledge._reachable.cache_clear()
+    llm.forget()
     monkeypatch.setattr(
         httpx, "get", lambda *a, **k: _FakeResponse({"models": [{"name": "qwen2.5:3b"}]})
     )
@@ -64,7 +64,7 @@ def model_up(monkeypatch):
     monkeypatch.setattr(httpx, "post", fake_post)
     yield state
     config.get_settings.cache_clear()
-    knowledge._reachable.cache_clear()
+    llm.forget()
 
 
 class TestGrounding:
@@ -130,7 +130,7 @@ class TestAssistantIntegration:
         from app import config
 
         config.get_settings.cache_clear()
-        knowledge._reachable.cache_clear()
+        llm.forget()
         try:
             reply = assistant.answer(
                 db, "what did the sub-blocking experiment on oversized buckets find", REGISTRAR

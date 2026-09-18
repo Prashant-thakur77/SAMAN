@@ -44,11 +44,12 @@ def _importable(module: str) -> bool:
 class Capabilities:
     linkage_mode: str  # "splink" | "rapidfuzz"
     embedding_mode: str  # "sentence-transformers" | "tfidf"
-    llm_mode: str  # "ollama" | "deterministic"
+    llm_mode: str  # "ollama" | "remote" | "deterministic"
     sovereign_mode: bool
     #: "rapidocr" | "absent". Not a tier — reading a nameplate is an input to
     #: Smart-Create, not a stage of the matcher — but it is reported the same
     #: way so an operator can see in one place what this install can do.
+    llm_engine: str = "rule-based adjudicator"
     ocr_mode: str = "absent"
     stt_mode: str = "absent"
     tts_mode: str = "absent"
@@ -85,8 +86,11 @@ class Capabilities:
             },
             "llm": {
                 "mode": self.llm_mode,
-                "engine": "ollama" if self.llm_mode == "ollama" else "rule-based adjudicator",
-                "degraded": self.llm_mode != "ollama",
+                "engine": self.llm_engine,
+                "degraded": self.llm_mode == "deterministic",
+                # A remote model is a working model, not a degraded one, but
+                # it is not the offline one: questions leave the machine.
+                "remote": self.llm_mode == "remote",
             },
             "ocr": {
                 "mode": self.ocr_mode,
@@ -179,19 +183,20 @@ def detect() -> Capabilities:
     if erp_status["degraded"]:
         degraded.append(erp_status["note"])
 
-    if settings.llm_enabled:
-        llm = "ollama"
-    else:
-        llm = "deterministic"
+    from . import llm as _llm
+
+    llm = _llm.provider()
+    if llm == "deterministic":
         if sovereign:
             degraded.append("sovereign mode ON — Tier 3 forced to rule-based adjudicator")
         else:
-            degraded.append("OLLAMA_URL unset — Tier 3 using rule-based adjudicator")
+            degraded.append("no model configured — Tier 3 using rule-based adjudicator")
 
     return Capabilities(
         linkage_mode=linkage,
         embedding_mode=embedding,
         llm_mode=llm,
+        llm_engine=_llm.engine_label(),
         ocr_mode=ocr,
         stt_mode=stt_mode,
         tts_mode=tts_mode,

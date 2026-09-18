@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import lru_cache
 
+from . import llm
 from .compare import IN_BAND, MATCH, MISMATCH, UNKNOWN
 from .config import get_settings
 
@@ -134,11 +135,7 @@ def _decide(
         first = vetoed_by[0]
         reasons.append(f"{_pretty(first['attr'])}: {first.get('reason', 'disagrees')}")
         if len(vetoed_by) > 1:
-            reasons.append(
-                "Also "
-                + ", ".join(_pretty(v["attr"]) for v in vetoed_by[1:4])
-                + "."
-            )
+            reasons.append("Also " + ", ".join(_pretty(v["attr"]) for v in vetoed_by[1:4]) + ".")
         return _finish(LEAN_SPLIT, 0.8, reasons, evidence)
 
     # --- what argues for holding it back --------------------------------
@@ -174,11 +171,7 @@ def _decide(
             f"All {len(agreed)} identity-critical attributes agree, and the veto "
             "layer refused nothing."
         )
-    cosmetic = [
-        c
-        for c in per_attr
-        if c.get("role") == "cosmetic" and c.get("result") == MISMATCH
-    ]
+    cosmetic = [c for c in per_attr if c.get("role") == "cosmetic" and c.get("result") == MISMATCH]
     if cosmetic:
         reasons.append(
             "The only differences are cosmetic: "
@@ -208,9 +201,7 @@ HEADLINE = {
 def _finish(
     recommendation: str, confidence: float, reasons: list[str], _evidence: dict
 ) -> Adjudication:
-    summary = f"{HEADLINE[recommendation]}. {reasons[0]}" if reasons else HEADLINE[
-        recommendation
-    ]
+    summary = f"{HEADLINE[recommendation]}. {reasons[0]}" if reasons else HEADLINE[recommendation]
     return Adjudication(recommendation, confidence, reasons, summary)
 
 
@@ -228,25 +219,17 @@ One sentence:"""
 
 
 @lru_cache(maxsize=512)
-def _generate(url: str, model: str, prompt: str) -> str:
+def _generate(prompt: str) -> str:
     """One model call per distinct prompt. The same pair rephrased the same
     way every time it is shown, and never twice."""
-    import httpx
-
-    response = httpx.post(
-        f"{url}/api/generate",
-        json={"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1}},
-        timeout=8.0,
-    )
-    response.raise_for_status()
-    return (response.json().get("response") or "").strip()
+    return llm.generate(prompt, temperature=0.1, timeout=8.0, max_tokens=120)
 
 
 def _maybe_rephrase(result: Adjudication, _evidence: dict) -> None:
     """Let a local model polish the sentence, under the Copilot's guard."""
     settings = get_settings()
     if not settings.llm_enabled:
-        result.prose_note = "no local model configured"
+        result.prose_note = "no model configured"
         return
 
     from .copilot import _numbers_in
@@ -256,9 +239,9 @@ def _maybe_rephrase(result: Adjudication, _evidence: dict) -> None:
         reasons="\n".join(f"- {reason}" for reason in result.reasons),
     )
     try:
-        candidate = _generate(settings.ollama_url.rstrip("/"), settings.ollama_model, prompt)
+        candidate = _generate(prompt)
     except Exception as exc:
-        result.prose_note = f"local model unavailable ({type(exc).__name__})"
+        result.prose_note = f"model unavailable ({type(exc).__name__})"
         return
 
     if not candidate:
@@ -276,4 +259,4 @@ def _maybe_rephrase(result: Adjudication, _evidence: dict) -> None:
         return
 
     result.summary = candidate
-    result.prose_by = "ollama"
+    result.prose_by = llm.provider()

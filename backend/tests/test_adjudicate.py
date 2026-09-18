@@ -169,7 +169,7 @@ class TestItNeverDecides:
     def test_the_recommendation_is_deterministic_without_a_model(self):
         payload = adjudicate(evidence(), {}, 0.84).as_dict()
         assert payload["prose_by"] == "deterministic"
-        assert payload["prose_note"] == "no local model configured"
+        assert payload["prose_note"] == "no model configured"
 
     def test_the_same_evidence_always_adjudicates_the_same_way(self):
         first = adjudicate(evidence(), {"tier0_key": "mpn"}, 0.84).as_dict()

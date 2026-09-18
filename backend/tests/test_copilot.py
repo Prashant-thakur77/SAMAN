@@ -199,14 +199,16 @@ class TestLlmComposition:
     def test_a_dead_model_costs_nothing(self, monkeypatch):
         """A local model that is not listening must not cost the user an answer."""
         import app.copilot as module
+        import app.llm as client
 
         monkeypatch.setattr(module, "get_settings", _settings_with_llm)
+        monkeypatch.setattr(client, "get_settings", _settings_with_llm)
         text, rejection = module.compose_with_llm("q", "the draft", [])
         assert text == "the draft" and "unavailable" in rejection
 
     def test_no_model_configured_returns_the_draft(self, db, pipeline_run):
         text, rejection = copilot.compose_with_llm("q", "the draft", [])
-        assert text == "the draft" and "no local model" in rejection
+        assert text == "the draft" and "no model" in rejection
 
 
 def _settings_with_llm():
@@ -233,8 +235,11 @@ def _compose(monkeypatch, model_output: str):
         def post(*_args, **_kwargs):
             return _Response()
 
+    import app.llm as client
+
     monkeypatch.setattr(module, "get_settings", _settings_with_llm)
-    monkeypatch.setattr(module, "httpx", _Httpx)
+    monkeypatch.setattr(client, "get_settings", _settings_with_llm)
+    monkeypatch.setattr(client, "httpx", _Httpx)
     return module.compose_with_llm(
         "which cpse overpays", "CPCL pays the most at 662.95.", [{"cpse": "CPCL"}]
     )

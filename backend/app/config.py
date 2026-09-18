@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     # Optional Tier-3 LLM. Unset => deterministic adjudicator + templated Copilot.
     ollama_url: str | None = None
     ollama_model: str = "qwen2.5:3b"
+    #: A remote, OpenAI-compatible model instead of Ollama, for a host with no
+    #: room for one (the free demo link): the base URL up to and including
+    #: `/v1`, the model name, and a key. The health page calls it remote; an
+    #: installation leaves these unset and runs the model on the machine.
+    saman_llm_url: str | None = None
+    saman_llm_model: str = "llama-3.1-8b-instant"
+    saman_llm_key: str | None = None
 
     # ERP adapter (docs/sap-integration.md). "mock" ships with the demo; "rfc"
     # needs pyrfc and the SAP NetWeaver RFC SDK and falls back to the mock,
@@ -95,8 +102,8 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
-        """Sovereign mode wins over OLLAMA_URL (spec 6.13)."""
-        return bool(self.ollama_url) and not sovereign_mode()
+        """Sovereign mode wins over any model, local or remote (spec 6.13)."""
+        return bool(self.ollama_url or self.saman_llm_url) and not sovereign_mode()
 
     def model_post_init(self, _context) -> None:
         # OLLAMA_URL unset means "whatever is on this machine": a local Ollama
