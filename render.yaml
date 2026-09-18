@@ -1,0 +1,35 @@
+# SAMAN on Render, from this repository: one container, no laptop.
+#
+# On render.com: New → Blueprint → pick this repository. Render reads this file,
+# builds deploy/single/Dockerfile and serves it over HTTPS at
+# https://saman.onrender.com (or whatever name is free).
+#
+# What the free plan costs in honesty: 512 MB of memory and a tenth of a CPU,
+# so the dashboards answer in seconds rather than milliseconds; and the service
+# sleeps after 15 minutes without a visitor, waking on the next request in about
+# a minute. Before handing the link to an audience, open it once yourself.
+#
+# Voice and OCR are left out here — their models want more memory than the free
+# plan has. Every screen still works on the browser's own engines and says so.
+# On a paid plan or a VM, build with SAMAN_EXTRAS=voice for the local engines.
+
+services:
+  - type: web
+    name: saman
+    runtime: docker
+    plan: free
+    # Closest free region to India; oregon and frankfurt are the alternatives.
+    region: singapore
+    dockerfilePath: ./deploy/single/Dockerfile
+    dockerContext: .
+    # The API's own readiness answer, which reports every engine's state rather
+    # than only that the process is up.
+    healthCheckPath: /api/health
+    envVars:
+      # Signs the session cookie. Render generates it once and keeps it, so
+      # sessions survive a redeploy; the development default never reaches here.
+      - key: SAMAN_SECRET_KEY
+        generateValue: true
+      # Render terminates HTTPS in front of the container.
+      - key: SAMAN_SECURE_COOKIES
+        value: "true"

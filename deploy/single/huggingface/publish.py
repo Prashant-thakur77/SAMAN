@@ -3,11 +3,12 @@
     make space SPACE=<user>/saman            # first time, and after edits here
     make space SPACE=<user>/saman REBUILD=1  # after a push to GitHub
 
-Needs a Hugging Face token with write access: `hf auth login` once, or
-HF_TOKEN in the environment. The Space holds only this directory's Dockerfile
-and README.md; the build clones the GitHub repository itself. A random
-SAMAN_SECRET_KEY is set as a Space secret so sessions are not signed with the
-development default.
+Needs a Hugging Face token with write access (`hf auth login` once, or
+HF_TOKEN in the environment) and, since 2026, a PRO subscription: Docker Spaces
+are refused on a free account with 402. The Space receives the repository with
+deploy/single/Dockerfile at its root, which is where a Docker Space looks, and
+this directory's README.md as the Space card. A random SAMAN_SECRET_KEY is set
+as a Space secret so sessions are not signed with the development default.
 """
 
 from __future__ import annotations
@@ -19,6 +20,19 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]
+#: What the build context must not carry: not in git, or not the build's business.
+IGNORE = [
+    ".git/*",
+    "data/*",
+    "backend/.venv/*",
+    "frontend/node_modules/*",
+    "frontend/dist/*",
+    "docs/screenshots/*",
+    "deploy/.env",
+    "**/__pycache__/*",
+    "**/.pytest_cache/*",
+]
 POLL_SECONDS = 20
 GIVE_UP_AFTER = 40 * 60
 
@@ -37,14 +51,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from huggingface_hub import HfApi
     except ImportError:
-        print("huggingface_hub is not installed: pip install huggingface_hub", file=sys.stderr)
+        print(
+            "huggingface_hub is not installed: pip install huggingface_hub",
+            file=sys.stderr,
+        )
         return 2
 
     api = HfApi()
     try:
         me = api.whoami()["name"]
     except Exception as exc:  # noqa: BLE001 - the message is the point
-        print(f"Not signed in to Hugging Face ({exc}). Run `hf auth login` or set HF_TOKEN.")
+        print(
+            f"Not signed in to Hugging Face ({exc}). Run `hf auth login` or set HF_TOKEN."
+        )
         return 2
     print(f"signed in as {me}")
 
@@ -52,22 +71,39 @@ def main(argv: list[str] | None = None) -> int:
         api.restart_space(args.space, factory_reboot=True)
         print("factory rebuild requested")
     else:
-        api.create_repo(args.space, repo_type="space", space_sdk="docker", exist_ok=True)
+        api.create_repo(
+            args.space, repo_type="space", space_sdk="docker", exist_ok=True
+        )
         api.add_space_secret(args.space, "SAMAN_SECRET_KEY", secrets.token_urlsafe(48))
         api.upload_folder(
-            folder_path=str(HERE),
+            folder_path=str(REPO),
             repo_id=args.space,
             repo_type="space",
-            allow_patterns=["Dockerfile", "README.md"],
+            ignore_patterns=IGNORE + ["README.md"],
+            commit_message="SAMAN: repository",
+        )
+        api.upload_file(
+            path_or_fileobj=str(REPO / "deploy" / "single" / "Dockerfile"),
+            path_in_repo="Dockerfile",
+            repo_id=args.space,
+            repo_type="space",
+        )
+        api.upload_file(
+            path_or_fileobj=str(HERE / "README.md"),
+            path_in_repo="README.md",
+            repo_id=args.space,
+            repo_type="space",
             commit_message="SAMAN: single-container Space",
         )
-        print(f"pushed Dockerfile and README.md to https://huggingface.co/spaces/{args.space}")
+        print(f"pushed to https://huggingface.co/spaces/{args.space}")
 
     if args.no_wait:
         return 0
 
     owner, name = args.space.split("/", 1)
-    site = f"https://{owner}-{name}.hf.space".lower().replace("_", "-").replace(".", "-")
+    site = (
+        f"https://{owner}-{name}.hf.space".lower().replace("_", "-").replace(".", "-")
+    )
     started = time.time()
     last = None
     while time.time() - started < GIVE_UP_AFTER:

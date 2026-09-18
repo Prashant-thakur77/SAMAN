@@ -128,16 +128,15 @@ tunnel then drops and re-registers every few minutes, which to anyone holding
 the link looks exactly like the site being down.
 
 **Without the laptop.** Every link above ends at the machine running the
-stack. `deploy/hf/` is the same application as one self-contained image —
-frontend, API, and the demo estate generated at build time — for hosts that run
-a single container for free and keep it up on their own: Hugging Face Spaces
-(Docker), Render, Koyeb, Fly. `make image` builds it locally and `make image-run`
-serves it on :7860. On Hugging Face the Space holds only that directory's
-`Dockerfile` and `README.md`; the build clones this repository and comes up at
-`https://<user>-<space>.hf.space` in about ten minutes, and stays up with the
-laptop closed. What it does not carry: the local language model (the assistant
-answers from the documents and says so), and anything written after the build,
-which a free host's disk forgets on restart. The Space README has the steps.
+stack, and dies with it. `deploy/single/` is the other shape: the same
+application as one self-contained image — frontend, API, and the demo estate
+generated during the build — for a host that runs a single container and keeps
+it up on its own. `make image` builds it, `make image-run MEM=512m` rehearses a
+free plan's memory, and `render.yaml` in the repository root deploys it on
+Render's free tier from a Blueprint. What it gives up: the local language model,
+anything written after the build, and on 512 MB the voice engines too. What it
+buys: a link that answers with the laptop shut. `deploy/single/README.md` has
+the hosts, their sizes and what each one costs in honesty.
 
 **Voice and OCR on the server.** The image installs only the core engines.
 `SAMAN_EXTRAS=voice` in `deploy/.env` bakes in local speech recognition and

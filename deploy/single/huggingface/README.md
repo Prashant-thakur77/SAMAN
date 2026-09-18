@@ -34,11 +34,18 @@ time — every figure on every screen is computed from it, none is typed in.
 
 ## Publishing this Space
 
-1. Create a Space at <https://huggingface.co/new-space>: **Docker**, blank template, free CPU.
-2. Upload two files from the repository's `deploy/hf/` directory into the Space:
-   `Dockerfile` and this `README.md`. Nothing else.
-3. The build clones the GitHub repository, builds the frontend, generates the
-   demo data and starts. It takes about ten minutes the first time.
+**Docker Spaces are not free.** Hugging Face allows only static Spaces on a free
+account; creating this one answers `402 Payment Required` unless the account has
+a PRO subscription. `deploy/single/README.md` lists the hosts that do run it for
+nothing. With PRO, `make space SPACE=<user>/saman` does all of the below.
+
+1. Create a Space at <https://huggingface.co/new-space>: **Docker**, blank template, CPU basic.
+2. Push the whole repository to the Space (`git remote add space
+   https://huggingface.co/spaces/<user>/saman && git push space main`), with
+   `deploy/single/Dockerfile` copied to the root as `Dockerfile` and this file
+   as the root `README.md`. The build wants the repository as its context.
+3. The build installs the API, builds the frontend, generates the demo data
+   and starts. It takes about ten minutes the first time.
 4. Open the Space's own address, `https://<user>-<space>.hf.space`, rather than
    the framed page on huggingface.co: the sign-in cookie is first-party there.
 
