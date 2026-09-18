@@ -32,6 +32,7 @@ from .routers import (
     pipeline,
     pprl,
     relations,
+    scan,
     search,
     smart_create,
     substitutes,
@@ -120,6 +121,7 @@ for signed_in_router in (
     assistant.router,
     learn.router,
     substitutes.router,
+    scan.router,
 ):
     app.include_router(signed_in_router, prefix="/api", dependencies=SIGNED_IN)
 
