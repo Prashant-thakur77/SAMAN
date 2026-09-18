@@ -15,6 +15,8 @@ import Copilot from './routes/Copilot'
 // split out of the initial bundle (spec §9: keep the bundle lean).
 const DashExecutive = lazy(() => import('./routes/DashExecutive'))
 const DashOpportunity = lazy(() => import('./routes/DashOpportunity'))
+// The label carries a QR and a Code 128 encoder nobody else needs.
+const Label = lazy(() => import('./routes/Label'))
 
 import Home from './routes/Home'
 import Item from './routes/Item'
@@ -25,6 +27,7 @@ import NotFound from './routes/NotFound'
 import Onboard from './routes/Onboard'
 import Search from './routes/Search'
 import Pprl from './routes/Pprl'
+import Scan from './routes/Scan'
 import SmartCreate from './routes/SmartCreate'
 import Substitutes from './routes/Substitutes'
 import Workbench from './routes/Workbench'
@@ -46,6 +49,8 @@ const SHELL_ROUTES = [
   // inside the screen, and other CPSEs' valuations are withheld server-side.
   { path: '/migration', element: <Migration /> },
   { path: '/smart-create', element: <SmartCreate /> },
+  { path: '/scan', element: <Scan /> },
+  { path: '/labels/:code', element: <Label /> },
   { path: '/pprl', element: <Pprl /> },
   {
     path: '/admin',

@@ -37,7 +37,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-40 flex h-screen w-sidebar shrink-0 flex-col',
+        'no-print fixed inset-y-0 left-0 z-40 flex h-screen w-sidebar shrink-0 flex-col',
         'border-r border-hairline bg-surface',
         'transition-[transform,visibility] duration-200 ease-saman',
         // `invisible` rather than only a transform: an off-screen drawer that

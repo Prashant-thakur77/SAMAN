@@ -35,3 +35,8 @@ data/snapshot/
 # local model weights (make deps-stt); never committed
 data/models/
 deploy/.env
+
+# The browser OCR engine is copied from node_modules on install
+# (frontend/scripts/ocr-assets.mjs); only the language model is kept in git.
+frontend/public/ocr/*
+!frontend/public/ocr/eng.traineddata.gz

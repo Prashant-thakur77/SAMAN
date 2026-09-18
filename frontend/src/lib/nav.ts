@@ -17,6 +17,7 @@ import {
   IconMigration,
   IconOpportunity,
   IconRestricted,
+  IconScan,
   IconSearch,
   IconSmartCreate,
   IconSubstitute,
@@ -71,6 +72,15 @@ export const NAV: NavItem[] = [
     roles: null,
   },
 
+  {
+    label: 'Scan',
+    path: '/scan',
+    icon: IconScan,
+    group: 'Tools',
+    // The storekeeper at a bin, the engineer on the floor, the clerk at the
+    // gate: every role holds parts, so every role may ask what one is.
+    roles: null,
+  },
   {
     label: 'Smart-Create',
     path: '/smart-create',

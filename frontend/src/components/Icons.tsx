@@ -139,6 +139,14 @@ export const IconChevronRight = (p: IconProps) => (
 )
 
 /** Two materials that can stand in for each other: opposed arrows. */
+export const IconScan = (p: IconProps) => (
+  <Svg {...p}>
+    {/* a viewfinder's four corners, and the line a reader sweeps across a code */}
+    <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" />
+    <path d="M5.5 10h9" />
+  </Svg>
+)
+
 export const IconSubstitute = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 7h12m0 0-3-3m3 3-3 3" />

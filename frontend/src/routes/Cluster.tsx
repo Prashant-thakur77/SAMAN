@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
 import { ItemPanel } from '../components/workbench/ItemPanel'
@@ -87,7 +87,15 @@ export default function Cluster() {
         actions={
           <div className="flex items-center gap-3">
             {detail.cnmc ? (
-              <CodeChip code={detail.cnmc.code} />
+              <>
+                <CodeChip code={detail.cnmc.code} />
+                <Link
+                  to={`/labels/${detail.cnmc.code}`}
+                  className="text-sm text-muted underline underline-offset-4 hover:text-ink"
+                >
+                  Print label
+                </Link>
+              </>
             ) : (
               <Button
                 variant="primary"

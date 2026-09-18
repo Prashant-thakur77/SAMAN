@@ -53,6 +53,136 @@
   }
 }
 
+/* The bin label (routes/Label.tsx). Sized in millimetres so the screen preview
+   and the print agree: 92 × 52 mm inside a 100 × 60 mm sheet with 4 mm margins.
+   A label is paper, so it is drawn in the light tokens in both themes; a QR
+   printed white-on-black from dark mode would not scan. */
+.label-sheet {
+  width: 92mm;
+  max-width: 100%;
+  height: 52mm;
+  padding: 2mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5mm;
+  background: rgb(255 255 255);
+  color: rgb(10 10 10);
+  border: 1px solid rgb(229 229 229);
+  border-radius: 2px;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+.label-top {
+  display: flex;
+  gap: 3mm;
+  min-height: 0;
+  flex: 1;
+}
+
+.label-qr {
+  width: 30mm;
+  height: 30mm;
+  flex: none;
+}
+
+.label-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.label-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+}
+
+.label-code {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-weight: 500;
+  font-size: 14pt;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+.label-desc {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 7pt;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.label-meta {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 6pt;
+  line-height: 1.2;
+  color: rgb(82 82 82);
+}
+
+.label-legacy {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2mm;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 5.5pt;
+  line-height: 1.3;
+}
+
+.label-legacy span {
+  color: rgb(82 82 82);
+}
+
+.label-barcode {
+  display: block;
+  width: 100%;
+  height: 11mm;
+  flex: none;
+}
+
+@media print {
+  /* The shell (sidebar, command bar, footer, assistant) and the page chrome
+     around the label are marked .no-print; the label prints alone. */
+  body.label-print {
+    background: rgb(255 255 255);
+  }
+
+  body.label-print .no-print {
+    display: none !important;
+  }
+
+  body.label-print main {
+    padding: 0 !important;
+  }
+
+  /* The shell's full-height column and the page's spacing would push the
+     label onto a second sheet; the label is the only thing on the page. */
+  body.label-print .min-h-screen {
+    min-height: 0;
+  }
+
+  body.label-print .label-page > * {
+    margin: 0 !important;
+  }
+
+  .label-sheet {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    width: 92mm;
+    /* A hair under the printable 52 mm so rounding never spills a page. */
+    height: 51mm;
+  }
+}
+
 /* Hand-drawn bar charts (components/charts/BarRows.tsx) draw in once: a clip
    rectangle over the plot scales open from the baseline, so the bars are
    revealed rather than stretched and their rounded ends never distort. The

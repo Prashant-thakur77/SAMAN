@@ -65,7 +65,7 @@ export function Shell({ children }: { children: ReactNode }) {
           route; this is the way past them. Visible only while focused. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:border focus:border-hairline focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:text-ink"
+        className="no-print sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:border focus:border-hairline focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:text-ink"
       >
         Skip to content
       </a>
@@ -115,7 +115,7 @@ export function Shell({ children }: { children: ReactNode }) {
             )}
           </div>
         </main>
-        <footer className="border-t border-hairline px-4 py-4 sm:px-6">
+        <footer className="no-print border-t border-hairline px-4 py-4 sm:px-6">
           <p className="mx-auto max-w-content text-xs text-muted">
             SAMAN · Standardised Asset &amp; Material Analysis Network · issues the CNMC
           </p>

@@ -18,7 +18,7 @@ export function CommandBar({
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '')
 
   return (
-    <header className="sticky top-0 z-20 flex h-commandbar shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3 sm:gap-4 sm:px-4">
+    <header className="no-print sticky top-0 z-20 flex h-commandbar shrink-0 items-center gap-2 border-b border-hairline bg-surface px-3 sm:gap-4 sm:px-4">
       {/* Below lg the sidebar is a drawer, and this is the handle for it. */}
       <button
         type="button"

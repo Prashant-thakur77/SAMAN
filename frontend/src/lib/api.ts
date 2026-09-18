@@ -1113,6 +1113,21 @@ export type SmartCreateMatch = {
   tier_scores: Record<string, unknown>
   veto: Record<string, unknown> | null
   why: string
+  /**
+   * On an interchangeable part only: the engineer's decision on the
+   * equivalence between it and the existing record the check found.
+   */
+  approval?: SmartCreateApproval
+}
+
+export type SmartCreateApproval = {
+  status: 'approved' | 'proposed' | 'rejected' | 'none'
+  relation_id?: number
+  with_item_id?: number
+  decided_by?: string | null
+  reason?: string | null
+  ts?: string | null
+  note?: string
 }
 
 export type SmartCreateResult = {
@@ -1199,6 +1214,135 @@ export async function smartCreateScan(file: File, uom?: string): Promise<SmartCr
   if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
   return body as SmartCreateResult
 }
+
+// ---- Scan: what a barcode, a label or a nameplate names ----
+
+export type ScanMember = {
+  item_id: number
+  cpse: string
+  legacy_code: string
+  description: string
+  mpn: string | null
+  gtin: string | null
+  /** True for the catalogue row the scanned code hit directly. */
+  scanned: boolean
+}
+
+export type ScanPosition = {
+  cpse: string
+  plant: string
+  qty_on_hand: number
+  reserved_qty: number
+  available: number
+  unit_value: number | null
+  value: number | null
+  value_withheld: boolean
+  last_movement: string | null
+}
+
+export type ScanInstallation = {
+  tag: string
+  description: string
+  criticality: 'A' | 'B' | 'C'
+  ved: string | null
+  cpse: string
+  qty: number
+}
+
+export type ScanSubstitute = {
+  relation_id: number
+  rel_type: 'equivalent' | 'supersedes'
+  direction: string | null
+  status: 'proposed' | 'approved' | 'rejected'
+  confidence: number
+  other: {
+    item_id: number
+    normalized?: string
+    class_code?: string
+    legacy_code?: string
+    description?: string
+    cpse?: string
+    cluster_id?: number
+    cnmc?: string | null
+  }
+  approval: {
+    status: string
+    decided_by: string | null
+    reason: string | null
+    ts: string | null
+  } | null
+}
+
+export type ScanMaterial = {
+  cluster_id: number | null
+  golden_id: number | null
+  cnmc: string | null
+  status: string | null
+  std_description: string | null
+  class_code: string
+  family: string | null
+  attrs: Record<string, unknown>
+  members: ScanMember[]
+  cpses: string[]
+  stock: {
+    cluster_id: number
+    cpse_count: number
+    plant_count: number
+    total_qty: number
+    total_value: number
+    positions: ScanPosition[]
+  } | null
+  installed_on: ScanInstallation[]
+  ved: string | null
+  substitutes: ScanSubstitute[]
+}
+
+export type ScanSpare = {
+  item_id: number
+  cluster_id: number | null
+  cnmc: string | null
+  legacy_code: string
+  description: string
+  class_code: string
+  qty_fitted: number
+  stock_here: number
+  stock_elsewhere: number
+  cpses_elsewhere: number
+}
+
+/** A tag plate: the equipment at one CPSE that carries it, with its spares. */
+export type ScanEquipment = {
+  id: number
+  tag: string
+  description: string
+  criticality: 'A' | 'B' | 'C'
+  ved: string | null
+  cpse: string
+  spares: ScanSpare[]
+}
+
+export type ScanResult = {
+  query: string
+  /** How the code resolved, in the order the server tries them. */
+  matched_by: 'cnmc' | 'legacy_code' | 'gtin' | 'mpn' | 'equipment_tag' | null
+  /** What was tried when nothing matched; 'cnmc' means the check digit failed. */
+  tried: string | null
+  /** 0, 1, or several (a part number shared by variants). */
+  materials: ScanMaterial[]
+  /** The plant carrying the tag, own CPSE first; empty unless matched by a tag. */
+  equipment: ScanEquipment[]
+  /** Attribute keys on which several materials differ; empty for 0 or 1. */
+  differs_on: string[]
+  /** One sentence for the reader. Always shown. */
+  note: string
+  next: {
+    action: 'open_cluster' | 'open_item' | 'choose' | 'choose_site' | 'smart_create' | 'none'
+    to: string | null
+  }
+}
+
+export const scanLookup = (code: string) =>
+  api.get<ScanResult>('/scan/lookup?code=' + encodeURIComponent(code))
 
 // ---- PPRL restricted mode (§5, M10) ----
 

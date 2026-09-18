@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
 import { Button } from '../components/primitives/Button'
@@ -12,6 +12,7 @@ import {
   smartCreateCreate,
   smartCreateReuse,
   smartCreateScan,
+  type SmartCreateApproval,
   type SmartCreateMatch,
   type SmartCreateResult,
   type SmartCreateStats,
@@ -53,8 +54,21 @@ export default function SmartCreate() {
   const camera = useRef<HTMLInputElement>(null)
   const ocrReady = health?.capabilities.ocr?.available ?? false
 
+  const [params] = useSearchParams()
+
   useEffect(() => {
     void getSmartCreateStats().then(setStats).catch(() => setStats(null))
+  }, [])
+
+  // Scan hands a nameplate's text over as `?description=`; check it at once,
+  // so the person who photographed the marking sees the answer, not a form.
+  useEffect(() => {
+    const handed = params.get('description')?.trim()
+    if (!handed) return
+    setDescription(handed)
+    void checkText(handed)
+    // Once, on arrival: a later edit to the field is the person's own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function run(work: () => Promise<void>) {
@@ -83,17 +97,19 @@ export default function SmartCreate() {
       setResult(scanned)
     })
 
-  const check = () =>
+  const checkText = (text: string) =>
     run(async () => {
       setResolved(false)
       setResult(
         await smartCreateCheck({
-          description,
+          description: text,
           mpn: mpn || undefined,
           uom: uom || undefined,
         }),
       )
     })
+
+  const check = () => checkText(description)
 
   const reuse = (match: SmartCreateMatch) =>
     run(async () => {
@@ -413,6 +429,7 @@ function MatchList({
               </div>
               <p className="break-words font-mono text-sm">{match.description}</p>
               <p className={cn('text-xs', match.veto ? 'text-muted' : 'text-ink')}>{match.why}</p>
+              {match.approval && <Approval approval={match.approval} />}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Link
@@ -431,5 +448,32 @@ function MatchList({
         ))}
       </ul>
     </section>
+  )
+}
+
+/**
+ * Whether an engineer has ruled on the equivalence. "Interchangeable" is the
+ * matcher's word; only an approval says the part may be fitted.
+ */
+function Approval({ approval }: { approval: SmartCreateApproval }) {
+  if (approval.status === 'none') {
+    return <p className="text-xs text-muted">{approval.note ?? 'No equivalence on record yet'}</p>
+  }
+  const label = {
+    approved: 'Approved substitute',
+    proposed: 'Proposed, not yet approved by an engineer',
+    rejected: 'Rejected as a substitute',
+  }[approval.status]
+  const tone = { approved: 'ok', proposed: 'neutral', rejected: 'danger' } as const
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
+      <StatusChip tone={tone[approval.status]}>{label}</StatusChip>
+      {approval.status !== 'proposed' && approval.reason && (
+        <span className="text-xs text-muted">
+          {approval.decided_by ? `${approval.decided_by}: ` : ''}
+          {approval.reason}
+        </span>
+      )}
+    </div>
   )
 }

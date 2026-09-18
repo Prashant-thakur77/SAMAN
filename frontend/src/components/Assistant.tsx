@@ -777,7 +777,7 @@ export function Assistant() {
         aria-controls="saman-assistant"
         aria-label={open ? 'Close the assistant' : 'Ask SAMAN'}
         className={cn(
-          'fixed bottom-5 right-5 z-40 flex h-12 items-center gap-2 rounded-full border border-hairline',
+          'no-print fixed bottom-5 right-5 z-40 flex h-12 items-center gap-2 rounded-full border border-hairline',
           'bg-bg pl-2 pr-4 text-sm font-medium text-ink shadow-sm transition-opacity duration-150',
           'hover:bg-surface',
           open && 'pointer-events-none opacity-0',
@@ -799,7 +799,7 @@ export function Assistant() {
             animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: EASE } }}
             exit={{ opacity: 0, y: reduce ? 0 : 12, transition: { duration: 0.14 } }}
             className={cn(
-              'fixed bottom-5 right-5 z-50 flex max-h-[min(40rem,calc(100vh-2.5rem))] w-[min(24rem,calc(100vw-2.5rem))] flex-col',
+              'no-print fixed bottom-5 right-5 z-50 flex max-h-[min(40rem,calc(100vh-2.5rem))] w-[min(24rem,calc(100vw-2.5rem))] flex-col',
               'overflow-hidden rounded-2xl border border-hairline bg-bg text-ink shadow-sm',
             )}
           >

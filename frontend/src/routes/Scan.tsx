@@ -1,0 +1,1135 @@
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+
+import { PageHeader } from '../components/PageHeader'
+import { Button } from '../components/primitives/Button'
+import { CodeChip, StatusChip } from '../components/primitives/Chip'
+import { EmptyState } from '../components/primitives/EmptyState'
+import { Input } from '../components/primitives/Field'
+import {
+  ApiError,
+  scanLookup,
+  smartCreateScan,
+  type ScanEquipment,
+  type ScanMaterial,
+  type ScanResult,
+  type ScanSubstitute,
+} from '../lib/api'
+import { cn } from '../lib/cn'
+import { useHealth } from '../lib/useHealth'
+import { useSession } from '../lib/session'
+
+/**
+ * /scan — what a code names (spec §5, the floor).
+ *
+ * One question from a bin, a plant floor or the store gate: what is this
+ * thing, do we hold it under any name in any CPSE, and what is its national
+ * code. Three ways in — a typed or gun-scanned code, the phone's camera on a
+ * barcode, a photograph of a nameplate read by OCR — and one lookup behind
+ * them. The server resolves; it does not guess. Several materials sharing a
+ * part number are put to the person to choose by the attribute that differs.
+ */
+export default function Scan() {
+  const [code, setCode] = useState('')
+  const [result, setResult] = useState<ScanResult | null>(null)
+  const [chosen, setChosen] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const field = useRef<HTMLInputElement>(null)
+
+  const lookup = useCallback(async (raw: string) => {
+    const query = raw.trim()
+    if (!query) return
+    setBusy(true)
+    setError(null)
+    setChosen(null)
+    try {
+      setResult(await scanLookup(query))
+    } catch (err) {
+      setResult(null)
+      setError(err instanceof ApiError ? err.message : 'The lookup did not work.')
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  // The gun types into whatever has focus, so the field takes it a frame
+  // after mount: later than `autoFocus`, and later than the route announcer
+  // moving focus to the main landmark on the same navigation.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => field.current?.focus())
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  // A barcode gun scans many parts in a row: after every answer the field
+  // keeps focus with its text selected, so the next scan replaces the last.
+  useEffect(() => {
+    if (!result && !error) return
+    const el = field.current
+    if (!el) return
+    el.focus()
+    el.select()
+  }, [result, error])
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (!busy) void lookup(code)
+  }
+
+  const scanAgain = () => {
+    setResult(null)
+    setError(null)
+    setCode('')
+    field.current?.focus()
+  }
+
+  const decoded = (text: string) => {
+    setCode(text)
+    void lookup(text)
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-8">
+      <PageHeader
+        section="Tools"
+        title="Scan"
+        description="What is this part, do we already hold it under any name in any CPSE, and what is its national code. A barcode, a bin label, a GTIN or a part number all resolve here."
+      />
+
+      <section className="space-y-4 card p-4 sm:p-6">
+        <form onSubmit={submit} className="space-y-2">
+          <label htmlFor="scan-code" className="micro-label block">
+            Code
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              ref={field}
+              id="scan-code"
+              value={code}
+              autoFocus
+              inputMode="text"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              enterKeyHint="search"
+              placeholder="BRNG-010-000001-3"
+              className="h-12 font-mono text-base"
+              onChange={(e) => setCode(e.target.value)}
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={busy || !code.trim()}
+              className="h-12 shrink-0 sm:px-6"
+            >
+              {busy ? 'Looking…' : 'Look up'}
+            </Button>
+          </div>
+          <p className="text-sm text-muted">
+            Type a code, or point a barcode scanner here and pull the trigger.
+          </p>
+        </form>
+
+        <div className="flex flex-col gap-3 border-t border-hairline pt-4 sm:flex-row sm:flex-wrap">
+          <CameraScanner disabled={busy} onDecoded={decoded} />
+          <NameplateReader disabled={busy} />
+          <PhotoDecoder disabled={busy} onDecoded={decoded} />
+        </div>
+      </section>
+
+      {error && (
+        <p role="status" className="border border-hairline px-4 py-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
+
+      {result && (
+        <ScanOutcome
+          result={result}
+          chosen={chosen}
+          onChoose={setChosen}
+          onScanAgain={scanAgain}
+          onLookup={decoded}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---- the result area -------------------------------------------------------
+
+function ScanOutcome({
+  result,
+  chosen,
+  onChoose,
+  onScanAgain,
+  onLookup,
+}: {
+  result: ScanResult
+  chosen: number | null
+  onChoose: (index: number | null) => void
+  onScanAgain: () => void
+  onLookup: (code: string) => void
+}) {
+  const { materials } = result
+  const equipment = result.equipment ?? []
+
+  if (equipment.length > 0) {
+    const single = equipment.length === 1 || chosen !== null
+    return (
+      <div className="space-y-3">
+        {single && chosen !== null && (
+          <button
+            type="button"
+            onClick={() => onChoose(null)}
+            className="h-11 text-sm text-muted underline underline-offset-4 hover:text-ink"
+          >
+            ← Back to the {equipment.length} sites that use this tag
+          </button>
+        )}
+        {single ? (
+          <EquipmentCard equipment={equipment[chosen ?? 0]} onLookup={onLookup} />
+        ) : (
+          <SiteChooser result={result} onChoose={onChoose} />
+        )}
+        <MatchedBy result={result} />
+      </div>
+    )
+  }
+
+  if (materials.length === 0) {
+    return (
+      <div className="space-y-3">
+        <EmptyState
+          title={result.tried === 'cnmc' ? 'Scan it again' : 'Nothing carries that code'}
+          description={result.note}
+          action={
+            <div className="flex flex-wrap gap-3">
+              {result.tried === 'cnmc' && (
+                <Button variant="primary" className="h-11" onClick={onScanAgain}>
+                  Scan again
+                </Button>
+              )}
+              {result.next.action === 'smart_create' && result.next.to && (
+                <Link
+                  to={result.next.to}
+                  className={cn(
+                    'inline-flex h-11 items-center justify-center rounded-full border px-4 text-sm font-medium',
+                    result.tried === 'cnmc'
+                      ? 'border-hairline bg-surface text-ink hover:bg-bg'
+                      : 'border-inverse bg-inverse text-bg hover:opacity-90',
+                  )}
+                >
+                  Check it as a description in Smart-Create
+                </Link>
+              )}
+            </div>
+          }
+        />
+        <MatchedBy result={result} />
+      </div>
+    )
+  }
+
+  if (materials.length === 1 || chosen !== null) {
+    const material = materials[chosen ?? 0]
+    const to =
+      chosen === null
+        ? result.next.to
+        : material.cluster_id !== null
+          ? `/clusters/${material.cluster_id}`
+          : `/items/${material.members[0]?.item_id}`
+    return (
+      <div className="space-y-3">
+        {chosen !== null && (
+          <button
+            type="button"
+            onClick={() => onChoose(null)}
+            className="h-11 text-sm text-muted underline underline-offset-4 hover:text-ink"
+          >
+            ← Back to the {materials.length} that share this code
+          </button>
+        )}
+        <MaterialCard material={material} to={to} />
+        <MatchedBy result={result} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <Chooser result={result} onChoose={onChoose} />
+      <MatchedBy result={result} />
+    </div>
+  )
+}
+
+const METHOD_NAMES: Record<NonNullable<ScanResult['matched_by']>, string> = {
+  cnmc: 'the national code',
+  legacy_code: "a CPSE's own material code",
+  gtin: 'the GTIN',
+  mpn: "the manufacturer's part number",
+  equipment_tag: 'the equipment tag',
+}
+
+function MatchedBy({ result }: { result: ScanResult }) {
+  return (
+    <p className="text-sm text-muted">
+      {result.matched_by ? `Matched by ${METHOD_NAMES[result.matched_by]}` : 'Nothing matched'}
+      {' · '}
+      <span className="font-mono">{result.query}</span>
+    </p>
+  )
+}
+
+// ---- one material ----------------------------------------------------------
+
+function MaterialCard({ material, to }: { material: ScanMaterial; to: string | null }) {
+  const { user } = useSession()
+  const own = user?.cpse_code ?? null
+
+  const members = [...material.members].sort(
+    (a, b) => Number(b.scanned) - Number(a.scanned) || a.cpse.localeCompare(b.cpse),
+  )
+  // The signed-in person's own CPSE first: it is the shelf they can walk to.
+  const positions = [...(material.stock?.positions ?? [])].sort(
+    (a, b) => Number(b.cpse === own) - Number(a.cpse === own) || a.cpse.localeCompare(b.cpse),
+  )
+  const approved = dedupe(material.substitutes.filter((s) => s.status === 'approved'))
+  const proposed = dedupe(material.substitutes.filter((s) => s.status === 'proposed'))
+
+  return (
+    <article className="card divide-y divide-hairline" data-testid="scan-material">
+      <header className="space-y-3 p-4 sm:p-6">
+        <div className="flex flex-wrap items-center gap-3">
+          {material.cnmc ? (
+            <CodeChip code={material.cnmc} className="text-sm" />
+          ) : (
+            <StatusChip tone="neutral">No national code yet · in review</StatusChip>
+          )}
+          {material.family && <span className="micro-label">{material.family}</span>}
+        </div>
+        <h2 className="break-words font-mono text-base text-ink">
+          {material.std_description ?? material.members[0]?.description ?? 'Unnamed material'}
+        </h2>
+        <p className="text-sm text-muted">
+          {material.class_code}
+          {material.cpses.length > 0 && ` · held by ${material.cpses.join(', ')}`}
+        </p>
+      </header>
+
+      <Block title="Also called">
+        <ul className="space-y-2">
+          {members.map((m) => (
+            <li key={m.item_id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+              <span className="micro-label w-12 shrink-0">{m.cpse}</span>
+              <CodeChip code={m.legacy_code} />
+              <span className="min-w-0 flex-1 break-words text-muted">{m.description}</span>
+              {m.scanned && <span className="text-xs text-ok">you scanned this</span>}
+            </li>
+          ))}
+        </ul>
+      </Block>
+
+      <Block title="Where it is">
+        {material.stock && positions.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm">
+              <span className="font-mono">{qty(material.stock.total_qty)}</span> on hand across{' '}
+              {material.stock.plant_count} {material.stock.plant_count === 1 ? 'plant' : 'plants'}
+            </p>
+            <ul className="space-y-2">
+              {positions.map((p) => (
+                <li
+                  key={`${p.cpse}-${p.plant}`}
+                  className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm"
+                >
+                  <span className="micro-label w-12 shrink-0">
+                    {p.cpse}
+                    {p.cpse === own && <span className="sr-only"> (your CPSE)</span>}
+                  </span>
+                  <span className="min-w-0 flex-1">{p.plant}</span>
+                  <span className="font-mono">
+                    {qty(p.available)}
+                    <span className="text-muted"> of {qty(p.qty_on_hand)}</span>
+                  </span>
+                  <span className="w-24 text-right font-mono">
+                    {p.value_withheld ? (
+                      <span className="text-muted">withheld</span>
+                    ) : p.value !== null ? (
+                      rupees(p.value)
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-sm text-muted">No stock position recorded.</p>
+        )}
+      </Block>
+
+      <Block title="Fitted to">
+        {material.installed_on.length > 0 ? (
+          <ul className="space-y-2">
+            {material.installed_on.map((fit) => (
+              <li
+                key={`${fit.cpse}-${fit.tag}`}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+              >
+                <span className="micro-label w-12 shrink-0">{fit.cpse}</span>
+                <span className="font-mono">{fit.tag}</span>
+                <span className="min-w-0 flex-1 text-muted">{fit.description}</span>
+                <StatusChip tone="neutral">
+                  {fit.criticality} · {CRITICALITY[fit.criticality] ?? fit.ved ?? 'unrated'}
+                </StatusChip>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">Not on any equipment BOM.</p>
+        )}
+      </Block>
+
+      <Block title="Approved substitutes">
+        {approved.length === 0 && proposed.length === 0 && (
+          <p className="text-sm text-muted">No substitute has been proposed for this material.</p>
+        )}
+        {approved.length > 0 && (
+          <ul className="space-y-3">
+            {approved.map((s) => (
+              <li key={s.relation_id} className="space-y-1 text-sm">
+                <SubstituteLine substitute={s} />
+                {s.approval?.reason && (
+                  <p className="text-sm text-muted">
+                    {s.approval.decided_by ?? 'An engineer'}: {s.approval.reason}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {approved.length === 0 && proposed.length > 0 && (
+          <p className="text-sm text-muted">None approved yet.</p>
+        )}
+        {proposed.length > 0 && (
+          <div className="space-y-2 pt-3">
+            <p className="micro-label">Proposed, not yet approved</p>
+            <ul className="space-y-1 text-muted">
+              {proposed.map((s) => (
+                <li key={s.relation_id} className="text-sm">
+                  <SubstituteLine substitute={s} muted />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Block>
+
+      <footer className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4 sm:p-6">
+        {to && (
+          <Link
+            to={to}
+            className="inline-flex h-11 items-center text-sm font-medium text-ink underline underline-offset-4"
+          >
+            Open the full record
+          </Link>
+        )}
+        {material.cnmc && (
+          <Link
+            to={`/labels/${material.cnmc}`}
+            className="inline-flex h-11 items-center text-sm text-muted underline underline-offset-4 hover:text-ink"
+          >
+            Print a label
+          </Link>
+        )}
+      </footer>
+    </article>
+  )
+}
+
+const CRITICALITY: Record<string, string> = { A: 'vital', B: 'essential', C: 'desirable' }
+
+function SubstituteLine({ substitute, muted }: { substitute: ScanSubstitute; muted?: boolean }) {
+  const { other } = substitute
+  const relation =
+    substitute.rel_type === 'supersedes'
+      ? substitute.direction === 'b_to_a'
+        ? 'supersedes this'
+        : 'superseded by this'
+      : 'equivalent'
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {other.cpse && <span className="micro-label">{other.cpse}</span>}
+        {(other.cnmc || other.legacy_code) && (
+          <CodeChip code={other.cnmc ?? other.legacy_code ?? ''} />
+        )}
+        <span className="text-xs text-muted">{relation}</span>
+      </div>
+      <Link
+        to={`/items/${other.item_id}`}
+        className={cn(
+          'block break-words underline-offset-4 hover:underline',
+          muted ? 'text-muted' : 'text-ink',
+        )}
+      >
+        {other.description ?? other.normalized ?? `item ${other.item_id}`}
+      </Link>
+    </div>
+  )
+}
+
+/** The server returns one relation per member; the person wants one row per
+ *  other material. */
+function dedupe(subs: ScanSubstitute[]): ScanSubstitute[] {
+  const seen = new Set<string>()
+  return subs.filter((s) => {
+    const key = `${s.other.item_id}-${s.rel_type}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function Block({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3 p-4 sm:p-6">
+      <h3 className="micro-label">{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+// ---- a piece of equipment: the maintenance engineer's starting point --------
+
+/** "Scan the pump, see its spares": one tag at one site, with what is fitted
+ *  to it and where each spare is held. A row is a lookup of that spare. */
+function EquipmentCard({
+  equipment,
+  onLookup,
+}: {
+  equipment: ScanEquipment
+  onLookup: (code: string) => void
+}) {
+  return (
+    <article className="card divide-y divide-hairline" data-testid="scan-equipment">
+      <header className="space-y-3 p-4 sm:p-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-mono text-lg text-ink">{equipment.tag}</span>
+          <span className="micro-label">{equipment.cpse}</span>
+          <StatusChip tone="neutral">
+            {equipment.criticality} ·{' '}
+            {CRITICALITY[equipment.criticality] ?? equipment.ved ?? 'unrated'}
+          </StatusChip>
+        </div>
+        <h2 className="text-base text-ink">{equipment.description}</h2>
+      </header>
+      <section className="space-y-3 p-4 sm:p-6">
+        <h3 className="micro-label">
+          Spares · {equipment.spares.length}
+        </h3>
+        {equipment.spares.length === 0 ? (
+          <p className="text-sm text-muted">No spare is recorded on this equipment's BOM.</p>
+        ) : (
+          <ul className="-mx-2 divide-y divide-hairline">
+            {equipment.spares.map((spare) => (
+              <li key={spare.item_id}>
+                <button
+                  type="button"
+                  onClick={() => onLookup(spare.cnmc ?? spare.legacy_code)}
+                  className="flex min-h-[44px] w-full flex-col gap-1 rounded-lg px-2 py-3 text-left hover:bg-bg focus-visible:bg-bg"
+                  aria-label={`Look up ${spare.cnmc ?? spare.legacy_code}`}
+                >
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {spare.cnmc ? (
+                      <CodeChip code={spare.cnmc} />
+                    ) : (
+                      <span className="micro-label">no code</span>
+                    )}
+                    <span className="font-mono text-xs text-muted">{spare.legacy_code}</span>
+                    <span className="text-xs text-muted">fitted ×{qty(spare.qty_fitted)}</span>
+                  </span>
+                  <span className="break-words text-sm text-ink">{spare.description}</span>
+                  <span className="font-mono text-xs text-muted">
+                    here {qty(spare.stock_here)} ·{' '}
+                    {spare.stock_elsewhere > 0
+                      ? `elsewhere ${qty(spare.stock_elsewhere)} at ${spare.cpses_elsewhere} ${
+                          spare.cpses_elsewhere === 1 ? 'CPSE' : 'CPSEs'
+                        }`
+                      : 'none elsewhere'}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </article>
+  )
+}
+
+/** A tag is local to a plant: the same tag names different plant at each
+ *  CPSE, so the person chooses the site. Own CPSE is already first. */
+function SiteChooser({
+  result,
+  onChoose,
+}: {
+  result: ScanResult
+  onChoose: (index: number) => void
+}) {
+  return (
+    <section className="space-y-3" data-testid="scan-site-chooser">
+      <p className="max-w-prose text-sm text-muted">{result.note}</p>
+      <ul className="card divide-y divide-hairline">
+        {result.equipment.map((equipment, index) => (
+          <li key={equipment.id}>
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="micro-label">{equipment.cpse}</span>
+                  <StatusChip tone="neutral">
+                    {equipment.criticality} ·{' '}
+                    {CRITICALITY[equipment.criticality] ?? equipment.ved ?? 'unrated'}
+                  </StatusChip>
+                </div>
+                <p className="text-sm text-ink">{equipment.description}</p>
+                <p className="text-xs text-muted">
+                  {equipment.spares.length} {equipment.spares.length === 1 ? 'spare' : 'spares'}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                className="h-11 shrink-0"
+                onClick={() => onChoose(index)}
+              >
+                This site
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// ---- several materials -----------------------------------------------------
+
+function Chooser({
+  result,
+  onChoose,
+}: {
+  result: ScanResult
+  onChoose: (index: number) => void
+}) {
+  return (
+    <section className="space-y-3" data-testid="scan-chooser">
+      <p className="max-w-prose text-sm text-muted">{result.note}</p>
+      <ul className="card divide-y divide-hairline">
+        {result.materials.map((material, index) => (
+          <li key={material.cluster_id ?? `item-${material.members[0]?.item_id ?? index}`}>
+            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:p-5">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {material.cnmc ? (
+                    <CodeChip code={material.cnmc} />
+                  ) : (
+                    <span className="micro-label">no code</span>
+                  )}
+                  <span className="micro-label">{material.cpses.join(' · ')}</span>
+                </div>
+                <p className="break-words font-mono text-sm">{material.std_description}</p>
+                <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {result.differs_on.map((key) => {
+                    const shown = formatAttr(key, material.attrs[key])
+                    return (
+                      <div key={key} className="flex gap-1">
+                        <dt className="text-muted">{shown.label}</dt>
+                        <dd className="font-mono">{shown.value}</dd>
+                      </div>
+                    )
+                  })}
+                </dl>
+              </div>
+              <Button
+                variant="secondary"
+                className="h-11 shrink-0 sm:self-center"
+                onClick={() => onChoose(index)}
+              >
+                This one
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** `load_rating_kg: 640` → { label: 'Load rating', value: '640 kg' }. The unit
+ *  suffix on an attribute key is the unit of its value. */
+const UNITS: Record<string, string> = {
+  mm: 'mm',
+  cm: 'cm',
+  m: 'm',
+  kg: 'kg',
+  g: 'g',
+  c: '°C',
+  v: 'V',
+  a: 'A',
+  w: 'W',
+  kw: 'kW',
+  bar: 'bar',
+  l: 'L',
+  pct: '%',
+  rpm: 'rpm',
+}
+
+export function formatAttr(key: string, value: unknown): { label: string; value: string } {
+  const parts = key.split('_')
+  const last = parts[parts.length - 1]
+  const unit = parts.length > 1 ? UNITS[last] : undefined
+  const words = unit ? parts.slice(0, -1) : parts
+  const label = words.join(' ').replace(/^./, (c) => c.toUpperCase())
+  if (value === null || value === undefined || value === '') return { label, value: '—' }
+  const shown =
+    typeof value === 'number'
+      ? value.toLocaleString('en-IN', { maximumFractionDigits: 2 })
+      : String(value)
+  return { label, value: unit ? `${shown} ${unit}` : shown }
+}
+
+const qty = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 1 })
+const rupees = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
+
+// ---- the camera ------------------------------------------------------------
+
+type CameraState = 'off' | 'starting' | 'on' | 'denied' | 'failed'
+
+/**
+ * A live viewfinder decoding barcodes and QR codes continuously. The decoder
+ * is loaded on first use so the main bundle does not carry it; the button is
+ * absent where there is no camera API at all (plain http on a LAN).
+ */
+function CameraScanner({
+  disabled,
+  onDecoded,
+}: {
+  disabled: boolean
+  onDecoded: (text: string) => void
+}) {
+  const [state, setState] = useState<CameraState>('off')
+  const video = useRef<HTMLVideoElement>(null)
+  const controls = useRef<{ stop: () => void } | null>(null)
+  const supported =
+    typeof navigator !== 'undefined' &&
+    typeof navigator.mediaDevices?.getUserMedia === 'function'
+
+  const stop = useCallback(() => {
+    controls.current?.stop()
+    controls.current = null
+    // Duck-typed: `MediaStream` is not a global everywhere the screen renders.
+    const stream = video.current?.srcObject as MediaStream | null | undefined
+    if (stream && typeof stream.getTracks === 'function') stream.getTracks().forEach((t) => t.stop())
+    if (video.current) video.current.srcObject = null
+  }, [])
+
+  useEffect(() => {
+    if (state !== 'starting') return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { BrowserMultiFormatReader } = await import('@zxing/browser')
+        const el = video.current
+        if (!el || cancelled) return
+        const reader = new BrowserMultiFormatReader()
+        // No device id: the reader asks for `{ facingMode: 'environment' }`,
+        // the back camera on a phone.
+        const c = await reader.decodeFromVideoDevice(undefined, el, (found, _err, ctl) => {
+          if (!found) return
+          ctl.stop()
+          controls.current = null
+          stop()
+          if (typeof navigator.vibrate === 'function') navigator.vibrate(40)
+          setState('off')
+          onDecoded(found.getText())
+        })
+        if (cancelled) {
+          c.stop()
+          return
+        }
+        controls.current = c
+        setState('on')
+      } catch (err) {
+        if (cancelled) return
+        const name = err instanceof Error ? err.name : ''
+        setState(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'failed')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [state, stop, onDecoded])
+
+  useEffect(() => stop, [stop])
+
+  if (!supported) return null
+
+  const live = state === 'starting' || state === 'on'
+  return (
+    <div className={cn('flex flex-col items-stretch gap-3 sm:items-start', live && 'w-full')}>
+      {!live && (
+        <Button
+          variant="secondary"
+          className="h-11 w-full sm:w-auto"
+          disabled={disabled}
+          onClick={() => setState('starting')}
+        >
+          Scan with the camera
+        </Button>
+      )}
+      {state === 'denied' && (
+        <p className="text-sm text-danger">Allow the camera, or type the code.</p>
+      )}
+      {state === 'failed' && (
+        <p className="text-sm text-danger">The camera could not start. Type the code instead.</p>
+      )}
+      {live && (
+        <div className="w-full space-y-3">
+          <div className="relative w-full overflow-hidden rounded-lg border border-hairline bg-ink">
+            {/* The stream is muted and inline so iOS does not go full-screen. */}
+            <video
+              ref={video}
+              muted
+              playsInline
+              autoPlay
+              aria-label="Camera viewfinder"
+              className="block aspect-[4/3] w-full object-cover"
+            />
+            {/* The frame sits on a camera image, not the page, so it is the
+                light token's white in both themes, as the label is paper. */}
+            <div aria-hidden className="pointer-events-none absolute inset-4 text-[rgb(255_255_255)]">
+              <span className="absolute left-0 top-0 h-6 w-6 border-l border-t border-current" />
+              <span className="absolute right-0 top-0 h-6 w-6 border-r border-t border-current" />
+              <span className="absolute bottom-0 left-0 h-6 w-6 border-b border-l border-current" />
+              <span className="absolute bottom-0 right-0 h-6 w-6 border-b border-r border-current" />
+              <span className="absolute inset-x-6 top-1/2 border-t border-current opacity-60" />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="secondary"
+              className="h-11"
+              onClick={() => {
+                stop()
+                setState('off')
+              }}
+            >
+              Cancel
+            </Button>
+            <span className="text-sm text-muted">
+              {state === 'starting' ? 'Starting the camera…' : 'Hold the code inside the frame.'}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- a still photograph of a barcode ----------------------------------------
+
+/** A laptop without a camera, or a photograph somebody sent: decode the still. */
+function PhotoDecoder({
+  disabled,
+  onDecoded,
+}: {
+  disabled: boolean
+  onDecoded: (text: string) => void
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function decode(file: File) {
+    setBusy(true)
+    setMessage(null)
+    const url = URL.createObjectURL(file)
+    try {
+      const { BrowserMultiFormatReader } = await import('@zxing/browser')
+      const found = await new BrowserMultiFormatReader().decodeFromImageUrl(url)
+      onDecoded(found.getText())
+    } catch {
+      setMessage('No barcode or QR code could be read from that photo.')
+    } finally {
+      URL.revokeObjectURL(url)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="hidden sm:flex sm:flex-col sm:gap-2">
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        aria-label="Decode a photo of a barcode"
+        data-testid="scan-photo-decode"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) void decode(file)
+        }}
+      />
+      <Button
+        variant="ghost"
+        className="h-11"
+        disabled={disabled || busy}
+        onClick={() => input.current?.click()}
+      >
+        {busy ? 'Decoding…' : 'Decode a photo of a barcode'}
+      </Button>
+      {message && <p className="text-sm text-danger">{message}</p>}
+    </div>
+  )
+}
+
+// ---- a nameplate, read as text ----------------------------------------------
+
+type OcrLine = { text: string; confidence: number }
+type ReaderState =
+  | { phase: 'idle' }
+  | { phase: 'working'; message: string }
+  | { phase: 'read'; text: string; lines: OcrLine[] }
+  | { phase: 'failed'; message: string }
+
+const LOW_CONFIDENCE = 0.75
+
+/**
+ * Photograph the stamped marking and read it as text. The server's OCR reads
+ * it when the API has one; otherwise tesseract.js runs in the browser from
+ * files on our own origin (public/ocr), nothing from the internet. Either way
+ * the text ends up in Smart-Create, the one place that shows a duplicate check.
+ */
+function NameplateReader({ disabled }: { disabled: boolean }) {
+  const navigate = useNavigate()
+  const { health } = useHealth()
+  const input = useRef<HTMLInputElement>(null)
+  const worker = useRef<Promise<TesseractWorker> | null>(null)
+  const [state, setState] = useState<ReaderState>({ phase: 'idle' })
+  const [text, setText] = useState('')
+  const serverOcr = health?.capabilities.ocr?.available === true
+
+  // The worker holds a WebAssembly engine and a language model: one per
+  // screen, gone with it.
+  useEffect(
+    () => () => {
+      void worker.current?.then((w) => w.terminate()).catch(() => undefined)
+      worker.current = null
+    },
+    [],
+  )
+
+  async function read(file: File) {
+    if (serverOcr) {
+      setState({ phase: 'working', message: 'Reading…' })
+      try {
+        const scanned = await smartCreateScan(file)
+        const seen = scanned.ocr?.text?.trim() ?? ''
+        if (!seen) {
+          setState({ phase: 'failed', message: 'The reader saw no text. Move closer, or type it.' })
+          return
+        }
+        navigate(`/smart-create?description=${encodeURIComponent(seen)}`)
+      } catch (err) {
+        setState({
+          phase: 'failed',
+          message: err instanceof ApiError ? err.message : 'The reader did not answer.',
+        })
+      }
+      return
+    }
+
+    setState({ phase: 'working', message: 'Loading the reader…' })
+    try {
+      const w = await getWorker(worker, (m) => setState({ phase: 'working', message: m }))
+      setState({ phase: 'working', message: 'Preparing the photo…' })
+      const prepared = await prepare(file)
+      setState({ phase: 'working', message: 'Reading…' })
+      const { data } = await w.recognize(prepared, {}, { text: true, blocks: true })
+      const lines: OcrLine[] = (data.blocks ?? [])
+        .flatMap((b) => b.paragraphs)
+        .flatMap((p) => p.lines)
+        .map((l) => ({ text: l.text.trim(), confidence: l.confidence / 100 }))
+        .filter((l) => l.text.length > 0)
+      const seen = lines.length > 0 ? lines.map((l) => l.text).join('\n') : data.text.trim()
+      if (!seen) {
+        setState({ phase: 'failed', message: 'The reader saw no text. Move closer, or type it.' })
+        return
+      }
+      setText(seen)
+      setState({ phase: 'read', text: seen, lines })
+    } catch {
+      worker.current = null
+      setState({
+        phase: 'failed',
+        message: 'The reader could not start on this device. Type what the nameplate says instead.',
+      })
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'flex flex-col items-stretch gap-3 sm:items-start',
+        state.phase === 'read' && 'w-full',
+      )}
+    >
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        aria-label="Photograph the marking"
+        data-testid="scan-nameplate"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) void read(file)
+        }}
+      />
+      <Button
+        variant="secondary"
+        className="h-11 w-full sm:w-auto"
+        disabled={disabled || state.phase === 'working'}
+        onClick={() => input.current?.click()}
+      >
+        Photograph the marking
+      </Button>
+      {state.phase === 'working' && (
+        <p role="status" className="text-sm text-muted">
+          {state.message}
+        </p>
+      )}
+      {state.phase === 'failed' && (
+        <p role="status" className="text-sm text-danger">
+          {state.message}
+        </p>
+      )}
+      {state.phase === 'read' && (
+        <div className="w-full space-y-3" data-testid="scan-ocr">
+          <div className="space-y-2">
+            <label htmlFor="scan-ocr-text" className="micro-label block">
+              What the reader saw
+            </label>
+            <textarea
+              id="scan-ocr-text"
+              value={text}
+              rows={Math.min(8, Math.max(3, state.lines.length + 1))}
+              onChange={(e) => setText(e.target.value)}
+              className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 font-mono text-sm text-ink"
+            />
+          </div>
+          {state.lines.some((l) => l.confidence < LOW_CONFIDENCE) && (
+            <ul className="flex flex-wrap gap-2">
+              {state.lines.map((line, index) => (
+                <li
+                  key={`${line.text}-${index}`}
+                  title={`${Math.round(line.confidence * 100)}% confident`}
+                  className={cn(
+                    'border border-hairline px-2 py-1 font-mono text-xs',
+                    line.confidence < LOW_CONFIDENCE ? 'text-danger' : 'text-muted',
+                  )}
+                >
+                  {line.text}
+                  {line.confidence < LOW_CONFIDENCE && (
+                    <span className="sr-only"> (uncertain)</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-sm text-muted">
+            {state.lines.some((l) => l.confidence < LOW_CONFIDENCE)
+              ? 'Lines in the warning tone read below 75% confidence. Correct the text, then check it.'
+              : 'Correct anything the reader misread, then check it.'}
+          </p>
+          <Button
+            variant="primary"
+            className="h-11"
+            disabled={!text.trim()}
+            onClick={() =>
+              navigate(`/smart-create?description=${encodeURIComponent(text.trim())}`)
+            }
+          >
+            Check this description
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type TesseractWorker = Awaited<ReturnType<typeof import('tesseract.js').createWorker>>
+
+/** One worker per screen, created on first use from files on our own origin. */
+function getWorker(
+  slot: { current: Promise<TesseractWorker> | null },
+  onProgress: (message: string) => void,
+): Promise<TesseractWorker> {
+  if (!slot.current) {
+    slot.current = (async () => {
+      const { createWorker } = await import('tesseract.js')
+      return createWorker('eng', 1, {
+        workerPath: '/ocr/worker.min.js',
+        corePath: '/ocr/tesseract-core-simd-lstm.wasm.js',
+        langPath: '/ocr',
+        gzip: true,
+        logger: (m) => {
+          const pct = Math.round((m.progress ?? 0) * 100)
+          onProgress(
+            m.status === 'recognizing text'
+              ? `Reading… ${pct}%`
+              : `Loading the reader… ${pct}%`,
+          )
+        },
+      })
+    })()
+  }
+  return slot.current
+}
+
+/**
+ * Downscale to a longest edge of 1600 px and convert to greyscale before
+ * recognising. Nameplates are stamped metal: colour is noise to the reader,
+ * and a 12-megapixel photograph is slower to read and no more legible.
+ */
+async function prepare(file: File): Promise<Blob | File> {
+  if (typeof createImageBitmap !== 'function') return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const px = image.data
+    for (let i = 0; i < px.length; i += 4) {
+      const grey = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2])
+      px[i] = px[i + 1] = px[i + 2] = grey
+    }
+    ctx.putImageData(image, 0, 0)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    return blob ?? file
+  } catch {
+    return file
+  }
+}
