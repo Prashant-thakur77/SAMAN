@@ -127,6 +127,18 @@ cloudflared's default QUIC: many home and mobile networks throttle UDP, and the
 tunnel then drops and re-registers every few minutes, which to anyone holding
 the link looks exactly like the site being down.
 
+**Without the laptop.** Every link above ends at the machine running the
+stack. `deploy/hf/` is the same application as one self-contained image —
+frontend, API, and the demo estate generated at build time — for hosts that run
+a single container for free and keep it up on their own: Hugging Face Spaces
+(Docker), Render, Koyeb, Fly. `make image` builds it locally and `make image-run`
+serves it on :7860. On Hugging Face the Space holds only that directory's
+`Dockerfile` and `README.md`; the build clones this repository and comes up at
+`https://<user>-<space>.hf.space` in about ten minutes, and stays up with the
+laptop closed. What it does not carry: the local language model (the assistant
+answers from the documents and says so), and anything written after the build,
+which a free host's disk forgets on restart. The Space README has the steps.
+
 **Voice and OCR on the server.** The image installs only the core engines.
 `SAMAN_EXTRAS=voice` in `deploy/.env` bakes in local speech recognition and
 synthesis and the OCR reader; their model files are read from `data/models`,

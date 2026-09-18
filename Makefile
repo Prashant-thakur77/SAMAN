@@ -106,6 +106,15 @@ deploy-down:  ## Stop the production stack
 deploy-logs:  ## Follow the production stack's logs
 	cd deploy && docker compose --env-file .env -f docker-compose.prod.yml --profile llm logs -f --tail=100
 
+image:  ## One self-contained image (frontend + API + demo data): what a free host such as Hugging Face Spaces runs
+	docker build -f deploy/hf/Dockerfile -t saman-one .
+
+image-run:  ## Run that image on :7860 to look at it before handing it to a host
+	docker run --rm -p 7860:7860 -e SAMAN_SECURE_COOKIES=false saman-one
+
+space:  ## Publish deploy/hf as a Hugging Face Space and wait for it (SPACE=<user>/saman; REBUILD=1 after a GitHub push)
+	$(PY) deploy/hf/publish.py $(SPACE) $(if $(REBUILD),--rebuild,)
+
 tunnel:  ## Temporary public HTTPS link to a local port (default 80) through a Cloudflare quick tunnel; no account needed
 	# --protocol http2 on purpose. The default is QUIC over UDP, which home and
 	# mobile networks throttle: the link then drops every few minutes and comes
