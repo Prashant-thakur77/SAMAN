@@ -255,3 +255,15 @@ class TestSovereignMode:
     def test_the_prototype_says_the_setting_is_not_persisted(self, as_registrar, pipeline_run):
         body = as_registrar.post("/api/settings/sovereign", json={"enabled": False}).json()
         assert body["persisted"] is False
+
+
+class TestSearchReadsHindi:
+    def test_a_hindi_query_asks_for_what_it_names(self, as_viewer, pipeline_run):
+        """The tokeniser knows Latin letters and digits; a Devanagari word must
+        reach it as its English term, not vanish from the query."""
+        hindi = as_viewer.get("/api/items", params={"search": "वाल्व गेट 50NB", "limit": 50}).json()
+        english = as_viewer.get(
+            "/api/items", params={"search": "VALVE GATE 50NB", "limit": 50}
+        ).json()
+        assert hindi["total"] == english["total"] > 0
+        assert {i["item_id"] for i in hindi["items"]} == {i["item_id"] for i in english["items"]}

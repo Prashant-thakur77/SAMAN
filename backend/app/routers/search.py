@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Cluster, ClusterMember, Cnmc, Cpse, GoldenRecord, Item, RawItem
+from ..normalize import apply_hindi_terms, transliterate_devanagari
 from ..taxonomy import load_schemas
 
 router = APIRouter(tags=["search"])
@@ -51,7 +52,13 @@ def search_items(
         .outerjoin(ClusterMember, ClusterMember.item_id == Item.id)
     )
 
-    tokens = _TOKEN.findall((search or "").upper())[:6]
+    # A query is read the way a description is: Hindi domain words land on
+    # their English term and the rest is transliterated, so "वाल्व गेट 50NB"
+    # asks for gate valves and not for everything with 50NB in it. The
+    # tokeniser only knows Latin letters and digits; without this, Devanagari
+    # was silently dropped from the query.
+    readable = transliterate_devanagari(apply_hindi_terms(search or ""))
+    tokens = _TOKEN.findall(readable.upper())[:6]
     if tokens:
         # Every token must appear, so "6205 SKF" narrows rather than widens,
         # and each must start a token in the text. A plain substring match
