@@ -91,6 +91,21 @@ class BlockingStats:
         }
 
 
+#: The passes in the order they run, each with what it keys on. `per_pass`
+#: counts what a pass added beyond the ones before it, so the order is part of
+#: the measurement: swap two passes and both their numbers change. Stated once
+#: here so a chart of the passes cannot reorder them to flatter one.
+PASSES: tuple[tuple[str, str], ...] = (
+    ("mpn", "the same normalized manufacturer part number"),
+    ("gtin", "the same GTIN"),
+    ("text", "byte-identical normalized text"),
+    ("class_band", "the same class and coarse blocking attribute"),
+    ("token", "a rare token shared inside one class"),
+    ("identity", "every identity-critical attribute identical, whatever the ratings"),
+    ("ann", "nearest embedding neighbours inside one class"),
+)
+
+
 @dataclass
 class ItemKey:
     """The minimum an item needs to be blocked on."""

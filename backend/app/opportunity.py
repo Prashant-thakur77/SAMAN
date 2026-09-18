@@ -154,25 +154,44 @@ def _describe(db: Session, cluster_ids: list[int]) -> dict[int, dict]:
 
 
 def joint_tender_candidates(
-    db: Session, scope: Scope, capture: float = DEFAULT_CAPTURE, limit: int = 25
+    db: Session,
+    scope: Scope,
+    capture: float = DEFAULT_CAPTURE,
+    limit: int = 25,
+    purchases: list[Purchase] | None = None,
 ) -> dict:
-    """Items bought by two or more CPSEs in the window (§9A demand aggregation)."""
-    grouped = _group(load_purchases(db))
-    candidates = []
+    """Items bought by two or more CPSEs in the window (§9A demand aggregation).
 
-    for cluster_id, purchases in grouped.items():
+    Besides the candidates, the result carries the window's totals (spend,
+    orders, materials, and the same three over shared materials) and the sum
+    of every candidate's ceiling. They are the rungs the executive dashboard's
+    savings ladder is built from, and computing them here, in the loop that
+    already reads every purchase, is what keeps the ladder reconciled with the
+    savings KPI by construction. A caller that has the window's purchases in
+    hand passes them in rather than loading them twice.
+    """
+    purchases = load_purchases(db) if purchases is None else purchases
+    grouped = _group(purchases)
+    candidates = []
+    spend = shared_spend = 0.0
+    shared_orders = 0
+
+    for cluster_id, orders in grouped.items():
+        spend += sum(p.qty * p.unit_price for p in orders)
         by_cpse: dict[str, list[Purchase]] = {}
-        for purchase in purchases:
+        for purchase in orders:
             by_cpse.setdefault(purchase.cpse, []).append(purchase)
         if len(by_cpse) < 2:
             continue
 
-        unit_prices = [p.price_per_base_unit for p in purchases if p.price_per_base_unit > 0]
+        unit_prices = [p.price_per_base_unit for p in orders if p.price_per_base_unit > 0]
         if not unit_prices:
             continue
+        shared_spend += sum(p.qty * p.unit_price for p in orders)
+        shared_orders += len(orders)
         low, high = min(unit_prices), max(unit_prices)
         spread = high - low
-        combined_qty = sum(p.base_qty for p in purchases)
+        combined_qty = sum(p.base_qty for p in orders)
         # Consolidating at the best observed price is the ceiling; the capture
         # assumption is what turns that into an estimate.
         opportunity = spread * combined_qty
@@ -181,7 +200,7 @@ def joint_tender_candidates(
                 "cluster_id": cluster_id,
                 "cpses": sorted(by_cpse),
                 "cpse_count": len(by_cpse),
-                "orders": len(purchases),
+                "orders": len(orders),
                 "combined_qty": round(combined_qty, 1),
                 "price_low": round(low, 2),
                 "price_high": round(high, 2),
@@ -206,6 +225,7 @@ def joint_tender_candidates(
     candidates.sort(key=lambda c: c["estimated_saving"], reverse=True)
     # Totalled before redaction, for the same reason as the transfer figures.
     total_saving = round(sum(c["estimated_saving"] for c in candidates), 2)
+    total_ceiling = round(sum(c["max_opportunity"] for c in candidates), 2)
     top = candidates[:limit]
     described = _describe(db, [c["cluster_id"] for c in top])
     for candidate in top:
@@ -228,6 +248,14 @@ def joint_tender_candidates(
         ),
         "candidates_found": len(candidates),
         "total_estimated_saving": total_saving,
+        # The ceiling the estimate is a share of: every order at the lowest
+        # per-base-unit price any CPSE paid. An upper bound, not a forecast.
+        "total_max_opportunity": total_ceiling,
+        "orders_in_window": len(purchases),
+        "materials_in_window": len(grouped),
+        "spend_in_window": round(spend, 2),
+        "shared_spend": round(shared_spend, 2),
+        "shared_orders": shared_orders,
         "candidates": top,
     }
 

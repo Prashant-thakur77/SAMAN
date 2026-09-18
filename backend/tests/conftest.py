@@ -106,6 +106,18 @@ def _clean_login_throttle():
     reset_login_throttle()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_dashboard_memo():
+    """The dashboard memo is keyed on the estate's version, and two test
+    databases can share a version; a memo carried between tests would then
+    answer one test with another's figures. Every test starts with it empty."""
+    from app import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
 @pytest.fixture
 def client():
     with TestClient(app) as c:

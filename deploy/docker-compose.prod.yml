@@ -27,6 +27,9 @@ services:
       # reaches an Ollama already running on the host.
       OLLAMA_URL: ${OLLAMA_URL:-}
       SAMAN_OLLAMA_AUTODETECT: "false"
+      # The dashboards are computed once at start rather than on the first
+      # visitor's click; they stay memoised until the estate changes.
+      SAMAN_WARM_DASHBOARDS: "true"
     volumes:
       - ../data:/srv/data
     extra_hosts:

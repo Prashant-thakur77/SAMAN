@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -472,6 +473,31 @@ def compute_metrics(db: Session) -> dict:
             for name, target in TARGETS.items()
         ),
     }
+
+
+def record_evaluation(db: Session) -> dict | None:
+    """Score the latest run on held-out truth and keep the report on the run.
+
+    The executive dashboard shows these figures on every load, and computing
+    them costs over a second on the demo estate: the wrong side of a request.
+    So the report is taken once, when the pipeline finishes or on demand from
+    `python -m app.cli evaluate`, stamped, and stored beside the run's other
+    statistics. The dashboard reads it back and says when it was taken and how
+    many decisions have been made since, which is the honest way to show a
+    number that is not recomputed live. Returns None when there is no run yet.
+    """
+    run = db.execute(select(MatchRun).order_by(desc(MatchRun.id)).limit(1)).scalar_one_or_none()
+    if run is None:
+        return None
+    report = compute_metrics(db)
+    stats = json.loads(run.stats_json or "{}")
+    # Naive UTC, the same form the `decision.ts` column stores, so the two can
+    # be compared without a timezone dance.
+    computed_at = datetime.now(UTC).replace(tzinfo=None).isoformat(timespec="seconds")
+    stats["evaluation"] = {"computed_at": computed_at, **report}
+    run.stats_json = json.dumps(stats, sort_keys=True, default=str)
+    db.commit()
+    return stats["evaluation"]
 
 
 def measure_blocking_recall(db: Session, candidates: set[tuple[int, int]]) -> dict:

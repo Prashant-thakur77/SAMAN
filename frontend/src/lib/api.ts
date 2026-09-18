@@ -494,6 +494,216 @@ export type QualityScorecard = {
   note: string
 }
 
+export type HarmonisationPart = 'coded' | 'duplicate_pending' | 'unique_pending'
+
+/** The donut's three parts applied per material family; sums to the donut. */
+export type ByClass = {
+  parts: { key: HarmonisationPart; label: string }[]
+  rows: {
+    class_code: string
+    family: string | null
+    rows: number
+    coded: number
+    duplicate_pending: number
+    unique_pending: number
+    coded_share: number
+  }[]
+  note: string
+}
+
+/** How many CPSEs describe each material. */
+export type ByCpseCount = {
+  rows: { cpses: number; materials: number; rows: number }[]
+  multi_materials: number
+  multi_rows: number
+  internal_duplicate_rows: number
+  cpses_with_rows: number
+  cpses_empty: string[]
+  note: string
+}
+
+export type PipelineRungKey = 'possible' | 'candidates' | 'close' | 'merged' | 'materials' | 'codes'
+
+/** The ladder from every possible pair to issued codes; null without a run. */
+export type PipelineLadder = {
+  run_id: number
+  run_at: string | null
+  rungs: {
+    key: PipelineRungKey
+    label: string
+    value: number
+    unit: 'pairs' | 'materials' | 'codes'
+    factor_from_previous: number | null
+    aside: { label: string; value: number } | null
+    note: string | null
+  }[]
+  blocking: {
+    recall: number | null
+    true_pairs: number | null
+    missed: number | null
+    passes: { pass: string; added: number; note: string | null }[]
+  }
+  source: 'run'
+} | null
+
+export type VetoRole = 'identity_critical' | 'performance'
+
+/** Which attribute kept look-alikes apart, counted as distinct pairs. */
+export type VetoAttributes = {
+  source: 'run' | 'stored_pairs'
+  pairs_with_veto: number
+  coverage: { conflict: number; refused: number; refused_total: number }
+  by_attribute: {
+    attr: string
+    label: string
+    role: VetoRole
+    pairs: number
+    example: { a: string; b: string; reason: string } | null
+  }[]
+  other: { attributes: number; pairs: number }
+  attrs_per_pair: { n: number; pairs: number }[]
+  cosmetic_never_vetoes: string[]
+  note: string
+}
+
+/** What is in the share of pairs the machine did not decide. */
+export type HeldForReview = {
+  total: number
+  thresholds: { t_low: number; t_high: number }
+  reasons: [
+    {
+      key: 'conflict'
+      label: string
+      pairs: number
+      confidence: { min: number | null; max: number | null }
+      owner_roles: string[]
+      parts: [
+        { key: 'identity_critical'; label: string; pairs: number; equivalence_flagged: null },
+        { key: 'performance_only'; label: string; pairs: number; equivalence_flagged: number },
+      ]
+    },
+    {
+      key: 'review'
+      label: string
+      pairs: number
+      confidence: { min: number | null; max: number | null }
+      owner_roles: string[]
+      parts: null
+    },
+  ]
+  also_queued: [
+    {
+      band: 'high'
+      reason: string
+      pending: number
+      done: number
+      disposition: 'policy'
+      evidence: { duplicate_precision: number | null; split: 'holdout' }
+    },
+    {
+      band: 'low'
+      reason: string
+      pending: number
+      done: number
+      disposition: 'audit_sample'
+      sample_of: number
+    },
+  ]
+  decisions: { by_action: Record<string, number>; total: number; last_at: string | null }
+  labels: { reviewer: number; simulated: number }
+  note: string
+}
+
+export type EvaluationRowKey =
+  | 'precision'
+  | 'recall'
+  | 'f1'
+  | 'bcubed_f1'
+  | 'blocking_recall'
+  | 'veto_precision'
+
+/** The held-out scorecard the pipeline snapshotted; null when not recorded. */
+export type Evaluation = {
+  run_id: number
+  computed_at: string
+  split: 'holdout'
+  items_holdout: number
+  decisions_since: number
+  rows: {
+    key: EvaluationRowKey
+    label: string
+    value: number
+    target: number | null
+    pass: boolean | null
+    baseline: number | null
+    detail: string | null
+  }[]
+  baseline_note: string
+  per_class: {
+    class_code: string
+    items: number
+    precision: number
+    recall: number
+    f1: number
+    false_negatives: number
+  }[]
+  worst_class: string | null
+  note: string
+} | null
+
+export type SavingsRungKey = 'spend' | 'shared' | 'ceiling' | 'estimate'
+
+/** From last year's spend to the savings KPI, one rung at a time. */
+export type SavingsLadder = {
+  window_months: number
+  capture: number
+  assumption_note: string
+  rungs: {
+    key: SavingsRungKey
+    label: string
+    value_inr: number
+    share_of_previous: number | null
+    materials: number | null
+    orders: number | null
+    assumption: string | null
+    sensitivity?: {
+      capture_low: number
+      value_low_inr: number
+      capture_high: number
+      value_high_inr: number
+    }
+  }[]
+  synthetic_note: string
+}
+
+/** Stock by months since its last movement, with the dead-stock rule drawn. */
+export type StockAge = {
+  rule_months: number
+  quality_stale_months: number
+  demand_window_months: number
+  bins: {
+    from_months: number
+    to_months: number | null
+    label: string
+    positions: number
+    materials: number
+    value_inr: number
+    demand_elsewhere_value_inr: number
+    no_demand_value_inr: number
+    idle: boolean
+  }[]
+  idle: {
+    value_inr: number
+    positions: number
+    materials: number
+    demand_elsewhere_value_inr: number
+    demand_elsewhere_materials: number
+  }
+  top_class: { class_code: string; share_of_idle_value: number } | null
+  excluded_positions: number
+  note: string
+}
+
 export type ExecutiveDashboard = {
   kpis: Kpi[]
   per_cpse: { cpse: string; name: string; items: number; coded: number; progress: number }[]
@@ -507,15 +717,23 @@ export type ExecutiveDashboard = {
   quality: QualityScorecard
   harmonisation: {
     total: number
-    parts: { key: string; label: string; value: number; note: string }[]
+    parts: { key: HarmonisationPart; label: string; value: number; note: string }[]
   }
+  by_class: ByClass
+  by_cpse_count: ByCpseCount
+  pipeline: PipelineLadder
+  veto_attributes: VetoAttributes
+  held_for_review: HeldForReview
+  evaluation: Evaluation
   trend: { date: string; cnmcs_issued: number; cnmcs_total: number; decisions: number }[]
+  savings_ladder: SavingsLadder
   inventory: {
     positions: number
     total_value: number
     dead_stock_value: number
     dead_stock_materials: number
   }
+  stock_age: StockAge
   visibility: { role: string; cpse: string | null; sees_attributed_prices: boolean; note: string }
 }
 

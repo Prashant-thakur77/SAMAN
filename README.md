@@ -198,7 +198,7 @@ actually renders.
 | ![Front page](docs/screenshots/landing.png) | ![Sign in](docs/screenshots/login.png) |
 | **Front page.** one real cluster from the demo database: the same bearing as three catalogues write it, the record they were fused into, the code that was issued, then the five questions asked in order to decide they were one material. It carries no metrics and fetches nothing: the measurements are behind sign-in and at `/api/metrics`, where they can be checked. | **Sign in.** pick a seeded account and its role. Every one uses the password `demo`. |
 | ![Home](docs/screenshots/home.png) | ![Executive](docs/screenshots/executive.png) |
-| **Home.** role-aware: a registrar gets the national KPIs, a steward gets their queue. | **Executive.** KPIs that reconcile with `/api/metrics`, per-CPSE progress, a class × CPSE heatmap in grayscale. |
+| **Home.** role-aware: a registrar gets the national KPIs, a steward gets their queue. | **Executive.** KPIs that reconcile with `/api/metrics`, then eight sections that argue from where the estate stands, through how the machine decided, to what it is worth — every chart one hue, every figure from the database. |
 | ![Opportunity](docs/screenshots/opportunity.png) | ![Workbench](docs/screenshots/workbench.png) |
 | **Opportunity.** joint-tender candidates with the discount assumption stated inline and adjustable, price variance per base unit, inventory sharing. | **Workbench.** two records side by side, tier scores, attribute comparison with identity-critical fields marked. Keyboard-first: `A` approve, `R` reject, `J`/`K` move. |
 | ![Migration](docs/screenshots/migration.png) | ![Search](docs/screenshots/search.png) |
@@ -730,6 +730,36 @@ Copilot cannot diverge. A steward sees their own CPSE's prices in full and an
 anonymised band for everyone else, "market range ₹1,088–₹96,183, n=3 CPSEs",
 while consolidated programme totals stay visible to all, because the aggregate
 is the point and only its attribution is restricted.
+
+### The executive dashboard, read as an argument
+
+The KPI row says how far the estate has come. Eight sections under it say
+where, how, and what it is worth, in that order, every figure computed from
+the database on each load and every chart in one hue. **Where the estate
+stands:** the harmonisation donut's three parts applied per material family
+(a 100% bar per class, so the family that trails is visible and the bars sum
+to the donut), then how many CPSEs describe the same material. **How the
+machine decided:** the ladder from every possible pair down to issued codes, a
+ladder of numbers rather than a bar chart because the range spans eight orders
+of magnitude; which attribute kept look-alikes apart, counted as pairs and
+split by whether it was an identity dimension or a performance rating; why the
+held pairs wait for a human, with who may close each part; and the held-out
+scorecard, read from a snapshot the pipeline writes at the end of a run
+(`make evaluate` refreshes it) because scoring costs over a second and does not
+belong inside a request. **What it is worth:** the savings ladder from last
+year's spend through the shared pool and the ceiling to the estimate at the
+stated capture, with its 40–80% sensitivity as one whisker, and stock by
+months since its last movement with the dead-stock rule drawn from the
+constant the code applies. Every chart has a table twin and a caption that
+says the estate is synthetic; a section whose evidence is missing renders an
+empty state rather than a number.
+
+The counters those sections need mid-run, which attribute vetoed each of the
+600,000-odd refused pairs and how the grey band splits, are tallied in the
+matcher's loop and stored on the run (`pipeline.RunTally`), since only a few
+thousand refusals keep their evidence afterwards. A database whose last run
+predates that recording gets the honest fallback, the stored pairs, and the
+caption says which it is showing.
 
 ### Data quality by CPSE, and ABC
 

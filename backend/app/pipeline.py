@@ -37,6 +37,13 @@ LOW_BAND_SAMPLE = 500
 #: them, which is what the demo profile was doing.
 LOW_BAND_EVIDENCE_KEPT = 5_000
 
+#: Why a review task exists, in the words the workbench shows. Constants so the
+#: executive dashboard can name a queue that happens to be empty.
+REASON_CONFLICT = "specification conflict on an anchor-key match"
+REASON_GREY = "confidence in the grey band"
+REASON_CONFIRM_MERGE = "confirm an automatic merge"
+REASON_CONFIRM_REFUSAL = "confirm an automatic refusal: a close match the veto layer declined"
+
 
 @dataclass
 class PipelineStatus:
@@ -221,6 +228,14 @@ def run_pipeline(db: Session, stages: list[str] | None = None) -> PipelineStatus
             status.stage = name
             fn(db, status)
             status.stages_done.append(name)
+        if "cluster" in status.stages_done:
+            # The held-out scorecard costs over a second, so it is measured
+            # once here, with the clusters just built, and kept on the run for
+            # the dashboard to read (`metrics.record_evaluation`).
+            from .metrics import record_evaluation
+
+            status.stage = "evaluate"
+            record_evaluation(db)
         status.state = "done"
     except Exception as exc:  # a failed run must report, never take the app down
         status.state = "error"
@@ -329,6 +344,99 @@ def _block_value(class_code: str, attrs: dict) -> str | None:
     return None if value is None else str(value)
 
 
+@dataclass
+class RunTally:
+    """What the executive dashboard needs from a run that only exists mid-run.
+
+    Which attribute vetoed a refused pair is known here, with the evidence in
+    hand, for every one of the 600,000-odd refusals; only a few thousand of
+    them ever store that evidence (`LOW_BAND_EVIDENCE_KEPT`), so the pair
+    table cannot answer the question afterwards. The same goes for how the
+    grey band splits between conflicts and genuine doubt. Both are counted
+    here and written into `MatchRun.stats_json` beside the band totals. The
+    dashboard reads them back, and falls back to the stored pairs, saying so,
+    for a run that predates this.
+    """
+
+    pairs_with_veto: int = 0
+    conflict: int = 0
+    refused: int = 0
+    #: attr -> role, distinct pairs it vetoed, and the first example seen.
+    by_attribute: dict[str, dict] = field(default_factory=dict)
+    #: how many distinct attributes vetoed each pair -> pairs
+    attrs_per_pair: Counter = field(default_factory=Counter)
+    conflict_identity: int = 0
+    conflict_performance_only: int = 0
+    conflict_equivalence_flagged: int = 0
+    #: verdict -> [pairs, lowest confidence, highest confidence] in the grey band
+    grey: dict[str, list] = field(default_factory=dict)
+
+    def add(self, verdict: str, band: str, confidence: float, veto: dict | None) -> None:
+        if band == "grey":
+            entry = self.grey.setdefault(verdict, [0, confidence, confidence])
+            entry[0] += 1
+            entry[1] = min(entry[1], confidence)
+            entry[2] = max(entry[2], confidence)
+        if veto is None:
+            return
+        self.pairs_with_veto += 1
+        if verdict == "conflict":
+            self.conflict += 1
+        else:
+            self.refused += 1
+        # A pair is one pair however many times an attribute appears in its
+        # evidence; the bars are pairs, so count each attribute once per pair.
+        seen: dict[str, dict] = {}
+        for entry in veto.get("vetoed_by", []):
+            seen.setdefault(entry["attr"], entry)
+        self.attrs_per_pair[len(seen)] += 1
+        identity = False
+        for attr, entry in seen.items():
+            counted = self.by_attribute.setdefault(
+                attr,
+                {
+                    "role": entry["role"],
+                    "pairs": 0,
+                    "example": {"a": entry["a"], "b": entry["b"], "reason": entry["reason"]},
+                },
+            )
+            counted["pairs"] += 1
+            identity = identity or entry["role"] == "identity_critical"
+        if verdict == "conflict":
+            if identity:
+                self.conflict_identity += 1
+            else:
+                self.conflict_performance_only += 1
+                if veto.get("equivalence_candidate"):
+                    self.conflict_equivalence_flagged += 1
+
+    def as_stats(self) -> dict:
+        def band(verdict: str) -> dict:
+            pairs, low, high = self.grey.get(verdict, (0, None, None))
+            return {"pairs": pairs, "confidence": {"min": low, "max": high}}
+
+        return {
+            "veto_attributes": {
+                "pairs_with_veto": self.pairs_with_veto,
+                "conflict": self.conflict,
+                "refused": self.refused,
+                "by_attribute": self.by_attribute,
+                "attrs_per_pair": {
+                    str(n): pairs for n, pairs in sorted(self.attrs_per_pair.items())
+                },
+            },
+            "held_for_review": {
+                "conflict": {
+                    **band("conflict"),
+                    "identity_critical": self.conflict_identity,
+                    "performance_only": self.conflict_performance_only,
+                    "equivalence_flagged": self.conflict_equivalence_flagged,
+                },
+                "review": band("review"),
+            },
+        }
+
+
 @register_stage("match")
 def _stage_match(db: Session, status: PipelineStatus) -> None:
     """Generate candidates, score every pair, persist the decisions worth keeping."""
@@ -400,11 +508,13 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
     #: actually reach survives while the other 99% is not written at all.
     evidence_kept: list[tuple[float, int, int, str | None, str]] = []
     equivalence_candidates = 0
+    tally = RunTally()
 
     for n, (a, b) in enumerate(pairs, start=1):
         result = match_pair(candidates[a], candidates[b], linkage)
         bands[result.band] = bands.get(result.band, 0) + 1
         verdicts[result.verdict] = verdicts.get(result.verdict, 0) + 1
+        tally.add(result.verdict, result.band, result.confidence, result.veto)
         if result.equivalence:
             equivalence_candidates += 1
 
@@ -509,8 +619,11 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
         "low_band_evidence_kept": len(restored),
         "equivalence_candidates": equivalence_candidates,
         "items": len(candidates),
+        **tally.as_stats(),
     }
-    db.execute(insert(MatchRun), [{"stats_json": json.dumps(stats, sort_keys=True)}])
+    db.execute(
+        insert(MatchRun), [{"stats_json": json.dumps(stats, sort_keys=True, default=str)}]
+    )
     db.commit()
 
 
@@ -739,9 +852,7 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
             band,
             verdict,
             "approver" if verdict == "conflict" else "steward",
-            "specification conflict on an anchor-key match"
-            if verdict == "conflict"
-            else "confidence in the grey band",
+            REASON_CONFLICT if verdict == "conflict" else REASON_GREY,
         )
         for pair_id, item_a, band, verdict in db.execute(
             select(Pair.id, Pair.item_a, Pair.band, Pair.verdict).where(
@@ -751,8 +862,7 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     ]
 
     tasks += [
-        _task(pair_id, item_a, "high", "duplicate", "approver",
-              "confirm an automatic merge")
+        _task(pair_id, item_a, "high", "duplicate", "approver", REASON_CONFIRM_MERGE)
         for pair_id, item_a in db.execute(
             select(Pair.id, Pair.item_a).where(Pair.band == "high")
         ).all()
@@ -761,8 +871,7 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     # The most valuable low-band sample is the pairs that looked most alike and
     # were refused anyway — that is where the veto layer did the work.
     tasks += [
-        _task(pair_id, item_a, "low", "distinct", "steward",
-              "confirm an automatic refusal: a close match the veto layer declined")
+        _task(pair_id, item_a, "low", "distinct", "steward", REASON_CONFIRM_REFUSAL)
         for pair_id, item_a in db.execute(
             select(Pair.id, Pair.item_a)
             .where(Pair.band == "low", Pair.veto_json.is_not(None))

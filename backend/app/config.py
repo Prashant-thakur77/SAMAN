@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     #: A directory holding the built frontend for this process to serve
     #: itself (the single-container image). Empty: the API answers only /api.
     saman_static_dir: str = ""
+    #: Compute the dashboards once at start, in the background, so the first
+    #: visitor does not wait for them. On by the deployments, off in development.
+    saman_warm_dashboards: bool = False
 
     cors_origins: list[str] = [
         "http://localhost:5173",

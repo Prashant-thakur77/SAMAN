@@ -14,7 +14,8 @@ PYTEST      := $(VENV)/bin/pytest
 
 .PHONY: help setup venv deps deps-optional web-deps dev backend frontend test \
         lint build clean licenses licenses-check seed seed-large pipeline demo demo-splink \
-        demo-snapshot demo-restore tune test-web preview screenshots check deps-ocr deps-stt deps-tts
+        demo-snapshot demo-restore tune test-web preview screenshots check deps-ocr deps-stt deps-tts \
+        evaluate
 
 help:  ## Show available targets
 	@echo "SAMAN — make targets"
@@ -171,6 +172,9 @@ demo-splink:  ## The same demo on the spec-named Tier-1 engine (needs make deps-
 
 learn:  ## Train the pairwise model on every Workbench label (writes data/models/pairwise.json)
 	cd backend && ../$(PY) -m app.cli learn
+
+evaluate:  ## Score the latest run on held-out truth and record it on the run (what the executive dashboard reads)
+	cd backend && ../$(PY) -m app.cli evaluate
 
 simulate-reviews:  ## Demo only: label tuning-split pairs from ground truth as simulated reviewers
 	cd backend && ../$(PY) -m app.cli simulate-reviews --n 400

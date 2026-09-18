@@ -96,6 +96,40 @@ def _startup() -> None:
     init_db()
     with SessionLocal() as db:
         ensure_genesis(db)
+    if settings.saman_warm_dashboards:
+        warm_dashboards()
+
+
+def warm_dashboards():
+    """The dashboards, computed once before anyone asks (see `cache`).
+
+    A free host's CPU makes the executive dashboard a ten-second wait the
+    first time; this pays it at start, for the two viewers a demo has, the
+    signed-out visitor and the registrar. Every other role fills the memo on
+    its own first request. Best effort: a failure is logged, never fatal.
+    """
+    from . import cache
+    from .routers.dashboard import executive_for, opportunity_for
+    from .routers.metrics import metrics_for
+    from .visibility import ANONYMOUS, Scope
+
+    registrar = Scope(role="registrar", cpse_code=None)
+
+    def job(fn, *args):
+        def run():
+            with SessionLocal() as db:
+                fn(db, *args)
+
+        return run
+
+    return cache.warm(
+        [
+            ("executive (visitor)", job(executive_for, ANONYMOUS)),
+            ("executive (registrar)", job(executive_for, registrar)),
+            ("metrics", job(metrics_for)),
+            ("opportunity (registrar)", job(opportunity_for, registrar)),
+        ]
+    )
 
 
 #: Where the built frontend lives when this process serves it itself, which

@@ -2,6 +2,7 @@
 
 python -m app.cli seed --profile demo
 python -m app.cli pipeline
+python -m app.cli evaluate
 python -m app.cli status
 """
 
@@ -197,6 +198,31 @@ def cmd_learn(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_evaluate(_args: argparse.Namespace) -> int:
+    """Score the latest run on held-out truth and record it on that run.
+
+    What a fresh `make demo` does at the end of its pipeline, for a database
+    that already exists: the executive dashboard reads the recorded snapshot
+    rather than computing it per request, so a database from before the
+    snapshot existed shows an empty scorecard until this has run.
+    """
+    from .metrics import record_evaluation
+
+    init_db()
+    started = time.time()
+    with SessionLocal() as db:
+        snapshot = record_evaluation(db)
+    if snapshot is None:
+        print("!! no match run to evaluate; run `make pipeline` first")
+        return 1
+    print_metrics(snapshot)
+    print(
+        f"\nRecorded on the latest match run at {snapshot['computed_at']} "
+        f"({round(time.time() - started, 1)}s)."
+    )
+    return 0
+
+
 def cmd_simulate_reviews(args: argparse.Namespace) -> int:
     """Label tuning-split pairs from ground truth, as simulated reviewers."""
     from . import learn
@@ -272,6 +298,11 @@ def main(argv: list[str] | None = None) -> int:
 
     learn_cmd = sub.add_parser("learn", help="train the pairwise model on Workbench labels")
     learn_cmd.set_defaults(func=cmd_learn)
+
+    evaluate = sub.add_parser(
+        "evaluate", help="score the latest run on held-out truth and record it on the run"
+    )
+    evaluate.set_defaults(func=cmd_evaluate)
 
     simulate = sub.add_parser(
         "simulate-reviews", help="label tuning-split pairs from ground truth (demo only)"

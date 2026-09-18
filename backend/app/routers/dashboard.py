@@ -2,7 +2,9 @@
 
 Every figure is computed from the database. Nothing here is a constant, and
 every modelled number (savings, avoided purchases) travels with the assumption
-that produced it (§10).
+that produced it (§10). The executive page's eight explanatory sections are
+computed in `analytics`; this module reads the headline figures and wires the
+sections in.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
-from .. import inventory, opportunity, quality, smart_create
+from .. import analytics, cache, inventory, opportunity, quality, smart_create
 from ..auth import current_user_optional
 from ..db import get_db
 from ..models import (
@@ -24,13 +26,12 @@ from ..models import (
     Decision,
     GoldenRecord,
     Item,
-    MatchRun,
     Pair,
     RawItem,
     ReviewTask,
     User,
 )
-from ..visibility import scope_for
+from ..visibility import Scope, scope_for
 
 router = APIRouter(prefix="/dashboard", tags=["dashboards"])
 
@@ -45,8 +46,16 @@ def executive(
     The KPIs reconcile with `/api/metrics`: both read the same tables, and the
     duplicate count here is the same pairwise notion the metrics report.
     """
-    scope = scope_for(user)
+    return executive_for(db, scope_for(user))
 
+
+def executive_for(db: Session, scope: Scope) -> dict:
+    """The executive dashboard as `scope` sees it, memoised on the estate's
+    version (see `cache`): computed once per change, not once per visitor."""
+    return cache.memo(db, ("executive", scope.role, scope.cpse_code), lambda: _executive(db, scope))
+
+
+def _executive(db: Session, scope: Scope) -> dict:
     items_total = db.execute(select(func.count(Item.id))).scalar() or 0
     clusters_total = db.execute(select(func.count(Cluster.id))).scalar() or 0
     codes_issued = db.execute(select(func.count(Cnmc.id))).scalar() or 0
@@ -66,16 +75,20 @@ def executive(
     )
     duplicates_confirmed = sum(size - 1 for size in multi)
 
-    bands = dict(db.execute(select(Pair.band, func.count(Pair.id)).group_by(Pair.band)).all())
-    run = db.execute(select(MatchRun.stats_json).order_by(MatchRun.id.desc()).limit(1)).scalar()
-    if run:
-        import json
-
-        bands = json.loads(run).get("bands", bands)
+    # Band totals come from the run record: the pair table keeps only the
+    # decisions worth showing, so counting it would understate the refusals.
+    run = analytics.latest_run(db)
+    bands = run.stats.get("bands") if run else None
+    if not bands:
+        bands = dict(db.execute(select(Pair.band, func.count(Pair.id)).group_by(Pair.band)).all())
     total_pairs = sum(bands.values())
     automation = (bands.get("high", 0) + bands.get("low", 0)) / total_pairs if total_pairs else 0.0
 
-    savings = opportunity.joint_tender_candidates(db, scope, limit=1)
+    # The window's purchases are read once and shared by the savings ladder,
+    # the KPI it ends in, and the stock-age demand signal.
+    purchases = opportunity.load_purchases(db)
+    savings_ladder = analytics.savings_ladder(db, scope, purchases)
+    savings = next(rung for rung in savings_ladder["rungs"] if rung["key"] == "estimate")
     stock = inventory.stock_totals(db)
     dead = inventory.dead_stock(db, scope, limit=1)
 
@@ -157,46 +170,15 @@ def executive(
 
     prevention = smart_create.stats(db)
 
-    # Three disjoint buckets over every catalogue row: carrying a code, waiting
-    # for one with a duplicate found, and waiting for one with none found.
-    coded_items = db.execute(
-        select(func.count(distinct(ClusterMember.item_id)))
-        .join(GoldenRecord, GoldenRecord.cluster_id == ClusterMember.cluster_id)
-        .join(Cnmc, Cnmc.golden_id == GoldenRecord.id)
-    ).scalar() or 0
-    sizes = db.execute(
-        select(ClusterMember.cluster_id, func.count(ClusterMember.item_id)).group_by(
-            ClusterMember.cluster_id
-        )
-    ).all()
-    in_multi = sum(n for _, n in sizes if n > 1)
-    in_single = sum(n for _, n in sizes if n == 1)
-    # Coded rows are spread across both kinds of cluster; take them off the
-    # duplicate pile first, then the singleton pile, so the parts never overlap.
-    from_multi = min(coded_items, in_multi)
-    harmonisation = {
-        "total": items_total,
-        "parts": [
-            {
-                "key": "coded",
-                "label": "Carrying a CNMC",
-                "value": coded_items,
-                "note": "Through review and issued a national code.",
-            },
-            {
-                "key": "duplicate_pending",
-                "label": "Duplicate found, awaiting a code",
-                "value": max(in_multi - from_multi, 0),
-                "note": "Clustered with at least one other row; the code is the next step.",
-            },
-            {
-                "key": "unique_pending",
-                "label": "No duplicate found",
-                "value": max(in_single - (coded_items - from_multi), 0),
-                "note": "The only row describing this material so far.",
-            },
-        ],
-    }
+    # Three disjoint parts over every catalogue row, decided row by row and
+    # summed: the donut is the family bars added up, so the two reconcile.
+    by_class = analytics.by_class(db)
+    harmonisation = analytics.harmonisation(by_class)
+
+    # The two sections that can only be measured while the pipeline runs read
+    # what it recorded; an older run falls back to the stored pairs and says so.
+    tally = analytics.tally_for(db, run)
+    evaluation = analytics.evaluation(db, run)
 
     return {
         "kpis": [
@@ -218,9 +200,9 @@ def executive(
             {
                 "key": "savings",
                 "label": "Savings identified",
-                "value": savings["total_estimated_saving"],
+                "value": savings["value_inr"],
                 "format": "currency",
-                "note": savings["assumption_note"],
+                "note": savings["assumption"],
             },
             {
                 # The only KPI that counts duplicates that never happened. The
@@ -260,13 +242,27 @@ def executive(
         # KPIs count things; this says what share of the catalogue is actually
         # through the process, which is the question the dashboard exists for.
         "harmonisation": harmonisation,
+        # The same three parts per material family, and how many CPSEs
+        # describe each material: where the estate stands, one level down.
+        "by_class": by_class,
+        "by_cpse_count": analytics.by_cpse_count(db),
+        # How the machine decided: the ladder of pairs, what vetoed the
+        # look-alikes, why pairs wait for a human, and the held-out scorecard.
+        "pipeline": analytics.pipeline(db, run),
+        "veto_attributes": analytics.veto_attributes(db, run, tally),
+        "held_for_review": analytics.held_for_review(db, run, evaluation, tally),
+        "evaluation": evaluation,
         "trend": trend,
+        # What it is worth: the ladder the savings KPI is the bottom rung of,
+        # and the stock that has stopped moving, with the dead-stock rule drawn.
+        "savings_ladder": savings_ladder,
         "inventory": {
             "positions": stock["positions"],
             "total_value": stock["total_value"],
             "dead_stock_value": dead["total_value"],
             "dead_stock_materials": dead["materials_found"],
         },
+        "stock_age": analytics.stock_age(db, purchases),
         "visibility": scope.as_dict(),
     }
 
@@ -283,7 +279,20 @@ def opportunity_dashboard(
     rather than a constant precisely because it is an assumption, and the
     response repeats it so no figure travels without it.
     """
-    scope = scope_for(user)
+    return opportunity_for(db, scope_for(user), capture)
+
+
+def opportunity_for(
+    db: Session, scope: Scope, capture: float = opportunity.DEFAULT_CAPTURE
+) -> dict:
+    return cache.memo(
+        db,
+        ("opportunity", scope.role, scope.cpse_code, capture),
+        lambda: _opportunity(db, scope, capture),
+    )
+
+
+def _opportunity(db: Session, scope: Scope, capture: float) -> dict:
     return {
         "joint_tenders": opportunity.joint_tender_candidates(db, scope, capture=capture),
         "price_variance": opportunity.price_variance(db, scope),
