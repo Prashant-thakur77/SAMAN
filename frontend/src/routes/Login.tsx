@@ -260,9 +260,7 @@ export default function Login() {
       </main>
 
       <footer className="border-t border-hairline px-6 py-4 text-center">
-        <p className="text-xs text-muted">
-          SIH 2026 · SIH26099 · Ministry of Petroleum &amp; Natural Gas
-        </p>
+        <p className="text-xs text-muted">One Nation, One Material Code</p>
       </footer>
 
       {/* The assistant meets people here too. Ask it to open a screen and it

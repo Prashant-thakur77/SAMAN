@@ -13,7 +13,7 @@ short_description: One Nation, One Material Code — CPSE material harmonisation
 # SAMAN on a free host
 
 **Standardised Asset & Material Analysis Network** — an offline-first prototype
-for SIH 2026 problem SIH26099: one national material code across CPSE
+one national material code across CPSE
 catalogues, with the matching pipeline, the review workbench, the analytics and
 the audit ledger all running here in one container.
 

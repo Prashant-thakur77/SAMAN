@@ -2,7 +2,7 @@
 
 Date: 2026-09-03. Status: approved in conversation; built in the order below.
 
-SIH26099 names eleven capabilities; the build covers all of them and reports
+The brief names eleven capabilities; the build covers all of them and reports
 SAP/ERP integration as partial. What a CPSE materials manager will test the
 demo against is not the feature list but how it behaves inside their world:
 codes are born in SAP, every PO needs an HSN, engineers refuse substitutes

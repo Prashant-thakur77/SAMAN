@@ -56,9 +56,9 @@ a feeling.
 | Identity | Which SSO the ministry uses (Parichay or the CPSE directory) | the ministry |
 | Database | The decision to move the registry node to PostgreSQL | the team |
 | Screen-reader walkthrough | An afternoon with NVDA or VoiceOver | a person who uses one |
-| Keys | Rotate the Groq and Render keys after the event | the team |
+| Keys | Rotate the Groq and Render keys after the demo | the team |
 
-### Not before the event
+### Not before the demo
 
 PostgreSQL, SSO, the federation bundles and the GeM tender pack are Stage 3
 work; each is a week or more and none changes what a judge sees. They start

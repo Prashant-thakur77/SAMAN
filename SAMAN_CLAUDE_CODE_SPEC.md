@@ -1,6 +1,5 @@
 # CLAUDE CODE BUILD SPEC — SAMAN
 ### Standardised Asset & Material Analysis Network
-**SIH 2026 · Problem Statement SIH26099 · Ministry of Petroleum & Natural Gas (CPCL)**
 *Tagline: "One Nation, One Material Code" — SAMAN issues the CNMC for every item.*
 
 You are building a **fully functional local prototype** of an AI platform that harmonizes material codes across Indian public-sector companies (CPSEs). Same physical item, different codes/descriptions in every company ("BALL BEARING SKF 6205-2Z" vs "BRG,BALL,6205ZZ,SKF") → this platform ingests catalogs, finds duplicates/equivalents, drafts one golden record + a Common National Material Code (CNMC) per real item, routes matches through human review, and exposes dashboards + a chat copilot on top.
@@ -311,7 +310,7 @@ Definition of done: fresh clone → `make demo` → login as steward → clear 5
 
 ## 9. Open-source foundation, inspiration repos & licensing
 
-Use proven engines inside our own architecture. SIH permits open-source libraries with attribution and license compliance; what it forbids is presenting someone else's product as ours. Never fork an existing app as the base.
+Use proven engines inside our own architecture. The brief permits open-source libraries with attribution and license compliance; what it forbids is presenting someone else's product as ours. Never fork an existing app as the base.
 
 **Incorporate (permissive licenses only):**
 | Library | License | Used for |
@@ -341,7 +340,7 @@ Use proven engines inside our own architecture. SIH permits open-source librarie
 
 ## 9A. Problem-statement traceability (completeness is an explicit judging criterion)
 
-The README must contain a **traceability table** mapping every capability named in SIH26099 to where it lives in this build. Claude Code must fill and keep this table honest (mark partial items as partial — inflated claims lose more marks than gaps):
+The README must contain a **traceability table** mapping every capability named in the brief to where it lives in this build. Claude Code must fill and keep this table honest (mark partial items as partial — inflated claims lose more marks than gaps):
 
 | PS-stated capability | Where it lives | Status |
 |---|---|---|

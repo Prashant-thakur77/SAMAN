@@ -1,5 +1,5 @@
 """Data quality by CPSE: the scorecard behind "improved material master data
-quality" (SIH26099, expected impact).
+quality" (the brief's expected impact).
 
 The problem statement promises better data; this is how the promise is
 measured. Every rate is computed from the tables the pipeline already keeps,

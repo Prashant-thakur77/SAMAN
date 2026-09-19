@@ -67,7 +67,7 @@ In the order a pilot would hit them.
 Four phases. Each has an acceptance gate in the spirit of the build spec's
 §8 gates: a number that must be true before the next phase starts.
 
-### Phase 0: to the finale (now to the event)
+### Phase 0: to the demo
 
 *Goal: a demo a judge can hold in their hand.*
 

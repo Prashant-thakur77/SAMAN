@@ -8,15 +8,14 @@ code and its tests are the truth.*
 
 Repository: `https://github.com/Prashant-thakur77/SAMAN` (branch `main`).
 Live demo: `https://saman-wymm.onrender.com` (Render free tier, auto-deploys
-from `main`; cold start ~40 s after idle). Owner: Prashant Thakur, SIH 2026 team.
+from `main`; cold start ~40 s after idle). Owner: Prashant Thakur.
 
 ---
 
-## 1. The problem (SIH 2026 · SIH26099)
+## 1. The problem
 
-**Ministry of Petroleum & Natural Gas, problem posted through CPCL (Chennai
-Petroleum Corporation Limited).** Title, in the ministry's words: an *AI-based
-platform for standardisation of material codes across CPSEs*.
+The brief, in one line: an *AI-based platform for standardisation of material
+codes across CPSEs*.
 
 **Background.** Every Central Public Sector Enterprise (CPSE) — IOCL, CPCL,
 GAIL, ONGC, BPCL, HPCL, SAIL … — keeps its own material master in its own ERP
@@ -354,7 +353,7 @@ OCR is measured on rendered nameplates, not warehouse photographs.
 4. **Executive dashboard → Opportunity** — every figure computed and reconcilable, joint-tender savings under a stated capture assumption, transfers instead of purchases; click any bar to see the rows.
 5. **Audit + Admin** — the hash chain verified live; what runs where (nothing leaves the machine); the per-CPSE report and the ministry roll-up; the auto-issue policy with its gates.
 
-Related write-ups: `docs/ROADMAP.md` (beyond the hackathon: federation,
+Related write-ups: `docs/ROADMAP.md` (beyond the prototype: federation,
 GeM/SAP integration, a national registry), `docs/sap-integration.md` (the
 three integration doors), the demo scripts and pitch kept as Claude artifacts
 by the owner.

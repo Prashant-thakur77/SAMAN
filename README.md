@@ -10,8 +10,6 @@
   <a href="https://saman-wymm.onrender.com"><img alt="demo" src="https://img.shields.io/badge/live%20demo-saman--wymm.onrender.com-111"></a>
 </p>
 
-<p align="center">SIH 2026 · Problem Statement <strong>SIH26099</strong> · Ministry of Petroleum &amp; Natural Gas (CPCL)</p>
-
 ---
 
 The same physical item is catalogued differently in every Indian public-sector
@@ -1562,7 +1560,7 @@ shelf is a fact for a steward to act on, not a merge or a split.
 
 ## Problem-statement traceability
 
-Every capability named in SIH26099, and where it lives in this build. Statuses
+Every capability the brief names, and where it lives in this build. Statuses
 are kept honest; partial is marked partial.
 
 | PS-stated capability | Where it lives | Status |

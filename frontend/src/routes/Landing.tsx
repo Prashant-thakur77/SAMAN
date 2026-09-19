@@ -1003,11 +1003,6 @@ export default function Landing() {
             <p className="max-w-[28ch] text-sm text-muted">
               Standardised Asset &amp; Material Analysis Network. One Nation, One Material Code.
             </p>
-            <p className="pt-2 text-xs text-muted">
-              Smart India Hackathon 2026 · SIH26099
-              <br />
-              Ministry of Petroleum &amp; Natural Gas
-            </p>
           </div>
           <FooterColumn
             heading="Screens"
