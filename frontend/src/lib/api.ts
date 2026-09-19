@@ -233,6 +233,10 @@ export type QueueResponse = {
 
 export type QueueOrder = 'id' | 'uncertainty'
 
+/** Pending tasks per band, one query; for the Home page. */
+export const getQueueCounts = () =>
+  api.get<{ counts: Record<string, number>; total: number }>('/queues/counts')
+
 export const getQueue = (
   band?: string,
   offset = 0,

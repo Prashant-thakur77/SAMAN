@@ -11,7 +11,7 @@ import {
   ApiError,
   getAudit,
   getExecutive,
-  getQueue,
+  getQueueCounts,
   type AuditEventRow,
   type ExecutiveDashboard,
 } from '../lib/api'
@@ -40,6 +40,8 @@ export default function Home() {
   const [recent, setRecent] = useState<AuditEventRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const isReviewer = can('steward', 'approver')
+
   // Three requests, each shown as it lands: the figures are the slow one on a
   // small host, and the queue and the ledger must not wait behind them.
   useEffect(() => {
@@ -49,20 +51,19 @@ export default function Home() {
     getExecutive()
       .then((exec) => alive && setSummary(exec))
       .catch(fail)
-    getQueue(undefined, 0, 1)
-      .then((queue) => {
-        if (alive) setPending(Object.values(queue.counts).reduce((a, b) => a + b, 0))
-      })
-      .catch(() => alive && setPending(null))
+    // Only a reviewer sees the queue card, so only a reviewer asks.
+    if (isReviewer)
+      getQueueCounts()
+        .then((queue) => alive && setPending(queue.total))
+        .catch(() => alive && setPending(null))
     getAudit({ exclude: 'auth.', limit: 6 })
       .then((ledger) => alive && setRecent(ledger.events))
       .catch(() => alive && setRecent([]))
     return () => {
       alive = false
     }
-  }, [])
+  }, [isReviewer])
 
-  const isReviewer = can('steward', 'approver')
   const headline = summary?.kpis.filter((k) =>
     isReviewer
       ? ['items', 'clusters', 'duplicates'].includes(k.key)

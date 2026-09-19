@@ -32,6 +32,14 @@ def pending_task(pipeline_run, db):
     return task
 
 
+class TestQueueCounts:
+    def test_the_counts_alone_match_the_full_queue(self, as_steward, pipeline_run):
+        light = as_steward.get("/api/queues/counts").json()
+        full = as_steward.get("/api/queues?limit=1").json()
+        assert light["counts"] == {b: full["counts"].get(b, 0) for b in ("high", "grey", "low")}
+        assert light["total"] == sum(full["counts"].values())
+
+
 class TestQueues:
     def test_all_three_bands_carry_work(self, as_viewer, pipeline_run):
         """§6.5: an automation rate only means something if it can be sampled."""

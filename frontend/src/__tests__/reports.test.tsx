@@ -70,7 +70,8 @@ vi.mock('../lib/api', async () => {
     getExecutive: vi.fn(async () => ({
       kpis: [{ key: 'items', label: 'Catalogue rows', value: 2889 }],
     })),
-    getQueue: vi.fn(async () => ({ counts: { high: 1, grey: 2, low: 3 } })),
+    getQueueCounts: vi.fn(async () => ({ counts: { high: 1, grey: 2, low: 3 }, total: 6 })),
+    getAudit: vi.fn(async () => ({ total: 0, offset: 0, actions: {}, events: [] })),
   }
 })
 

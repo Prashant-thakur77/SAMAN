@@ -216,6 +216,20 @@ def _facets(db: Session, band: str | None, state: str) -> dict:
     }
 
 
+@router.get("/queues/counts")
+def queue_counts(db: Session = Depends(get_db)) -> dict:
+    """Just the pending count per band: what the Home page needs, without a
+    page of cards, facets and adjudications behind it. One query."""
+    counts = dict(
+        db.execute(
+            select(ReviewTask.band, func.count(ReviewTask.id))
+            .where(ReviewTask.state == "pending")
+            .group_by(ReviewTask.band)
+        ).all()
+    )
+    return {"counts": {band: counts.get(band, 0) for band in BANDS}, "total": sum(counts.values())}
+
+
 @router.get("/queues")
 def queues(
     band: str | None = Query(default=None),
