@@ -511,6 +511,10 @@ def audit_stream(
     entity: str | None = None,
     user: str | None = None,
     action: str | None = None,
+    exclude: str | None = Query(
+        default=None,
+        description="comma-separated action prefixes to leave out, e.g. auth.",
+    ),
     limit: int = Query(default=100, le=500),
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -522,6 +526,11 @@ def audit_stream(
         query = query.where(AuditEvent.user == user)
     if action:
         query = query.where(AuditEvent.action.like(f"{action}%"))
+    # Sign-ins are on the ledger for the record and would otherwise be the
+    # whole first page; the reader hides them with `exclude=auth.` and the
+    # chain, hashes included, is untouched.
+    for prefix in (p.strip() for p in (exclude or "").split(",") if p.strip()):
+        query = query.where(AuditEvent.action.not_like(f"{prefix}%"))
 
     total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
     events = (

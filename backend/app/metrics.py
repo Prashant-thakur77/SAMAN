@@ -402,6 +402,26 @@ def compute_metrics(db: Session) -> dict:
     run = db.execute(select(MatchRun).order_by(desc(MatchRun.id)).limit(1)).scalar_one_or_none()
     run_stats = json.loads(run.stats_json) if run else {}
     blocking = run_stats.get("blocking", {})
+    # An incremental run blocks around its new rows only; blocking recall is a
+    # property of a full run, so the last full run's figure is the one graded
+    # and the increment is named beside it.
+    if run_stats.get("incremental"):
+        full = db.execute(
+            select(MatchRun)
+            .where(MatchRun.stats_json.not_like('%"incremental": {%'))
+            .order_by(desc(MatchRun.id))
+            .limit(1)
+        ).scalar_one_or_none()
+        if full is not None:
+            blocking = {
+                **json.loads(full.stats_json).get("blocking", {}),
+                "measured_on_run": full.id,
+                "note": (
+                    f"measured on the last full run (#{full.id}); the incremental run "
+                    f"#{run.id} scored {run_stats['incremental'].get('pairs_scored', 0):,} "
+                    f"pairs around {run_stats['incremental'].get('new_items', 0):,} new rows"
+                ),
+            }
 
     duplicate = pairwise(snap.predicted, snap.item_to_group, snap.holdout)
     per_class, worst_class = _per_class(snap)
@@ -500,8 +520,15 @@ def record_evaluation(db: Session) -> dict | None:
     return stats["evaluation"]
 
 
-def measure_blocking_recall(db: Session, candidates: set[tuple[int, int]]) -> dict:
+def measure_blocking_recall(
+    db: Session, candidates: set[tuple[int, int]], touching: set[int] | None = None
+) -> dict:
     """What share of true duplicate pairs survived into candidate generation?
+
+    `touching` narrows the truth to pairs with at least one member in the set:
+    an incremental run only generates pairs around its new rows, so grading it
+    against every planted pair would report a recall of zero that never
+    happened. With nothing to grade the recalls are None, not 0.0.
 
     Spec §2A.1 grades this separately, because a pair the blocker never emitted
     is invisible to precision and to matcher recall alike — the matcher is never
@@ -530,6 +557,8 @@ def measure_blocking_recall(db: Session, candidates: set[tuple[int, int]]) -> di
         for i in range(len(members)):
             for j in range(i + 1, len(members)):
                 a, b = members[i], members[j]
+                if touching is not None and a not in touching and b not in touching:
+                    continue
                 pair = (a, b) if a < b else (b, a)
                 hit = pair in candidates
                 totals["all"] += 1
@@ -540,14 +569,22 @@ def measure_blocking_recall(db: Session, candidates: set[tuple[int, int]]) -> di
                 if not hit and len(missed_examples) < 20:
                     missed_examples.append(pair)
 
+    def ratio(bucket: str) -> float | None:
+        return round(found[bucket] / totals[bucket], 4) if totals[bucket] else None
+
     return {
-        "recall_all": round(found["all"] / totals["all"], 4) if totals["all"] else 0.0,
-        "recall_holdout": round(found[HOLDOUT] / totals[HOLDOUT], 4) if totals[HOLDOUT] else 0.0,
+        "recall_all": ratio("all"),
+        "recall_holdout": ratio(HOLDOUT),
         # Reported so a configuration choice can be justified on tuning data
         # alone; the held-out figure is the one reported, never the one tuned on.
-        "recall_tuning": round(found["tuning"] / totals["tuning"], 4) if totals["tuning"] else 0.0,
+        "recall_tuning": ratio("tuning"),
         "true_pairs_all": totals["all"],
         "true_pairs_holdout": totals[HOLDOUT],
         "missed_all": totals["all"] - found["all"],
         "missed_examples": missed_examples,
+        **(
+            {"scope": f"true pairs touching the {len(touching):,} new rows"}
+            if touching is not None
+            else {}
+        ),
     }

@@ -721,7 +721,12 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
     db.commit()
 
     stats = {
-        "blocking": {**blocking_stats.as_dict(), **measure_blocking_recall(db, pairs)},
+        "blocking": {
+            **blocking_stats.as_dict(),
+            **measure_blocking_recall(
+                db, pairs, touching=set(status.new_item_ids) if incremental else None
+            ),
+        },
         "linkage": linkage.as_stats()
         if linkage
         else {"engine": "rapidfuzz", **({"incremental": True} if incremental else {})},

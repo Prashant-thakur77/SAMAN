@@ -64,7 +64,7 @@ class Candidate:
 def class_precision(db: Session) -> dict[str, float]:
     """Held-out precision per class from the latest run's snapshot; empty
     when no run carries one (no truth, no scorecard, no automation)."""
-    run = analytics.latest_run(db)
+    run = analytics.latest_run(db, full=True) or analytics.latest_run(db)
     snapshot = run.stats.get("evaluation") if run else None
     if not snapshot or not snapshot.get("counts", {}).get("truth_groups_holdout"):
         return {}

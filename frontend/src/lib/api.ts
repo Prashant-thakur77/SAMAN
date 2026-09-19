@@ -631,11 +631,14 @@ export type VerifyResponse = {
   note: string
 }
 
-export const getAudit = (params: { entity?: string; user?: string; action?: string; limit?: number } = {}) => {
+export const getAudit = (
+  params: { entity?: string; user?: string; action?: string; exclude?: string; limit?: number } = {},
+) => {
   const query = new URLSearchParams()
   if (params.entity) query.set('entity', params.entity)
   if (params.user) query.set('user', params.user)
   if (params.action) query.set('action', params.action)
+  if (params.exclude) query.set('exclude', params.exclude)
   query.set('limit', String(params.limit ?? 100))
   return api.get<AuditResponse>(`/audit?${query}`)
 }
@@ -703,6 +706,8 @@ export type PipelineRungKey = 'possible' | 'candidates' | 'close' | 'merged' | '
 export type PipelineLadder = {
   run_id: number
   run_at: string | null
+  /** Incremental runs since this full run, summed; null when there are none. */
+  increments: { runs: number; new_items: number; pairs_scored: number; latest: string } | null
   rungs: {
     key: PipelineRungKey
     label: string

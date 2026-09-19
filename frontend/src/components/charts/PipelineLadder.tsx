@@ -50,6 +50,15 @@ export function PipelineLadder({
         <p className="text-xs text-muted">
           Run {pipeline.run_id}
           {runDay && <> · {runDay}</>} · counts from the run record
+          {pipeline.increments && (
+            <>
+              {' '}
+              · since then {pipeline.increments.runs} incremental run
+              {pipeline.increments.runs === 1 ? '' : 's'} scored{' '}
+              {formatCount(pipeline.increments.pairs_scored)} pairs around{' '}
+              {formatCount(pipeline.increments.new_items)} new rows
+            </>
+          )}
         </p>
 
         <ol className="space-y-1">

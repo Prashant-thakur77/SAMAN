@@ -81,7 +81,10 @@ def _executive(db: Session, scope: Scope) -> dict:
 
     # Band totals come from the run record: the pair table keeps only the
     # decisions worth showing, so counting it would understate the refusals.
-    run = analytics.latest_run(db)
+    # The last full run describes the estate; an incremental run describes a
+    # few hundred pairs around its new rows and is named beside it.
+    run = analytics.latest_run(db, full=True) or analytics.latest_run(db)
+    increments = analytics.increments_since(db, run)
     bands = run.stats.get("bands") if run else None
     if not bands:
         bands = dict(db.execute(select(Pair.band, func.count(Pair.id)).group_by(Pair.band)).all())
@@ -252,7 +255,7 @@ def _executive(db: Session, scope: Scope) -> dict:
         "by_cpse_count": analytics.by_cpse_count(db),
         # How the machine decided: the ladder of pairs, what vetoed the
         # look-alikes, why pairs wait for a human, and the held-out scorecard.
-        "pipeline": analytics.pipeline(db, run),
+        "pipeline": analytics.pipeline(db, run, increments),
         "veto_attributes": analytics.veto_attributes(db, run, tally),
         "held_for_review": analytics.held_for_review(db, run, evaluation, tally),
         "evaluation": evaluation,

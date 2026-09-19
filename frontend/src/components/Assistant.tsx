@@ -900,7 +900,7 @@ export function Assistant() {
         style={{ right: corner.offset.right, bottom: corner.offset.bottom, touchAction: 'none' }}
         className={cn(
           'no-print fixed z-20 flex h-12 items-center gap-2 rounded-full border border-hairline',
-          'bg-bg pl-2 pr-2 text-sm font-medium text-ink shadow-sm transition-opacity duration-150 sm:pr-4',
+          'bg-bg pl-2 pr-4 text-sm font-medium text-ink shadow-sm transition-opacity duration-150',
           'select-none hover:bg-surface',
           corner.dragging ? 'cursor-grabbing shadow-md' : 'cursor-grab',
           open && 'pointer-events-none opacity-0',
@@ -909,7 +909,7 @@ export function Assistant() {
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-inverse text-bg">
           <AssistantMark className="h-5 w-5" />
         </span>
-        <span className="hidden sm:inline">{t('Ask SAMAN')}</span>
+        {t('Ask SAMAN')}
       </button>
 
       <AnimatePresence>

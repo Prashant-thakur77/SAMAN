@@ -294,7 +294,7 @@ class TestPipelineLadder:
     def test_without_a_run_the_section_is_null_and_the_page_still_answers(
         self, as_viewer, pipeline_run, monkeypatch
     ):
-        monkeypatch.setattr(analytics, "latest_run", lambda db: None)
+        monkeypatch.setattr(analytics, "latest_run", lambda db, full=False: None)
         response = as_viewer.get("/api/dashboard/executive")
         assert response.status_code == 200
         body = response.json()
@@ -464,7 +464,7 @@ class TestEvaluation:
         older = analytics.Run(
             run.id, run.ts, {k: v for k, v in run.stats.items() if k != "evaluation"}
         )
-        monkeypatch.setattr(analytics, "latest_run", lambda db: older)
+        monkeypatch.setattr(analytics, "latest_run", lambda db, full=False: older)
         response = as_viewer.get("/api/dashboard/executive")
         assert response.status_code == 200
         body = response.json()
@@ -482,7 +482,7 @@ class TestEvaluation:
         snapshot = dict(run.stats["evaluation"])
         snapshot["counts"] = {**snapshot["counts"], "truth_groups_holdout": 0, "items_holdout": 0}
         untested = analytics.Run(run.id, run.ts, {**run.stats, "evaluation": snapshot})
-        monkeypatch.setattr(analytics, "latest_run", lambda db: untested)
+        monkeypatch.setattr(analytics, "latest_run", lambda db, full=False: untested)
         body = as_viewer.get("/api/dashboard/executive").json()
         assert body["evaluation"] is None
 

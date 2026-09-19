@@ -325,6 +325,26 @@ class TestIncrementalRun:
         stats = json.loads(run.stats_json)
         assert stats["incremental"]["new_items"] == 3
         assert stats["incremental"]["pairs_scored"] > 0
+        # Blocking recall is graded around the new rows, never against every
+        # planted pair (which would read 0.0 and fail the gate for nothing);
+        # rows with no planted truth leave the recall unmeasured, not zero.
+        assert stats["blocking"]["scope"].startswith("true pairs touching the 3 new rows")
+        assert stats["blocking"]["recall_all"] in (None, 1.0) or 0 < stats["blocking"]["recall_all"] <= 1
+        assert stats["blocking"]["missed_all"] < 100
+        # The estate's figures keep reading the last full run and name the increment.
+        from app import analytics
+        from app.metrics import compute_metrics
+
+        full = analytics.latest_run(db, full=True)
+        assert full is not None and full.id < run.id
+        increments = analytics.increments_since(db, full)
+        assert increments["runs"] >= 1 and increments["new_items"] >= 3
+        ladder = analytics.pipeline(db, full, increments)
+        assert ladder["run_id"] == full.id and ladder["increments"]["new_items"] >= 3
+        report = compute_metrics(db)
+        assert report["blocking"]["recall"] > 0.9
+        assert report["blocking"]["stats"]["measured_on_run"] == full.id
+        assert "incremental run" in report["blocking"]["stats"]["note"]
         # The two new spellings found each other, and the earlier reject stands.
         new = {
             p

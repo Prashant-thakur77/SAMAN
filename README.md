@@ -682,6 +682,15 @@ and their tasks stay, decided pairs are not asked again, and attachments and
 bin bindings follow their rows into the rebuilt clusters. Without an earlier
 run to build on, the run is a full one and says so.
 
+An incremental run is graded as what it is. Its blocking recall is measured
+over the planted pairs that touch its new rows (and left unmeasured, not
+zero, when none are planted), so a run that blocked around eight rows is
+never scored against 7,675 pairs it was not asked about. The estate's figures
+keep reading the **last full run**: the Executive ladder, the automation
+rate, `/api/metrics`' blocking gate and the auto-issue precision table all
+take it, and say beside it how many incremental runs have come since, with
+their rows and pairs.
+
 Real extracts are `.xlsx` as often as CSV, so the wizard takes both. A
 workbook's first sheet (or the one you pick) is the table, and any other
 sheet that carries a material code and a text column, the way SAP keeps the
@@ -723,9 +732,8 @@ never names another CPSE's figure.
 
 A floating assistant, docked bottom-right on the front page and every
 application screen; drag it anywhere and it stays there on that device, and
-the panel opens from wherever it was put. On a phone the launcher is the
-mark alone, so it covers as little as a fingertip. It does three things and
-hands off the rest:
+the panel opens from wherever it was put. It does three things and hands
+off the rest:
 
 - **Navigate.** "Take me to the workbench", "open cluster 268", "search 6205",
   "वर्कबेंच खोलो". Matched against a route catalogue with English and Hindi

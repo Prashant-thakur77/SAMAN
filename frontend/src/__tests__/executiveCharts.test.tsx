@@ -70,6 +70,7 @@ const byCpseCount: ByCpseCount = {
 
 const pipeline: NonNullable<PipelineLadderData> = {
   run_id: 1,
+  increments: null,
   run_at: '2026-09-02T16:49:34',
   rungs: [
     { key: 'possible', label: 'Possible pairs', value: 69354753, unit: 'pairs', factor_from_previous: null, aside: null, note: '11,778 rows, every pair' },

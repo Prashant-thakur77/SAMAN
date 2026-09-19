@@ -47,6 +47,28 @@ _entries: dict[tuple, tuple[tuple, object]] = {}
 _computing: dict[tuple, threading.Lock] = {}
 
 
+#: Audited actions that change nothing a dashboard counts. A sign-in, a
+#: snapshot, a wrong-item report or a scan count is on the ledger for the
+#: record; keying the memo on it would recompute every dashboard after every
+#: login, which on a tenth of a CPU is twenty seconds of "Loading…" for the
+#: person who just signed in.
+NOT_ESTATE = (
+    "auth.login",
+    "demo.snapshot",
+    "scan.wrong_item",
+    "stock.count",
+    "bin.bind",
+    "attachment.add",
+    "attachment.void",
+    "smart_create.draft",
+    "abbreviation.upsert",
+    "abbreviation.retire",
+    "user.create",
+    "user.update",
+    "settings.sovereign",
+)
+
+
 def version(db: Session) -> tuple:
     """Everything a dashboard figure can depend on, as one comparable key."""
     counts = tuple(
@@ -64,7 +86,10 @@ def version(db: Session) -> tuple:
     )
     return (
         date.today().isoformat(),
-        db.execute(select(func.max(AuditEvent.seq))).scalar() or 0,
+        db.execute(
+            select(func.max(AuditEvent.seq)).where(AuditEvent.action.not_in(NOT_ESTATE))
+        ).scalar()
+        or 0,
         db.execute(select(func.max(MatchRun.id))).scalar() or 0,
         *counts,
     )

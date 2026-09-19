@@ -84,13 +84,36 @@ class Run:
     stats: dict
 
 
-def latest_run(db: Session) -> Run | None:
-    row = db.execute(
-        select(MatchRun.id, MatchRun.ts, MatchRun.stats_json).order_by(MatchRun.id.desc()).limit(1)
-    ).first()
+def latest_run(db: Session, full: bool = False) -> Run | None:
+    """The latest run; with `full`, the latest that re-scored the whole
+    estate. An incremental run's bands and funnel describe a few hundred
+    pairs around its new rows, so the figures that describe the estate read
+    the last full run and name the increments since."""
+    query = select(MatchRun.id, MatchRun.ts, MatchRun.stats_json)
+    if full:
+        query = query.where(MatchRun.stats_json.not_like('%"incremental": {%'))
+    row = db.execute(query.order_by(MatchRun.id.desc()).limit(1)).first()
     if row is None:
         return None
     return Run(row[0], row[1], json.loads(row[2] or "{}"))
+
+
+def increments_since(db: Session, run: Run | None) -> dict | None:
+    """The incremental runs after `run`, summed: how many, rows and pairs."""
+    if run is None:
+        return None
+    rows = db.execute(
+        select(MatchRun.id, MatchRun.ts, MatchRun.stats_json).where(MatchRun.id > run.id)
+    ).all()
+    if not rows:
+        return None
+    stats = [json.loads(r[2] or "{}").get("incremental") or {} for r in rows]
+    return {
+        "runs": len(rows),
+        "new_items": sum(int(s.get("new_items", 0)) for s in stats),
+        "pairs_scored": sum(int(s.get("pairs_scored", 0)) for s in stats),
+        "latest": rows[-1][1].isoformat(),
+    }
 
 
 # --------------------------------------------------------------------------
@@ -299,7 +322,7 @@ def by_cpse_count(db: Session) -> dict:
 # --------------------------------------------------------------------------
 
 
-def pipeline(db: Session, run: Run | None) -> dict | None:
+def pipeline(db: Session, run: Run | None, increments: dict | None = None) -> dict | None:
     """The ladder from every possible pair to issued codes, from the run record.
 
     Band totals come from the run, never from the pair table: only the most
@@ -402,6 +425,7 @@ def pipeline(db: Session, run: Run | None) -> dict | None:
     return {
         "run_id": run.id,
         "run_at": run.ts.isoformat() if run.ts else None,
+        "increments": increments,
         "rungs": rungs,
         "blocking": {
             "recall": recall,

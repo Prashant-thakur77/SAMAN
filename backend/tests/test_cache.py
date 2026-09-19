@@ -28,6 +28,15 @@ class TestMemo:
         audit.record(db, action="test.ping", entity="test", payload={}, user="tests")
         assert cache.version(db) != before
 
+    def test_a_sign_in_leaves_the_version_alone(self, db, seeded):
+        """A login is on the ledger for the record and changes no figure;
+        recomputing every dashboard after it cost the person who signed in
+        twenty seconds of Loading on the free host."""
+        before = cache.version(db)
+        audit.record(db, action="auth.login", entity="user", payload={}, user="tests")
+        audit.record(db, action="scan.wrong_item", entity="scan", payload={}, user="tests")
+        assert cache.version(db) == before
+
     def test_a_row_changed_behind_the_ledger_moves_the_version_too(self, db, pipeline_run):
         before = cache.version(db)
         # Flushed, never committed: the row is visible to this session's

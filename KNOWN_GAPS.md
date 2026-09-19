@@ -595,6 +595,27 @@ that could not be true:
   reports *low confidence* rather than a confident misread, which is what the
   retake threshold acts on.
 
+### After the phone-width pass (20 Sept 2026)
+
+- **Sign-in left the person on "Loading…" for twenty seconds on the free
+  host.** The dashboard memo is keyed on the audit ledger's head, and a
+  sign-in had become an audited event, so every login recomputed every
+  dashboard on a tenth of a CPU. The memo now ignores actions that change
+  no figure (`cache.NOT_ESTATE`: sign-ins, snapshots, wrong-item reports,
+  counts, bindings, attachments, drafts, house words, user edits). A test
+  pins it. The Home page also no longer waits for the figures before it
+  shows anything: the queue and the ledger land on their own, and the
+  figures arrive into skeleton tiles.
+- **An incremental run made the Executive page lie.** Its blocking recall
+  was measured against every planted pair and read 0.0000; the ladder,
+  automation rate and gate all read that run. See the README's incremental
+  paragraph for what each reads now.
+- **Compare called a valve and a bearing "probably the same".** The
+  adjudicator only ever saw grey pairs; a `distinct` verdict now leans split
+  with the matcher's own reason.
+- **The Audit page's first screen was sign-ins.** Folded by default, with a
+  checkbox and a count; the chain is untouched.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

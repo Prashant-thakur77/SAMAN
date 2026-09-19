@@ -26,6 +26,9 @@ export default function Audit() {
   const [entity, setEntity] = useState('')
   const [user, setUser] = useState('')
   const [action, setAction] = useState('')
+  // Sign-ins are on the chain like everything else, but a page of them hides
+  // the decisions; they are folded away until asked for.
+  const [signIns, setSignIns] = useState(false)
   // Held separately so choosing an action does not shrink the list of actions
   // to choose from — a filter that erases its own options is unusable.
   const [allActions, setAllActions] = useState<Record<string, number>>({})
@@ -39,6 +42,7 @@ export default function Audit() {
         entity: entity || undefined,
         user: user || undefined,
         action: action || undefined,
+        exclude: signIns || action.startsWith('auth.') ? undefined : 'auth.',
         limit: 100,
       })
       setData(next)
@@ -47,7 +51,7 @@ export default function Audit() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load the ledger.')
     }
-  }, [entity, user, action])
+  }, [entity, user, action, signIns])
 
   useEffect(() => {
     void load()
@@ -153,9 +157,21 @@ export default function Audit() {
               ))}
           </select>
         </div>
+        <label className="flex items-center gap-2 pb-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={signIns}
+            onChange={(e) => setSignIns(e.target.checked)}
+            className="h-4 w-4"
+          />
+          show sign-ins
+        </label>
         {data && (
           <p className="pb-2 text-xs text-muted">
             {data.total.toLocaleString('en-IN')} event{data.total === 1 ? '' : 's'}
+            {!signIns && !action.startsWith('auth.') && allActions['auth.login']
+              ? ` · ${allActions['auth.login'].toLocaleString('en-IN')} sign-ins folded`
+              : ''}
           </p>
         )}
         {(entity || user || action) && (
