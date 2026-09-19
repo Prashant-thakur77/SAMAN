@@ -24,6 +24,7 @@ import {
 import { cn } from '../lib/cn'
 import { downloadCsv, rowsToCsv } from '../lib/csv'
 import { useHealth } from '../lib/useHealth'
+import { useT } from '../lib/i18n'
 import { useSession } from '../lib/session'
 
 /**
@@ -125,6 +126,7 @@ export default function Scan() {
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
   const field = useRef<HTMLInputElement>(null)
   const { user: me } = useSession()
+  const t = useT()
 
   // Counts taken offline post themselves, in order, when the signal returns.
   const flushQueue = useCallback(async () => {
@@ -296,7 +298,7 @@ export default function Scan() {
                 mode === m ? 'border-inverse bg-inverse text-bg' : 'border-hairline text-muted hover:text-ink',
               )}
             >
-              {m === 'lookup' ? 'Look up' : 'Stock count'}
+              {m === 'lookup' ? t('Look up') : t('Stock count')}
             </button>
           ))}
           {mode === 'count' && (
@@ -332,7 +334,7 @@ export default function Scan() {
       <section className="space-y-4 card p-4 sm:p-6">
         <form onSubmit={submit} className="space-y-2">
           <label htmlFor="scan-code" className="micro-label block">
-            {mode === 'count' ? 'Scan the bin label or the part' : 'Code'}
+            {mode === 'count' ? t('Scan the bin label or the part') : t('Code')}
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
@@ -355,11 +357,11 @@ export default function Scan() {
               disabled={busy || !code.trim()}
               className="h-12 shrink-0 sm:px-6"
             >
-              {busy ? 'Looking…' : 'Look up'}
+              {busy ? 'Looking…' : t('Look up')}
             </Button>
           </div>
           <p className="text-sm text-muted">
-            Type a code, or point a barcode scanner here and pull the trigger.
+            {t('Type a code, or point a barcode scanner here and pull the trigger.')}
           </p>
         </form>
 
@@ -486,7 +488,7 @@ export default function Scan() {
       {!result && history.length > 0 && (
         <section className="space-y-2" aria-label="Recent scans">
           <div className="flex items-center justify-between">
-            <h2 className="micro-label">Recent scans on this device</h2>
+            <h2 className="micro-label">{t('Recent scans on this device')}</h2>
             <button
               type="button"
               className="text-xs text-muted underline-offset-2 hover:underline"
@@ -529,6 +531,7 @@ export default function Scan() {
 
 /** The scan resolved, but the part in hand is not the one on screen. */
 function WrongItem({ result, chosen }: { result: ScanResult; chosen: number | null }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [note, setNote] = useState('')
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
@@ -577,7 +580,7 @@ function WrongItem({ result, chosen }: { result: ScanResult; chosen: number | nu
           onClick={() => setOpen(true)}
           className="h-11 text-sm text-muted underline underline-offset-4 hover:text-ink"
         >
-          Wrong item? The part in hand is not this one
+          {t('Wrong item? The part in hand is not this one')}
         </button>
       ) : (
         <div className="card space-y-3 p-4">
@@ -1172,6 +1175,7 @@ function CameraScanner({
   disabled: boolean
   onDecoded: (text: string) => void
 }) {
+  const t = useT()
   const [state, setState] = useState<CameraState>('off')
   // Dim stores: the back camera's light, where the browser lets a page turn
   // it on (Chrome on Android does; iOS Safari does not, and shows no button).
@@ -1263,7 +1267,7 @@ function CameraScanner({
           disabled={disabled}
           onClick={() => setState('starting')}
         >
-          Scan with the camera
+          {t('Scan with the camera')}
         </Button>
       )}
       {state === 'denied' && (
@@ -1401,6 +1405,7 @@ const LOW_CONFIDENCE = 0.75
  * the text ends up in Smart-Create, the one place that shows a duplicate check.
  */
 function NameplateReader({ disabled }: { disabled: boolean }) {
+  const t = useT()
   const navigate = useNavigate()
   const { health } = useHealth()
   const input = useRef<HTMLInputElement>(null)
@@ -1494,7 +1499,7 @@ function NameplateReader({ disabled }: { disabled: boolean }) {
         disabled={disabled || state.phase === 'working'}
         onClick={() => input.current?.click()}
       >
-        Photograph the marking
+        {t('Photograph the marking')}
       </Button>
       {state.phase === 'working' && (
         <p role="status" className="text-sm text-muted">

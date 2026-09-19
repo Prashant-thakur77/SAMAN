@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 
+import { useT } from '../lib/i18n'
 import { useSession } from '../lib/session'
 
 /**
@@ -8,6 +9,7 @@ import { useSession } from '../lib/session'
  */
 export function UserChip() {
   const { user, loading, signOut } = useSession()
+  const t = useT()
   const navigate = useNavigate()
 
   if (loading) return <span className="micro-label">…</span>
@@ -40,7 +42,7 @@ export function UserChip() {
         }}
         className="flex h-8 items-center rounded-full border border-hairline bg-surface px-3 text-xs text-muted hover:text-ink"
       >
-        Sign out
+        {t('Sign out')}
       </button>
     </div>
   )

@@ -1,5 +1,7 @@
 import { DegradedChip } from './DegradedChip'
 import { IconMenu, IconSearch } from './Icons'
+import { useT } from '../lib/i18n'
+import { LangToggle } from './LangToggle'
 import { ThemeToggle } from './ThemeToggle'
 import { UserChip } from './UserChip'
 
@@ -16,6 +18,7 @@ export function CommandBar({
   onOpenNav: () => void
   onOpenHelp?: () => void
 }) {
+  const t = useT()
   const isMac =
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '')
 
@@ -38,7 +41,7 @@ export function CommandBar({
         className="flex h-9 max-w-md flex-1 items-center gap-2 rounded-full border border-hairline bg-surface px-3.5 text-left text-sm text-muted hover:text-ink"
       >
         <IconSearch className="h-4 w-4 shrink-0" />
-        <span className="truncate">Search SAMAN</span>
+        <span className="truncate">{t('Search SAMAN')}</span>
         <kbd className="ml-auto hidden shrink-0 rounded border border-hairline px-1.5 py-0.5 font-mono text-[10px] text-muted sm:block">
           {isMac ? '⌘K' : 'Ctrl K'}
         </kbd>
@@ -57,6 +60,7 @@ export function CommandBar({
             ?
           </button>
         )}
+        <LangToggle />
         <ThemeToggle />
         <UserChip />
       </div>

@@ -6,6 +6,7 @@ import { useHealth } from '../lib/useHealth'
 import { CommandBar } from './CommandBar'
 import { Assistant } from './Assistant'
 import { CommandPalette } from './CommandPalette'
+import { useT } from '../lib/i18n'
 import { ShortcutHelp } from './ShortcutHelp'
 import { RouteAnnouncer } from './RouteAnnouncer'
 import { Sidebar } from './Sidebar'
@@ -32,6 +33,7 @@ export function Shell({ children }: { children: ReactNode }) {
   // is out. Closed on every navigation, because a drawer that stays open over
   // the page you just asked for is a drawer in the way.
   const [navOpen, setNavOpen] = useState(false)
+  const t = useT()
   const { unreachable } = useHealth()
   const location = useLocation()
   // The Scan screen is installed on phones and used in stores with no signal:
@@ -81,7 +83,7 @@ export function Shell({ children }: { children: ReactNode }) {
         href="#main-content"
         className="no-print sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:border focus:border-hairline focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:text-ink"
       >
-        Skip to content
+        {t('Skip to content')}
       </a>
       <RouteAnnouncer />
       {/* The drawer's backdrop: it dims the page it is covering and is the

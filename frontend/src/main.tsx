@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
 import App from './app'
+import { LangProvider } from './lib/i18n'
 import { SessionProvider } from './lib/session'
 import { ThemeProvider } from './lib/theme'
 import './styles/index.css'
@@ -27,9 +28,11 @@ createRoot(root).render(
         so the console stays clean enough that a real warning is noticed. */}
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ThemeProvider>
-        <SessionProvider>
-          <App />
-        </SessionProvider>
+        <LangProvider>
+          <SessionProvider>
+            <App />
+          </SessionProvider>
+        </LangProvider>
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,

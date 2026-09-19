@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 
 import { cn } from '../lib/cn'
+import { useT } from '../lib/i18n'
 import { NAV, NAV_GROUPS } from '../lib/nav'
 import { useSession } from '../lib/session'
 import { IconChevronLeft, IconChevronRight, IconClose } from './Icons'
@@ -32,6 +33,7 @@ export function Sidebar({
   const { can, loading } = useSession()
   // Entries a role cannot open are hidden rather than shown and refused. The
   // route guard still stands behind this for anyone who types the address.
+  const t = useT()
   const visible = NAV.filter((item) => !item.roles || loading || can(...item.roles))
 
   return (
@@ -84,14 +86,14 @@ export function Sidebar({
           if (items.length === 0) return null
           return (
             <div key={group} className="mb-5">
-              <p className={cn('micro-label px-4 pb-2', collapsed && 'lg:hidden')}>{group}</p>
+              <p className={cn('micro-label px-4 pb-2', collapsed && 'lg:hidden')}>{t(group)}</p>
               <ul>
                 {items.map((item) => (
                   <li key={item.path}>
                     <NavLink
                       to={item.path}
                       end={item.path === '/'}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsed ? t(item.label) : undefined}
                       className={({ isActive }) =>
                         cn(
                           'mx-2 flex h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors duration-150',
@@ -103,7 +105,7 @@ export function Sidebar({
                       }
                     >
                       <item.icon className="shrink-0" />
-                      <span className={cn('truncate', collapsed && 'lg:hidden')}>{item.label}</span>
+                      <span className={cn('truncate', collapsed && 'lg:hidden')}>{t(item.label)}</span>
                     </NavLink>
                   </li>
                 ))}

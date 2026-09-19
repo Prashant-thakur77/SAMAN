@@ -800,6 +800,14 @@ take the model's word for what the documents say.
 
 `POST /api/assistant/query` is public and scoped like every other endpoint.
 
+**The interface itself reads in Hindi** at a click (`हिं` in the command bar,
+remembered on the device): navigation, page headers, the Workbench's verbs,
+the Scan screen's labels and the shell. Data never changes language — a
+description is shown as the catalogue wrote it, a code is a code — and a
+string nobody has translated yet stays in English rather than going blank.
+The dictionary is keyed by the English strings themselves (`lib/i18n.tsx`),
+so what it translates is exactly what the screen says.
+
 ### Commercial and inventory analytics
 
 Purchase history is *used*, not merely stored. Prices are normalized to price

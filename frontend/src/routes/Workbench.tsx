@@ -26,6 +26,7 @@ import {
 import { cn } from '../lib/cn'
 import { downloadCsv, rowsToCsv } from '../lib/csv'
 import { decisionCardVariants } from '../lib/motion'
+import { useT } from '../lib/i18n'
 import { useSession } from '../lib/session'
 
 const BANDS = [
@@ -95,6 +96,7 @@ export default function Workbench() {
   const reduce = useReducedMotion() ?? false
   const navigate = useNavigate()
   const { user } = useSession()
+  const t = useT()
 
   const load = useCallback(
     async (which: Band) => {
@@ -283,7 +285,7 @@ export default function Workbench() {
                 : 'border-transparent text-muted hover:text-ink',
             )}
           >
-            {entry.label}
+            {t(entry.label)}
             <span className="font-mono text-xs">{counts[entry.key]}</span>
           </button>
         ))}
@@ -300,7 +302,7 @@ export default function Workbench() {
                 : 'border-hairline text-muted hover:text-ink',
             )}
           >
-            Most informative first
+            {t('Most informative first')}
           </button>
         )}
       </div>
@@ -316,7 +318,7 @@ export default function Workbench() {
           value={filters.class ?? ''}
           onChange={(e) => setFilters((f) => ({ ...f, class: e.target.value || null }))}
         >
-          <option value="">All classes</option>
+          <option value="">{t('All classes')}</option>
           {facets?.classes.map((c) => (
             <option key={c.code} value={c.code}>
               {c.code} · {c.count}
@@ -334,7 +336,7 @@ export default function Workbench() {
             setFilters((f) => ({ ...f, cpse: e.target.value ? Number(e.target.value) : null }))
           }
         >
-          <option value="">All CPSEs</option>
+          <option value="">{t('All CPSEs')}</option>
           {facets?.cpses.map((c) => (
             <option key={c.id} value={c.id}>
               {c.code} · {c.count}
@@ -354,12 +356,12 @@ export default function Workbench() {
             )}
             title={`Only tasks assigned to your role (${user.role}).`}
           >
-            Assigned to me
+            {t('Assigned to me')}
           </button>
         )}
         {filtering && (
           <Button size="sm" variant="ghost" onClick={() => setFilters({})}>
-            Clear filters
+            {t('Clear filters')}
           </Button>
         )}
         {queue && (
@@ -399,7 +401,7 @@ export default function Workbench() {
         )}
         {canBulk && (
           <Button size="sm" variant="secondary" onClick={() => setBulkOpen((o) => !o)}>
-            {bulkOpen ? 'Close' : `Decide this page (${pending.length})`}
+            {bulkOpen ? 'Close' : `${t('Decide this page')} (${pending.length})`}
           </Button>
         )}
       </div>
@@ -481,7 +483,7 @@ export default function Workbench() {
             Task {last.taskId} {last.action === 'approve' ? 'approved' : 'rejected'}.
           </span>
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => void undo()}>
-            Undo <kbd className="font-mono text-[10px] opacity-60">U</kbd>
+            {t('Undo')} <kbd className="font-mono text-[10px] opacity-60">U</kbd>
           </Button>
           <span className="font-mono text-xs text-muted">
             {Math.floor(undoLeft / 60)}:{String(undoLeft % 60).padStart(2, '0')}
@@ -493,7 +495,7 @@ export default function Workbench() {
         <p className="text-sm text-muted">Loading the queue…</p>
       ) : !task ? (
         <EmptyState
-          title={filtering ? 'Nothing matches these filters' : 'Nothing left in this band'}
+          title={filtering ? 'Nothing matches these filters' : t('Nothing left in this band')}
           description={
             filtering
               ? 'Clear a filter to widen the queue.'
@@ -503,7 +505,7 @@ export default function Workbench() {
           }
           action={
             <Button variant="secondary" onClick={() => void load(band)}>
-              Reload queue
+              {t('Reload queue')}
             </Button>
           }
         />
@@ -636,17 +638,17 @@ export default function Workbench() {
 
             <footer className="flex flex-wrap items-center gap-3 border-t border-hairline pt-4">
               <Button variant="primary" disabled={busy} onClick={() => void decide('approve')}>
-                Approve <kbd className="font-mono text-[10px] opacity-60">A</kbd>
+                {t('Approve')} <kbd className="font-mono text-[10px] opacity-60">A</kbd>
               </Button>
               <Button variant="danger" disabled={busy} onClick={() => void decide('reject')}>
-                Reject <kbd className="font-mono text-[10px] opacity-60">R</kbd>
+                {t('Reject')} <kbd className="font-mono text-[10px] opacity-60">R</kbd>
               </Button>
               {task.cluster_id && (
                 <Button
                   variant="secondary"
                   onClick={() => navigate(`/clusters/${task.cluster_id}`)}
                 >
-                  Open cluster <kbd className="font-mono text-[10px] opacity-60">M</kbd>
+                  {t('Open cluster')} <kbd className="font-mono text-[10px] opacity-60">M</kbd>
                 </Button>
               )}
               <span className="ml-auto">
@@ -660,7 +662,7 @@ export default function Workbench() {
                       : `Issuing a CNMC is registrar-only. You are signed in as ${user?.role ?? 'a guest'}.`
                   }
                 >
-                  Issue CNMC
+                  {t('Issue CNMC')}
                 </Button>
               </span>
             </footer>
