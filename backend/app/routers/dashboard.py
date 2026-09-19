@@ -46,7 +46,8 @@ def executive(
     The KPIs reconcile with `/api/metrics`: both read the same tables, and the
     duplicate count here is the same pairwise notion the metrics report.
     """
-    return executive_for(db, scope_for(user))
+    scope = scope_for(user)
+    return {**executive_for(db, scope), "visibility": scope.as_dict()}
 
 
 def executive_for(db: Session, scope: Scope) -> dict:
@@ -54,7 +55,7 @@ def executive_for(db: Session, scope: Scope) -> dict:
     version (see `cache`): computed once per change, not once per visitor."""
     return cache.memo(
         db,
-        ("executive", scope.role, scope.cpse_code),
+        ("executive", *scope.view_key),
         lambda: cache.stamped(db, lambda: _executive(db, scope)),
     )
 
@@ -300,7 +301,8 @@ def opportunity_dashboard(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"months must be one of {', '.join(str(m) for m in WINDOWS)}.",
         )
-    return opportunity_for(db, scope_for(user), capture, months)
+    scope = scope_for(user)
+    return {**opportunity_for(db, scope, capture, months), "visibility": scope.as_dict()}
 
 
 def opportunity_for(
@@ -311,7 +313,7 @@ def opportunity_for(
 ) -> dict:
     return cache.memo(
         db,
-        ("opportunity", scope.role, scope.cpse_code, capture, months),
+        ("opportunity", *scope.view_key, capture, months),
         lambda: cache.stamped(db, lambda: _opportunity(db, scope, capture, months)),
     )
 

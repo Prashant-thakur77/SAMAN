@@ -30,6 +30,14 @@ class Scope:
     def sees_all_prices(self) -> bool:
         return self.role in UNRESTRICTED_ROLES
 
+    @property
+    def view_key(self) -> tuple:
+        """What a memo may key a scoped view on: every unrestricted role sees
+        the same figures, and a restricted one sees its own CPSE's. Keying on
+        the role itself would compute the registrar's dashboard again for
+        the admin and again for the auditor."""
+        return ("all",) if self.sees_all_prices else ("own", self.cpse_code)
+
     def owns(self, cpse_code: str | None) -> bool:
         return cpse_code is not None and cpse_code == self.cpse_code
 

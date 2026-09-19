@@ -623,6 +623,17 @@ that could not be true:
   the cached shell on a 502/503 from a host mid-restart. The front page and
   the sign-in page also no longer wait for each other's exit animation, so
   there is never an instant with nothing mounted.
+- **The Admin page took a minute for an administrator on the free host.**
+  Two causes, both measured: the auto-issue status walked every draft
+  cluster with two queries each (six thousand drafts, twelve thousand round
+  trips — a minute on a tenth of a CPU, and Render's proxy gave up on the
+  learner's status beside it); and the dashboards were memoised per *role*,
+  so the admin, the auditor and the registrar each paid for their own copy
+  of the same figures. Now: one batched query for the drafts, both status
+  panels memoised on the estate's version and warmed at start, and the
+  dashboard and report memos keyed on what a scope can see
+  (`Scope.view_key`) rather than who it is. Locally 1.4 s → 0.08 s and
+  2.1 s → 0.005 s; the admin's dashboard is the registrar's copy.
 - **The Audit page's first screen was sign-ins.** Folded by default, with a
   checkbox and a count; the chain is untouched.
 

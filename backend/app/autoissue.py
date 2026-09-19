@@ -162,18 +162,24 @@ def eligible(db: Session, family: str | None = None) -> tuple[list[Candidate], d
             )
         ).scalars()
     }
+    # One query for every draft cluster's members and their class, rather
+    # than two per golden: six thousand drafts were twelve thousand round
+    # trips, a minute on the free host's tenth of a CPU.
+    members_by_cluster: dict[int, list[int]] = {}
+    class_by_cluster: dict[int, str] = {}
+    cluster_ids = [g.cluster_id for g in goldens]
+    for i in range(0, len(cluster_ids), 900):
+        chunk = cluster_ids[i : i + 900]
+        for cluster_id, item_id, class_code in db.execute(
+            select(ClusterMember.cluster_id, ClusterMember.item_id, Item.class_code)
+            .join(Item, Item.id == ClusterMember.item_id)
+            .where(ClusterMember.cluster_id.in_(chunk))
+        ):
+            members_by_cluster.setdefault(cluster_id, []).append(item_id)
+            class_by_cluster.setdefault(cluster_id, class_code or "unclassified")
     for golden in goldens:
-        members = (
-            db.execute(
-                select(ClusterMember.item_id).where(ClusterMember.cluster_id == golden.cluster_id)
-            )
-            .scalars()
-            .all()
-        )
-        class_code = (
-            db.execute(select(Item.class_code).where(Item.id.in_(members)).limit(1)).scalar()
-            or "unclassified"
-        )
+        members = members_by_cluster.get(golden.cluster_id, [])
+        class_code = class_by_cluster.get(golden.cluster_id, "unclassified")
         fam, _ = family_for(class_code)
         if family and fam != family:
             continue

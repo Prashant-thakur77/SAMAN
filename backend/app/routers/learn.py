@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import audit, learn
+from .. import audit, cache, learn
 from ..auth import require_roles, require_user
 from ..db import get_db
 from ..models import User
@@ -28,7 +28,9 @@ def learn_status(
     _user: Annotated[User, Depends(require_user)],
     db: Session = Depends(get_db),
 ) -> dict:
-    return learn.status(db)
+    # Out-of-sample confusion over every reviewer label is seconds of work;
+    # memoised on the estate's version, which a new label or a retrain moves.
+    return cache.memo(db, ("learn.status",), lambda: learn.status(db))
 
 
 @router.post("/train")

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import autoissue
+from .. import autoissue, cache
 from ..auth import require_roles
 from ..db import get_db
 from ..models import User
@@ -37,7 +37,9 @@ def read_status(
     """Per family: the policy, the class precision it is judged on, and how
     many clusters would issue today. Readable by those who audit as well as
     the one who sets it."""
-    return autoissue.status(db)
+    # Every draft cluster is gated; memoised on the estate's version, which
+    # a policy change, a decision or an issue moves.
+    return cache.memo(db, ("autoissue.status",), lambda: autoissue.status(db))
 
 
 @router.put("/policy/{family}")

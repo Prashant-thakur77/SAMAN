@@ -12,7 +12,7 @@
  *     recent scans and queues stock counts for when the signal returns.
  */
 const VERSION = 'saman-sw-v1'
-const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
+const SHELL = ['/', '/manifest.webmanifest', '/icons/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png']
 const OCR = [
   '/ocr/worker.min.js',
   '/ocr/tesseract-core-simd-lstm.wasm.js',

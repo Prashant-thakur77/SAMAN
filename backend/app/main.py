@@ -186,6 +186,14 @@ def warm_dashboards():
     from .reports import rollup
 
     jobs.append(("reports (roll-up)", job(rollup, registrar)))
+    # The Admin page's two slow panels, so its first reader does not wait.
+    from . import autoissue, learn
+
+    def memoised(key: str, fn):
+        return job(lambda db: cache.memo(db, (key,), lambda: fn(db)))
+
+    jobs.append(("autoissue status", memoised("autoissue.status", autoissue.status)))
+    jobs.append(("learn status", memoised("learn.status", learn.status)))
     if get_settings().saman_warm_answers:
         jobs.append(("assistant answers", warm_answers))
     return cache.warm(jobs)

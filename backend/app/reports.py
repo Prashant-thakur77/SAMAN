@@ -131,11 +131,15 @@ def cpse_report(
         raise LookupError(f"Unknown CPSE {cpse_code!r}.")
     today = today or date.today()
     asked_by = scope.role if scope else "system"
-    return cache.memo(
+    # One copy per CPSE and day: the document is the same whoever asks
+    # (it is redacted as the CPSE's own steward regardless); only the
+    # "requested by" line is theirs.
+    memo = cache.memo(
         db,
-        ("report", cpse.code, today.isoformat(), asked_by),
+        ("report", cpse.code, today.isoformat()),
         lambda: _report(db, cpse, asked_by, today),
     )
+    return {**memo, "requested_by": asked_by}
 
 
 def _report(db: Session, cpse: Cpse, asked_by: str, today: date) -> dict:
