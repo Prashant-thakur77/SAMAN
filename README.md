@@ -722,7 +722,10 @@ never names another CPSE's figure.
 ### Ask SAMAN: the assistant on every screen
 
 A floating assistant, docked bottom-right on the front page and every
-application screen. It does three things and hands off the rest:
+application screen; drag it anywhere and it stays there on that device, and
+the panel opens from wherever it was put. On a phone the launcher is the
+mark alone, so it covers as little as a fingertip. It does three things and
+hands off the rest:
 
 - **Navigate.** "Take me to the workbench", "open cluster 268", "search 6205",
   "वर्कबेंच खोलो". Matched against a route catalogue with English and Hindi
@@ -1459,6 +1462,14 @@ recent scans and queues stock counts on the device; they post in order when
 the signal returns, and a refused line is named rather than blocking the
 rest. Lookups themselves need the connection, and the page says so instead of
 pretending. Verified in headless Chromium with the network switched off.
+
+**Every screen works at phone width**, not only Scan: checked in headless
+Chromium at 390 px on all nineteen routes plus the navigation drawer, the
+command palette, the item drawer and the assistant panel, for sideways
+overflow, elements wider than the screen and page errors. A wide table
+scrolls inside its card with a *scrolls sideways →* note above it rather
+than squeezing its first column to a word a line; the item drawer opens from
+the screen edge; a lone last tile in a figure grid takes the full row.
 
 On the shelf floor the screen keeps a list of the last scans on that device,
 turns the phone's torch on where the browser allows it (Chrome on Android;

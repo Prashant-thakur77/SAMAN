@@ -138,6 +138,21 @@ def _decide(
             reasons.append("Also " + ", ".join(_pretty(v["attr"]) for v in vetoed_by[1:4]) + ".")
         return _finish(LEAN_SPLIT, 0.8, reasons, evidence)
 
+    # --- what the matcher itself ruled out ------------------------------
+    # The queue only holds grey pairs, but Compare scores any two rows: a
+    # valve against a bearing arrives here with verdict "distinct" and no
+    # attributes in common, and "nothing disagrees" must not read as "agree".
+    if verdict == "distinct":
+        route_reason = evidence.get("reason")
+        if evidence.get("route") == "anchor_only" and route_reason:
+            reasons.append(route_reason[0].upper() + route_reason[1:].rstrip(".") + ".")
+        else:
+            reasons.append(
+                f"The matcher scored this pair at {confidence:.0%}, below the band "
+                "where a merge is considered."
+            )
+        return _finish(LEAN_SPLIT, 0.8, reasons, evidence)
+
     # --- what argues for holding it back --------------------------------
     if not evidence.get("defining_attribute_compared", True):
         reasons.append(

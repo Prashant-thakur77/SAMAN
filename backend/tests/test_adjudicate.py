@@ -101,6 +101,28 @@ class TestConflict:
         assert result.recommendation == FLAG_CONFLICT
 
 
+class TestDistinctVerdict:
+    """Compare scores any two rows; a pair the matcher ruled out must not
+    read as a merge because nothing was there to disagree."""
+
+    def test_two_classes_lean_split_with_the_matchers_reason(self):
+        cross = {
+            "route": "anchor_only",
+            "reason": "different classes: only an exact anchor key may match here",
+            "class_a": "valve.gate",
+            "class_b": "bearing.ball.deep_groove",
+        }
+        result = adjudicate(cross, {"tier1_fuzzy": 0.37}, 0.0, "distinct", None)
+        assert result.recommendation == LEAN_SPLIT
+        assert "Different classes" in result.summary
+        assert "no single field is decisive" not in result.summary
+
+    def test_a_low_score_leans_split_and_says_the_score(self):
+        result = adjudicate(evidence(), {}, 0.12, "distinct", None)
+        assert result.recommendation == LEAN_SPLIT
+        assert "12%" in result.summary
+
+
 class TestThinEvidence:
     def test_an_unreadable_defining_attribute_holds_the_pair_back(self):
         result = adjudicate(

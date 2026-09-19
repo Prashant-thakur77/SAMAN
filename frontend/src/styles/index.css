@@ -53,6 +53,17 @@
   }
 }
 
+/* Tables on a phone. A wide table scrolls inside its card rather than
+   squeezing every column to fit, so the description column keeps a readable
+   width and the numbers keep their own; the first column of a table with
+   four or more columns is the one that would otherwise be crushed. */
+@media (max-width: 639px) {
+  .data-table:has(th:nth-child(4)) th:first-child,
+  .data-table:has(th:nth-child(4)) td:first-child {
+    min-width: 11rem;
+  }
+}
+
 /* The bin label (routes/Label.tsx). Sized in millimetres so the screen preview
    and the print agree: 92 × 52 mm inside a 100 × 60 mm sheet with 4 mm margins.
    A label is paper, so it is drawn in the light tokens in both themes; a QR

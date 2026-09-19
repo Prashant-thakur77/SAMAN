@@ -113,7 +113,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 px-4 py-6 focus-visible:outline-none sm:px-6 sm:py-8"
+          className="flex-1 px-4 pb-24 pt-6 focus-visible:outline-none sm:px-6 sm:py-8"
         >
           <div className="mx-auto w-full max-w-content">
             {/* A blank content column is not a crash, but it is not an

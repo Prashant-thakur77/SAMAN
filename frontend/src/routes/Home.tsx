@@ -89,7 +89,7 @@ export default function Home() {
             <ReportCard cpse={user.cpse_code} />
           )}
 
-          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3">
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
             {(headline ?? []).map((kpi) => (
               <div key={kpi.key} className="space-y-2 bg-surface p-5">
                 <dt className="micro-label">{kpi.label}</dt>

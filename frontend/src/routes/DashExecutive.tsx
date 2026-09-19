@@ -125,7 +125,7 @@ export default function DashExecutive() {
             variants={listVariants(reduce)}
             initial="initial"
             animate="animate"
-            className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3"
+            className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1"
           >
             {data.kpis.map((kpi) => {
               const target = KPI_TARGET[kpi.key]

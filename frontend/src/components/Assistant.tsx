@@ -16,7 +16,9 @@ import {
   type AssistantReply,
 } from '../lib/api'
 import { cn } from '../lib/cn'
+import { useT } from '../lib/i18n'
 import { EASE } from '../lib/motion'
+import { clampOffset, useDraggableCorner } from '../lib/useDraggableCorner'
 
 /**
  * The floating assistant, docked bottom-right on every screen.
@@ -257,6 +259,14 @@ function IconMic({ className }: { className?: string }) {
   )
 }
 
+/** The open panel shares the launcher's corner, pulled back inside the
+ *  viewport where the launcher's spot would push it off. */
+function panelOffset(offset: { right: number; bottom: number }) {
+  const width = Math.min(384, window.innerWidth - 40)
+  const height = Math.min(640, window.innerHeight - 40)
+  return clampOffset(offset, { width, height })
+}
+
 export function Assistant() {
   const [initial] = useState(loadState)
   const [open, setOpen] = useState(initial.open)
@@ -299,7 +309,12 @@ export function Assistant() {
   const voicesRef = useRef<SpeechSynthesisVoice[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
-  const launcherRef = useRef<HTMLButtonElement>(null)
+  const launcherRef = useRef<HTMLButtonElement | null>(null)
+  const t = useT()
+  // Where the launcher sits is the person's choice, kept on this device
+  // (§ the launcher covers whatever is bottom-right on a phone).
+  const corner = useDraggableCorner('saman.assistant.pos', { right: 20, bottom: 20 })
+  const dragEnded = useRef(false)
   const counter = useRef(initial.turns.reduce((max, t) => Math.max(max, t.id), 0))
   const navigate = useNavigate()
   // A visitor's action carries the screen to open after sign-in; the
@@ -857,23 +872,44 @@ export function Assistant() {
   return (
     <>
       <button
-        ref={launcherRef}
+        ref={(el) => {
+          launcherRef.current = el
+          corner.ref.current = el
+        }}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onPointerDown={corner.onPointerDown}
+        onPointerMove={corner.onPointerMove}
+        onPointerUp={(event) => {
+          dragEnded.current = corner.onPointerUp(event)
+        }}
+        onPointerCancel={(event) => {
+          dragEnded.current = corner.onPointerUp(event)
+        }}
+        onClick={() => {
+          // A drag ends with a click event too; only a tap opens the panel.
+          if (dragEnded.current) {
+            dragEnded.current = false
+            return
+          }
+          setOpen((o) => !o)
+        }}
         aria-expanded={open}
         aria-controls="saman-assistant"
         aria-label={open ? 'Close the assistant' : 'Ask SAMAN'}
+        title="Ask SAMAN · drag to move it"
+        style={{ right: corner.offset.right, bottom: corner.offset.bottom, touchAction: 'none' }}
         className={cn(
-          'no-print fixed bottom-5 right-5 z-40 flex h-12 items-center gap-2 rounded-full border border-hairline',
-          'bg-bg pl-2 pr-4 text-sm font-medium text-ink shadow-sm transition-opacity duration-150',
-          'hover:bg-surface',
+          'no-print fixed z-20 flex h-12 items-center gap-2 rounded-full border border-hairline',
+          'bg-bg pl-2 pr-2 text-sm font-medium text-ink shadow-sm transition-opacity duration-150 sm:pr-4',
+          'select-none hover:bg-surface',
+          corner.dragging ? 'cursor-grabbing shadow-md' : 'cursor-grab',
           open && 'pointer-events-none opacity-0',
         )}
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-inverse text-bg">
           <AssistantMark className="h-5 w-5" />
         </span>
-        Ask SAMAN
+        <span className="hidden sm:inline">{t('Ask SAMAN')}</span>
       </button>
 
       <AnimatePresence>
@@ -885,8 +921,9 @@ export function Assistant() {
             initial={{ opacity: 0, y: reduce ? 0 : 16, scale: reduce ? 1 : 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: EASE } }}
             exit={{ opacity: 0, y: reduce ? 0 : 12, transition: { duration: 0.14 } }}
+            style={panelOffset(corner.offset)}
             className={cn(
-              'no-print fixed bottom-5 right-5 z-50 flex max-h-[min(40rem,calc(100vh-2.5rem))] w-[min(24rem,calc(100vw-2.5rem))] flex-col',
+              'no-print fixed z-50 flex max-h-[min(40rem,calc(100vh-2.5rem))] w-[min(24rem,calc(100vw-2.5rem))] flex-col',
               'overflow-hidden rounded-2xl border border-hairline bg-bg text-ink shadow-sm',
             )}
           >

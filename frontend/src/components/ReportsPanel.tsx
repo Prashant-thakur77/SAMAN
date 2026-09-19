@@ -133,7 +133,7 @@ export function ReportsSection() {
                       value={draft}
                       aria-label={`Contact email for ${row.code}`}
                       placeholder="materials@cpse.in"
-                      className="h-8 max-w-[16rem] font-mono text-xs"
+                      className="h-8 min-w-[11rem] max-w-[16rem] font-mono text-xs"
                       onChange={(e) => setDrafts({ ...drafts, [row.code]: e.target.value })}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && dirty)

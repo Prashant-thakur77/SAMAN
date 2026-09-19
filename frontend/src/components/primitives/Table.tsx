@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
 import { cn } from '../../lib/cn'
 import { downloadCsv, tableToCsv } from '../../lib/csv'
@@ -24,8 +24,18 @@ export function Table({
   exportAs?: string
 }) {
   const ref = useRef<HTMLTableElement>(null)
+  const scroller = useRef<HTMLDivElement>(null)
+  const scrolls = useScrollsSideways(scroller)
   return (
-    <div className={cn('relative', exportAs && 'pt-6')}>
+    <div className={cn('relative', (exportAs || scrolls) && 'pt-6')}>
+      {scrolls && (
+        <span
+          className="no-print absolute left-0 top-0 font-mono text-[11px] text-muted"
+          aria-hidden
+        >
+          scrolls sideways →
+        </span>
+      )}
       {exportAs && (
         <button
           type="button"
@@ -36,13 +46,31 @@ export function Table({
           CSV ↓
         </button>
       )}
-      <div className={cn('card w-full overflow-x-auto', className)}>
-        <table ref={ref} className="w-full border-collapse text-sm">
+      <div ref={scroller} className={cn('card w-full overflow-x-auto', className)}>
+        <table ref={ref} className="data-table w-full border-collapse text-sm">
           {children}
         </table>
       </div>
     </div>
   )
+}
+
+/** True while the table is wider than its card, so a phone is told the
+ *  table scrolls rather than left to discover it. */
+function useScrollsSideways(ref: RefObject<HTMLDivElement>): boolean {
+  const [scrolls, setScrolls] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const check = () => setScrolls(el.scrollWidth > el.clientWidth + 1)
+    check()
+    const observer = new ResizeObserver(check)
+    observer.observe(el)
+    const table = el.firstElementChild
+    if (table) observer.observe(table)
+    return () => observer.disconnect()
+  }, [ref])
+  return scrolls
 }
 
 export function THead({ children }: { children: ReactNode }) {

@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 
 import { ApiError, getItem, type ItemDetail } from '../lib/api'
@@ -56,7 +57,11 @@ export function ItemDrawer({ itemId, onClose }: { itemId: number | null; onClose
     }
   }, [itemId, onClose])
 
-  return (
+  // Rendered at the body, not where it is declared: a route's `space-y`
+  // otherwise hands the fixed wrapper a top margin and the drawer opens
+  // 32px short of the screen edge, and any animated ancestor would become
+  // its containing block.
+  return createPortal(
     <AnimatePresence>
       {itemId !== null && (
         <div className="fixed inset-0 z-40 flex justify-end">
@@ -123,6 +128,7 @@ export function ItemDrawer({ itemId, onClose }: { itemId: number | null; onClose
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
