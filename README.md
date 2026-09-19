@@ -1355,6 +1355,16 @@ who each screen is for and what a deployment would still need, and in
 [`docs/REFINEMENT_PLAN.md`](docs/REFINEMENT_PLAN.md), four stages with gates,
 items and effort against every capability in the problem statement.
 
+The storekeeper's real daily job is the **stock count**, so the screen has a
+count mode: pick the plant, scan the bin label or the part, type what is on
+the shelf, *Record & next*. Each line records the counted quantity beside what
+the system held at that moment and the variance, under a session that groups
+one walk through the store; the stock table is never changed by a count, and
+the walk downloads as CSV for reconciliation. A shelf label can be **bound**
+to the material it holds once (`POST /api/scan/bins`), after which scanning
+the bin answers with the material, its stock here and elsewhere, whether or
+not the part carries a code; rebinding replaces and is audited.
+
 On the shelf floor the screen keeps a list of the last scans on that device,
 turns the phone's torch on where the browser allows it (Chrome on Android;
 iOS shows no button), and carries a **Wrong item?** link under every result:

@@ -54,7 +54,7 @@ from .visibility import Scope
 #: How a code was resolved, in the order it is tried. An equipment tag comes
 #: last: tags are plant-local ("P-101B" exists at three CPSEs) and short, so a
 #: material's own keys must have their say first.
-METHODS = ("cnmc", "legacy_code", "gtin", "mpn", "equipment_tag")
+METHODS = ("cnmc", "legacy_code", "gtin", "mpn", "bin", "equipment_tag")
 
 #: A scanned string longer than this is not a code; it is a description, and
 #: Smart-Create is the place for it.
@@ -106,6 +106,23 @@ def lookup(db: Session, code: str, scope: Scope) -> dict:
         hits = db.execute(select(Item.id).where(Item.mpn_norm == mpn)).scalars().all()
         if hits:
             return _found(db, raw, "mpn", _clusters_of(db, hits), scope, hits)
+
+    # A bin label this CPSE bound to a material (stocktake.bind): the shelf
+    # answers even when the part in it carries no code of its own.
+    if scope.cpse_code:
+        from .models import BinBinding
+
+        bound = (
+            db.execute(
+                select(BinBinding)
+                .join(Cpse, Cpse.id == BinBinding.cpse_id)
+                .where(Cpse.code == scope.cpse_code, func.upper(BinBinding.bin_code) == upper)
+            )
+            .scalars()
+            .first()
+        )
+        if bound is not None:
+            return _found(db, raw, "bin", _clusters_of(db, [bound.item_id]), scope, [bound.item_id])
 
     equipment = (
         db.execute(select(Equipment).where(func.upper(Equipment.tag) == upper)).scalars().all()
@@ -213,6 +230,7 @@ _METHOD_NAMES = {
     "legacy_code": "a CPSE's own material code",
     "gtin": "the GTIN",
     "mpn": "the manufacturer's part number",
+    "bin": "a bin label bound to this material",
 }
 
 

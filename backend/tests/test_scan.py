@@ -224,3 +224,87 @@ class TestWrongItemReport:
 
     def test_a_visitor_cannot_report(self, client, pipeline_run):
         assert client.post("/api/scan/report", json={"code": "X"}).status_code == 401
+
+
+class TestStockTake:
+    """Scan, count, next: what the shelf said beside what the system said."""
+
+    def _own_row(self, db):
+        from app.models import Cpse, Item, RawItem, Stock
+
+        return db.execute(
+            select(RawItem.legacy_code, Stock.plant, Stock.qty_on_hand, Item.id)
+            .join(Item, Item.raw_item_id == RawItem.id)
+            .join(Stock, Stock.item_id == Item.id)
+            .join(Cpse, Cpse.id == RawItem.cpse_id)
+            .where(Cpse.code == "CPCL", Stock.qty_on_hand > 0)
+            .limit(1)
+        ).first()
+
+    def test_a_count_records_the_variance_and_changes_no_stock(self, as_steward, db, pipeline_run):
+        from app.models import AuditEvent, Stock
+
+        legacy, plant, qty, item_id = self._own_row(db)
+        stock_before = db.execute(select(func.sum(Stock.qty_on_hand))).scalar()
+        plants = as_steward.get("/api/scan/plants").json()["plants"]
+        assert plant in plants
+        response = as_steward.post(
+            "/api/scan/count",
+            json={"session_id": "walk-1", "code": legacy, "counted_qty": qty + 2, "plant": plant},
+        )
+        assert response.status_code == 200, response.text
+        line = response.json()
+        assert line["matched_by"] == "legacy_code" and line["system_qty"] is not None
+        assert line["variance"] == pytest.approx(qty + 2 - line["system_qty"])
+        db.expire_all()
+        assert db.execute(select(func.sum(Stock.qty_on_hand))).scalar() == stock_before
+        assert (
+            db.execute(select(AuditEvent).where(AuditEvent.action == "stock.count"))
+            .scalars()
+            .first()
+            is not None
+        )
+
+        session = as_steward.get("/api/scan/count/walk-1").json()
+        assert session["totals"]["lines"] == 1 and session["totals"]["over"] == 1
+        assert session["lines"][0]["description"]
+
+    def test_a_bound_bin_answers_with_its_material(self, as_steward, db, pipeline_run):
+        legacy, plant, qty, item_id = self._own_row(db)
+        bound = as_steward.post(
+            "/api/scan/bins", json={"plant": plant, "bin_code": "A-04-17", "code": legacy}
+        )
+        assert bound.status_code == 200, bound.text
+        assert bound.json()["item_id"] and bound.json()["replaced"] is False
+        # The ordinary lookup resolves the bin label now.
+        found = as_steward.get("/api/scan/lookup?code=A-04-17").json()
+        assert found["matched_by"] == "bin" and found["materials"]
+        # And a count against the bin needs no code on the part.
+        line = as_steward.post(
+            "/api/scan/count",
+            json={"session_id": "walk-2", "code": "a-04-17", "counted_qty": 0, "plant": plant},
+        ).json()
+        assert line["matched_by"] == "bin" and line["bin_code"] == "A-04-17"
+        assert any(
+            b["bin_code"] == "A-04-17" for b in as_steward.get("/api/scan/bins").json()["bins"]
+        )
+        # Rebinding replaces, and says so.
+        again = as_steward.post(
+            "/api/scan/bins", json={"plant": plant, "bin_code": "A-04-17", "code": legacy}
+        ).json()
+        assert again["replaced"] is True
+
+    def test_an_unknown_code_cannot_be_counted(self, as_steward, db, pipeline_run):
+        plant = self._own_row(db)[1]
+        response = as_steward.post(
+            "/api/scan/count",
+            json={"session_id": "walk-3", "code": "NOPE-1", "counted_qty": 1, "plant": plant},
+        )
+        assert response.status_code == 404 and "bind the bin" in response.json()["detail"]
+
+    def test_a_registrar_without_a_cpse_cannot_count(self, as_registrar, pipeline_run):
+        response = as_registrar.post(
+            "/api/scan/count",
+            json={"session_id": "walk-4", "code": "X", "counted_qty": 1, "plant": "MANALI"},
+        )
+        assert response.status_code == 403

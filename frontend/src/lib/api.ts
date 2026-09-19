@@ -1673,7 +1673,7 @@ export type ScanEquipment = {
 export type ScanResult = {
   query: string
   /** How the code resolved, in the order the server tries them. */
-  matched_by: 'cnmc' | 'legacy_code' | 'gtin' | 'mpn' | 'equipment_tag' | null
+  matched_by: 'cnmc' | 'legacy_code' | 'gtin' | 'mpn' | 'bin' | 'equipment_tag' | null
   /** What was tried when nothing matched; 'cnmc' means the check digit failed. */
   tried: string | null
   /** 0, 1, or several (a part number shared by variants). */
@@ -1694,6 +1694,65 @@ export const scanLookup = (code: string) =>
   api.get<ScanResult>('/scan/lookup?code=' + encodeURIComponent(code))
 
 /** "Wrong item?": the scan resolved, but the part in hand is not the one on screen. */
+// ---- stock take: scan, count, next; bins bound to materials ----
+
+export type CountLine = {
+  id: number
+  counted_at: string
+  plant: string
+  bin_code: string | null
+  code: string
+  matched_by: string | null
+  cluster_id: number | null
+  item_id: number | null
+  legacy_code: string | null
+  description: string | null
+  cpse: string | null
+  counted_qty: number
+  system_qty: number | null
+  variance: number | null
+  note: string | null
+}
+
+export type CountSession = {
+  session_id: string
+  lines: CountLine[]
+  totals: {
+    lines: number
+    counted: number
+    system: number
+    over: number
+    short: number
+    exact: number
+    unknown_to_system: number
+  }
+  note: string
+}
+
+export const getPlants = () => api.get<{ plants: string[]; note?: string }>('/scan/plants')
+export const postCount = (body: {
+  session_id: string
+  code: string
+  counted_qty: number
+  plant: string
+  bin_code?: string
+  note?: string
+}) => api.post<CountLine>('/scan/count', body)
+export const getCountSession = (id: string) =>
+  api.get<CountSession>(`/scan/count/${encodeURIComponent(id)}`)
+
+export type BinRow = {
+  bin_code: string
+  plant: string
+  cluster_id: number | null
+  item_id: number
+  legacy_code: string | null
+  description: string | null
+  replaced?: boolean
+}
+export const bindBin = (body: { plant: string; bin_code: string; code: string }) =>
+  api.post<BinRow>('/scan/bins', body)
+
 export const reportWrongItem = (body: {
   code: string
   matched_by?: string | null

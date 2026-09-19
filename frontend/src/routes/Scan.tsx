@@ -8,15 +8,21 @@ import { EmptyState } from '../components/primitives/EmptyState'
 import { Input } from '../components/primitives/Field'
 import {
   ApiError,
+  bindBin,
+  getCountSession,
+  getPlants,
+  postCount,
   reportWrongItem,
   scanLookup,
   smartCreateScan,
+  type CountSession,
   type ScanEquipment,
   type ScanMaterial,
   type ScanResult,
   type ScanSubstitute,
 } from '../lib/api'
 import { cn } from '../lib/cn'
+import { downloadCsv, rowsToCsv } from '../lib/csv'
 import { useHealth } from '../lib/useHealth'
 import { useSession } from '../lib/session'
 
@@ -63,6 +69,23 @@ function labelFor(result: ScanResult): string | null {
   return m.cnmc ?? m.std_description ?? m.members[0]?.description ?? null
 }
 
+/** One walk through the store: a session id kept on the device until "New walk". */
+const SESSION_KEY = 'saman.scan.count-session'
+
+function newSession(): string {
+  const d = new Date()
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
+  return `walk-${stamp}`
+}
+
+function readSession(): string {
+  try {
+    return localStorage.getItem(SESSION_KEY) || newSession()
+  } catch {
+    return newSession()
+  }
+}
+
 export default function Scan() {
   const [code, setCode] = useState('')
   const [result, setResult] = useState<ScanResult | null>(null)
@@ -70,7 +93,33 @@ export default function Scan() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [history, setHistory] = useState<ScanRecord[]>(() => readHistory())
+  // Stock-count mode: the storekeeper's real daily job. Scan, count, next.
+  const [mode, setMode] = useState<'lookup' | 'count'>('lookup')
+  const [plants, setPlants] = useState<string[]>([])
+  const [plant, setPlant] = useState('')
+  const [session, setSession] = useState(() => readSession())
+  const [walk, setWalk] = useState<CountSession | null>(null)
   const field = useRef<HTMLInputElement>(null)
+  const { user: me } = useSession()
+
+  useEffect(() => {
+    if (!me?.cpse_code) return
+    getPlants()
+      .then((r) => {
+        setPlants(r.plants)
+        setPlant((p) => p || r.plants[0] || '')
+      })
+      .catch(() => setPlants([]))
+  }, [me?.cpse_code])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SESSION_KEY, session)
+    } catch {
+      /* the walk still counts */
+    }
+    if (mode === 'count') getCountSession(session).then(setWalk).catch(() => setWalk(null))
+  }, [session, mode])
 
   const lookup = useCallback(async (raw: string) => {
     const query = raw.trim()
@@ -109,11 +158,14 @@ export default function Scan() {
   // keeps focus with its text selected, so the next scan replaces the last.
   useEffect(() => {
     if (!result && !error) return
+    // In a stock count the answer is followed by a quantity, so the count
+    // bar takes focus instead; the code field gets it back after "Record".
+    if (mode === 'count' && result && result.materials.length > 0) return
     const el = field.current
     if (!el) return
     el.focus()
     el.select()
-  }, [result, error])
+  }, [result, error, mode])
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -140,10 +192,56 @@ export default function Scan() {
         description="What is this part, do we already hold it under any name in any CPSE, and what is its national code. A barcode, a bin label, a GTIN or a part number all resolve here."
       />
 
+      {me?.cpse_code && (
+        <div className="flex flex-wrap items-center gap-2">
+          {(['lookup', 'count'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              onClick={() => setMode(m)}
+              className={cn(
+                'h-9 rounded-full border px-4 text-sm',
+                mode === m ? 'border-inverse bg-inverse text-bg' : 'border-hairline text-muted hover:text-ink',
+              )}
+            >
+              {m === 'lookup' ? 'Look up' : 'Stock count'}
+            </button>
+          ))}
+          {mode === 'count' && (
+            <>
+              <select
+                aria-label="Plant"
+                value={plant}
+                onChange={(e) => setPlant(e.target.value)}
+                className="h-9 rounded-full border border-hairline bg-surface px-3 text-sm"
+              >
+                {plants.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <span className="font-mono text-xs text-muted">{session}</span>
+              <button
+                type="button"
+                className="text-xs text-muted underline-offset-2 hover:underline"
+                onClick={() => {
+                  setSession(newSession())
+                  setWalk(null)
+                }}
+              >
+                new walk
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <section className="space-y-4 card p-4 sm:p-6">
         <form onSubmit={submit} className="space-y-2">
           <label htmlFor="scan-code" className="micro-label block">
-            Code
+            {mode === 'count' ? 'Scan the bin label or the part' : 'Code'}
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
@@ -187,6 +285,21 @@ export default function Scan() {
         </p>
       )}
 
+      {result && mode === 'count' && result.materials.length > 0 && plant && (
+        <CountBar
+          key={result.query}
+          result={result}
+          chosen={chosen}
+          plant={plant}
+          session={session}
+          disabled={busy}
+          onRecorded={(next) => {
+            setWalk(next)
+            scanAgain()
+          }}
+        />
+      )}
+
       {result && (
         <>
           <ScanOutcome
@@ -199,7 +312,69 @@ export default function Scan() {
           {(result.materials.length > 0 || result.equipment.length > 0) && (
             <WrongItem result={result} chosen={chosen} />
           )}
+          {mode === 'count' && result.materials.length > 0 && plant && (
+            <BindBin result={result} plant={plant} />
+          )}
         </>
+      )}
+
+      {mode === 'count' && walk && walk.lines.length > 0 && (
+        <section className="space-y-2" aria-label="This walk">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="micro-label">This walk · {walk.totals.lines} lines</h2>
+            <p className="font-mono text-xs text-muted">
+              {walk.totals.exact} exact · {walk.totals.over} over · {walk.totals.short} short
+              {walk.totals.unknown_to_system > 0 && ` · ${walk.totals.unknown_to_system} not in the system here`}
+              {' · '}
+              <button
+                type="button"
+                className="underline-offset-2 hover:text-ink hover:underline"
+                title="This walk's lines with their variances, as a CSV file for reconciliation"
+                onClick={() =>
+                  downloadCsv(
+                    walk.session_id,
+                    rowsToCsv(
+                      walk.lines.map((l) => ({
+                        counted_at: l.counted_at,
+                        plant: l.plant,
+                        bin: l.bin_code ?? '',
+                        code: l.code,
+                        legacy_code: l.legacy_code ?? '',
+                        description: l.description ?? '',
+                        counted: l.counted_qty,
+                        system: l.system_qty ?? '',
+                        variance: l.variance ?? '',
+                        note: l.note ?? '',
+                      })),
+                    ),
+                  )
+                }
+              >
+                CSV ↓
+              </button>
+            </p>
+          </div>
+          <ul className="card divide-y divide-hairline">
+            {[...walk.lines].reverse().map((line) => (
+              <li key={line.id} className="flex items-center gap-3 px-4 py-2 text-sm">
+                <span className="font-mono text-xs">{line.bin_code ?? line.code}</span>
+                <span className="min-w-0 flex-1 truncate text-muted">{line.description ?? line.legacy_code}</span>
+                <span className="font-mono text-xs tabular-nums">
+                  {line.counted_qty} / {line.system_qty ?? '—'}
+                </span>
+                <span
+                  className={cn(
+                    'w-14 text-right font-mono text-xs tabular-nums',
+                    line.variance === null ? 'text-muted' : line.variance === 0 ? 'text-ok' : 'text-danger',
+                  )}
+                >
+                  {line.variance === null ? '?' : line.variance > 0 ? `+${line.variance}` : line.variance}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted">{walk.note}</p>
+        </section>
       )}
 
       {!result && history.length > 0 && (
@@ -439,6 +614,7 @@ const METHOD_NAMES: Record<NonNullable<ScanResult['matched_by']>, string> = {
   legacy_code: "a CPSE's own material code",
   gtin: 'the GTIN',
   mpn: "the manufacturer's part number",
+  bin: 'a bin label bound to this material',
   equipment_tag: 'the equipment tag',
 }
 
@@ -1336,4 +1512,168 @@ async function prepare(file: File): Promise<Blob | File> {
   } catch {
     return file
   }
+}
+
+
+/** Scan, count, next: the counted quantity beside what the system holds here. */
+function CountBar({
+  result,
+  chosen,
+  plant,
+  session,
+  disabled = false,
+  onRecorded,
+}: {
+  result: ScanResult
+  chosen: number | null
+  plant: string
+  session: string
+  /** A lookup is in flight: the bar belongs to the previous scan until it lands. */
+  disabled?: boolean
+  onRecorded: (walk: CountSession) => void
+}) {
+  const [qty, setQty] = useState('')
+  const [state, setState] = useState<'idle' | 'sending' | 'failed'>('idle')
+  const [message, setMessage] = useState<string | null>(null)
+  const box = useRef<HTMLInputElement>(null)
+  const material = result.materials[chosen ?? 0]
+  const { user } = useSession()
+  const here = (material?.stock?.positions ?? []).filter(
+    (p) => p.cpse === user?.cpse_code && p.plant === plant,
+  )
+  const systemQty = here.reduce((sum, p) => sum + p.qty_on_hand, 0)
+
+  // Keyed by the scanned code, so a new scan is a fresh bar; this only
+  // moves focus to the quantity once the bar is on screen.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => box.current?.focus())
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  if (result.materials.length > 1 && chosen === null) {
+    return (
+      <p className="text-sm text-muted">Several materials share this code; choose one below to count it.</p>
+    )
+  }
+
+  const record = async () => {
+    const n = Number(qty)
+    if (disabled || !Number.isFinite(n) || n < 0) return
+    setState('sending')
+    try {
+      await postCount({ session_id: session, code: result.query, counted_qty: n, plant })
+      onRecorded(await getCountSession(session))
+    } catch (err) {
+      setState('failed')
+      setMessage(err instanceof ApiError ? err.message : 'The count could not be recorded.')
+    }
+  }
+
+  return (
+    <section className="card space-y-3 p-4" aria-label="Count">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm">
+          <span className="micro-label mr-2">system says</span>
+          <span className="font-mono text-lg">{here.length ? systemQty : '—'}</span>
+          <span className="ml-2 text-xs text-muted">
+            at {plant}
+            {!here.length && ' (no position here)'}
+          </span>
+        </p>
+        {result.matched_by === 'bin' && (
+          <span className="micro-label" data-testid="count-bin">
+            bin {result.query}
+          </span>
+        )}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          void record()
+        }}
+        className="flex flex-col gap-2 sm:flex-row"
+      >
+        <Input
+          ref={box}
+          aria-label="Counted quantity"
+          inputMode="decimal"
+          placeholder="Counted quantity"
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+          className="h-12 font-mono text-lg"
+        />
+        <Button
+          type="submit"
+          variant="primary"
+          className="h-12 shrink-0 sm:px-6"
+          disabled={disabled || state === 'sending' || qty === ''}
+        >
+          {state === 'sending' ? 'Recording…' : 'Record & next'}
+        </Button>
+      </form>
+      {state === 'failed' && <p className="text-sm text-danger">{message}</p>}
+    </section>
+  )
+}
+
+/** "This bin holds this material": bind the shelf's own label once. */
+function BindBin({ result, plant }: { result: ScanResult; plant: string }) {
+  const [open, setOpen] = useState(false)
+  const [bin, setBin] = useState('')
+  const [message, setMessage] = useState<string | null>(null)
+  useEffect(() => {
+    setOpen(false)
+    setBin('')
+    setMessage(null)
+  }, [result])
+  if (result.matched_by === 'bin' || result.materials.length !== 1) return null
+  const bind = async () => {
+    try {
+      const row = await bindBin({ plant, bin_code: bin.trim(), code: result.query })
+      setMessage(
+        `Bin ${row.bin_code} at ${plant} now answers with ${row.legacy_code ?? 'this material'}${row.replaced ? ' (replaced an earlier binding)' : ''}.`,
+      )
+      setOpen(false)
+    } catch (err) {
+      setMessage(err instanceof ApiError ? err.message : 'The bin could not be bound.')
+    }
+  }
+  return (
+    <div className="space-y-2">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="h-11 text-sm text-muted underline underline-offset-4 hover:text-ink"
+        >
+          Bind a bin label to this material
+        </button>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void bind()
+          }}
+          className="flex flex-col gap-2 sm:flex-row"
+        >
+          <Input
+            aria-label="Bin label"
+            placeholder="Bin label, e.g. A-04-17"
+            value={bin}
+            onChange={(e) => setBin(e.target.value)}
+            className="h-11 font-mono"
+            autoFocus
+          />
+          <Button type="submit" variant="secondary" className="h-11" disabled={!bin.trim()}>
+            Bind at {plant}
+          </Button>
+        </form>
+      )}
+      {message && (
+        <p role="status" className="text-sm text-muted">
+          {message}
+        </p>
+      )}
+    </div>
+  )
 }

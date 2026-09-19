@@ -409,6 +409,53 @@ class MigrationChange(Base):
     state: Mapped[str] = mapped_column(String(16), default="planned")  # applied|held|rolled_back
 
 
+class BinBinding(Base):
+    """ "This bin holds this material": a shelf label bound to a cluster (§5).
+
+    A storekeeper scans the bin's own label once and binds it; from then on
+    scanning the bin answers with the material, its stock here and elsewhere,
+    without the part in hand carrying any code at all. One binding per bin
+    per plant; rebinding replaces it and the old one is on the audit chain.
+    """
+
+    __tablename__ = "bin_binding"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cpse_id: Mapped[int] = mapped_column(ForeignKey("cpse.id"), index=True)
+    plant: Mapped[str] = mapped_column(String(32))
+    bin_code: Mapped[str] = mapped_column(String(64), index=True)
+    cluster_id: Mapped[int | None] = mapped_column(ForeignKey("cluster.id"), nullable=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("item.id"))
+    bound_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    bound_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class StockCount(Base):
+    """One counted line of a stock take: scan, count, next (§5).
+
+    The system quantity is copied at count time so the variance stands even
+    after the position moves. A session groups the lines of one walk through
+    the store; the count never changes the stock table, it records what the
+    shelf said beside what the system said, for a person to reconcile.
+    """
+
+    __tablename__ = "stock_count"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    counted_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    counted_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    cpse_id: Mapped[int] = mapped_column(ForeignKey("cpse.id"), index=True)
+    plant: Mapped[str] = mapped_column(String(32))
+    bin_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    code: Mapped[str] = mapped_column(String(64))
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("item.id"), nullable=True)
+    cluster_id: Mapped[int | None] = mapped_column(ForeignKey("cluster.id"), nullable=True)
+    counted_qty: Mapped[float] = mapped_column(Float)
+    system_qty: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class IssuePolicy(Base):
     """Per-family permission for codes to issue on their own (`autoissue`).
 
