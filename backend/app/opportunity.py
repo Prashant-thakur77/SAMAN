@@ -318,24 +318,42 @@ def price_variance(
 
 
 def vendor_overlap(db: Session, limit: int = 15) -> dict:
-    """Several CPSEs buying one item from different vendors (§9A d)."""
-    grouped = _group(load_purchases(db))
+    """Several CPSEs buying one item from different vendors (§9A d).
+
+    Vendors are grouped by `vendors.vendor_key`, so "SKF INDIA LTD" and "SKF
+    India Limited" are one supplier; the spelling shown is the one the
+    catalogues use most, and the spellings folded into it are listed.
+    """
+    from .vendors import canonical_names, vendor_key
+
+    purchases_all = load_purchases(db)
+    grouped = _group(purchases_all)
+    shown = canonical_names([p.vendor for p in purchases_all if p.vendor])
     rows = []
+    folded_total = 0
     for cluster_id, purchases in grouped.items():
         vendors: dict[str, set[str]] = {}
+        spellings: dict[str, set[str]] = {}
         for purchase in purchases:
-            vendors.setdefault(purchase.vendor, set()).add(purchase.cpse)
+            key = vendor_key(purchase.vendor) or (purchase.vendor or "")
+            vendors.setdefault(key, set()).add(purchase.cpse)
+            spellings.setdefault(key, set()).add((purchase.vendor or "").strip())
         cpses = {p.cpse for p in purchases}
         if len(cpses) < 2 or len(vendors) < 2:
             continue
+        folded_total += sum(len(v) - 1 for v in spellings.values())
         rows.append(
             {
                 "cluster_id": cluster_id,
                 "cpse_count": len(cpses),
                 "vendor_count": len(vendors),
                 "vendors": [
-                    {"vendor": vendor, "cpses": sorted(buyers)}
-                    for vendor, buyers in sorted(vendors.items())
+                    {
+                        "vendor": shown.get(key, key),
+                        "cpses": sorted(buyers),
+                        "also_spelt": sorted(spellings[key] - {shown.get(key, key)}),
+                    }
+                    for key, buyers in sorted(vendors.items())
                 ],
             }
         )
@@ -345,8 +363,12 @@ def vendor_overlap(db: Session, limit: int = 15) -> dict:
     for row in top:
         row.update(described.get(row["cluster_id"], {}))
     return {
-        "note": "The same material bought from different vendors by different CPSEs.",
+        "note": (
+            "The same material bought from different vendors by different CPSEs. "
+            "Vendor names are grouped by company, not by spelling."
+        ),
         "items_found": len(rows),
+        "spellings_folded": folded_total,
         "rows": top,
     }
 

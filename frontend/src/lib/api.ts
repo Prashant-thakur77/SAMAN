@@ -969,8 +969,18 @@ export type OpportunityDashboard = {
     }[]
   }
   vendor_overlap: {
+    note: string
     items_found: number
-    rows: { cluster_id: number; description?: string; vendor_count: number; cpse_count: number }[]
+    /** Spellings folded into one company across the rows shown ("SKF INDIA LTD" + "SKF India Limited"). */
+    spellings_folded: number
+    rows: {
+      cluster_id: number
+      description?: string
+      cnmc?: string | null
+      vendor_count: number
+      cpse_count: number
+      vendors: { vendor: string; cpses: string[]; also_spelt: string[] }[]
+    }[]
   }
   inventory: {
     transfers: {

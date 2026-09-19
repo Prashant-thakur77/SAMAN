@@ -1432,7 +1432,7 @@ are kept honest; partial is marked partial.
 | Inventory optimization & visibility | consolidated stock, transfer suggestions, dead stock | **Done.** one position across 11,778 rows; 30 transfer suggestions avoiding ₹19.3 Cr of purchase, 2,028 dead-stock materials worth ₹1,538 Cr |
 | Inter-CPSE collaboration | sharing engine + joint tenders | **Done.** 1,830 joint-tender candidates across two or more CPSEs, ₹233 Cr of identified saving under a stated 60% capture assumption |
 | Faster procurement/specification finalization | Smart-Create (`app/smart_create.py`, `/smart-create`) + §2D specs | **Done.** the same matcher and veto layer run before a code is raised; overrides need a reason and are audited. Camera input reads a material's marking into the same check (0.967 on a clean plate, held out) |
-| Foundation for strategic sourcing | vendor overlap + combined-volume analysis | **Done.** combined volume plus vendor overlap on 1,681 materials bought from different vendors by different CPSEs |
+| Foundation for strategic sourcing | vendor overlap + combined-volume analysis; the Vendors tab of the Opportunity dashboard | **Done.** combined volume plus vendor overlap on ~1,600 materials bought from different vendors by different CPSEs; vendor names grouped by company, not spelling (`app/vendors.py`) |
 
 ---
 

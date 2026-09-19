@@ -13,6 +13,7 @@ import { cn } from '../lib/cn'
 const TABS = [
   { key: 'tenders', label: 'Joint tenders' },
   { key: 'variance', label: 'Price variance' },
+  { key: 'vendors', label: 'Vendors' },
   { key: 'inventory', label: 'Inventory sharing' },
 ] as const
 
@@ -239,6 +240,53 @@ export default function DashOpportunity() {
                   <TD mono>
                     {row.highest.cpse}{' '}
                     {row.highest.unit_price === null ? '—' : formatRupees(row.highest.unit_price)}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </section>
+      )}
+
+      {tab === 'vendors' && (
+        <section className="space-y-4">
+          <p className="text-sm text-muted">
+            {data.vendor_overlap.note} {data.vendor_overlap.items_found.toLocaleString('en-IN')} materials
+            are bought from different vendors by different CPSEs
+            {data.vendor_overlap.spellings_folded > 0 &&
+              `; ${data.vendor_overlap.spellings_folded} vendor spellings were folded into their companies`}
+            . The foundation for strategic sourcing: one material, several suppliers, one combined volume to
+            negotiate with.
+          </p>
+          <Table exportAs="vendor-overlap">
+            <THead>
+              <TH>Material</TH>
+              <TH align="right">CPSEs</TH>
+              <TH align="right">Vendors</TH>
+              <TH>Who buys from whom</TH>
+            </THead>
+            <TBody>
+              {data.vendor_overlap.rows.map((row) => (
+                <TR key={row.cluster_id}>
+                  <TD>
+                    <Link to={`/clusters/${row.cluster_id}`} className="underline-offset-2 hover:underline">
+                      {row.description ?? `cluster ${row.cluster_id}`}
+                    </Link>
+                  </TD>
+                  <TD mono align="right">
+                    {row.cpse_count}
+                  </TD>
+                  <TD mono align="right">
+                    {row.vendor_count}
+                  </TD>
+                  <TD className="text-xs">
+                    {row.vendors.map((v) => (
+                      <span key={v.vendor} className="mr-3 inline-block" title={v.also_spelt.length ? `also spelt ${v.also_spelt.join(', ')}` : undefined}>
+                        <span className="font-medium">{v.vendor}</span>{' '}
+                        <span className="font-mono text-muted">{v.cpses.join(' ')}</span>
+                        {v.also_spelt.length > 0 && <span className="text-muted"> (+{v.also_spelt.length} spelling{v.also_spelt.length === 1 ? '' : 's'})</span>}
+                      </span>
+                    ))}
                   </TD>
                 </TR>
               ))}
