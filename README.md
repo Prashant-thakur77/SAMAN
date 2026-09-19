@@ -880,6 +880,14 @@ CPSE=CPCL SEND=1` delivers one. A weekly send from cron, Monday 07:00:
 0 7 * * 1  cd /opt/saman/backend && .venv/bin/python -m app.cli report --all --send >> /var/log/saman-report.log 2>&1
 ```
 
+The reader above the CPSEs gets the **ministry roll-up**
+(`/api/reports/rollup?format=html`, linked from the Administration page):
+every CPSE on one page, built from the same per-CPSE reports each company
+received so no figure can disagree with theirs. Coverage, review queue,
+quality rank and prevention are shown in full; each company's spend and
+attributable saving appear only as a quarter among its peers, never as a
+figure beside its name, while the estate's totals are exact.
+
 ### Codes that issue themselves, under policy
 
 Seven thousand policy confirmations are not a registrar's afternoon. Where the

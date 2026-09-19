@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import reports
-from ..auth import require_user
+from ..auth import require_roles, require_user
 from ..db import get_db
 from ..models import Cpse, User
 from ..visibility import UNRESTRICTED_ROLES, scope_for
@@ -134,3 +134,17 @@ def send_report(
         f"{result['path']}."
     )
     return result
+
+
+@router.get("/rollup", response_model=None)
+def rollup(
+    user: Annotated[User, Depends(require_roles(*UNRESTRICTED_ROLES, "approver"))],
+    format: str = Query(default="json", pattern="^(json|html)$"),
+    db: Session = Depends(get_db),
+) -> dict | HTMLResponse:
+    """Every CPSE on one page for the reader above them; each company's
+    money as a quarter among its peers, the estate's totals exact."""
+    doc = reports.rollup(db, scope_for(user))
+    if format == "html":
+        return HTMLResponse(reports.render_rollup_html(doc))
+    return doc

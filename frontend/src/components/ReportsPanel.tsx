@@ -5,6 +5,7 @@ import {
   getReports,
   patchCpse,
   reportHtmlUrl,
+  rollupHtmlUrl,
   sendReport,
   type ReportListing,
   type ReportSendResult,
@@ -80,7 +81,18 @@ export function ReportsSection() {
 
   return (
     <section className="space-y-4" data-testid="reports">
-      <h2 className="micro-label">Reports</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="micro-label">Reports</h2>
+        <a
+          href={rollupHtmlUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+          title="Every CPSE on one page for the reader above them; each company's money as a quarter among its peers, the estate's totals exact."
+        >
+          Ministry roll-up →
+        </a>
+      </div>
       <p className="max-w-prose text-sm text-muted">
         One document per CPSE: what the platform found in their catalogue and what it is worth
         to them, every figure from the database and redacted as their own steward would see it.

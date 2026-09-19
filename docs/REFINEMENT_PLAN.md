@@ -172,7 +172,7 @@ never a feeling.
 | One document per CPSE, computed from the database: catalogue size and coded share; duplicates inside their own catalogue with examples; duplicates shared with each other CPSE; pending reviews by band and decisions made; their quality scorecard row and the weakest rate; stock, dead stock, transfers where they are source or destination with only their side priced; joint tenders they are part of and the saving attributable to them at the stated capture; Smart-Create prevention by their users; a list of concrete next actions with the count behind each | done | A steward should not have to open six screens to know what SAMAN found in their catalogue |
 | Delivery by e-mail when SMTP is configured; otherwise an `.eml` written to an outbox, so an offline installation and the demo still produce the artefact; every send on the audit chain | done | Offline first, and a file a judge can open |
 | Preview and Send from the Admin page for any CPSE; a steward's own report from the Home page; a CLI and a weekly cron line | done | On demand and on schedule |
-| A ministry roll-up: the same report across CPSEs with per-CPSE attribution redacted to bands | next | The reader above the CPSE |
+| A ministry roll-up: the same report across CPSEs with per-CPSE attribution redacted to bands | done | The reader above the CPSE |
 
 ## Small add-ons judges ask about
 

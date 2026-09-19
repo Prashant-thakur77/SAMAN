@@ -407,3 +407,27 @@ class TestAdmin:
         assert len(written) == 2 and written[0].endswith(".html") and written[1].endswith(".json")
         assert str(html.name) in written[0]
         assert main(["report"]) == 2
+
+
+class TestMinistryRollup:
+    def test_every_cpse_on_one_page_with_money_in_bands(self, as_registrar, pipeline_run):
+        body = as_registrar.get("/api/reports/rollup").json()
+        assert body["kind"] == "rollup"
+        codes = [row["cpse"] for row in body["cpses"]]
+        assert len(codes) == body["totals"]["cpses"] >= 2
+        for row in body["cpses"]:
+            # Money never appears as a figure beside a name.
+            assert set(row) & {"spend_inr", "saving_inr", "estimated_saving_yours_inr"} == set()
+            assert row["spend_quarter"].endswith("quarter")
+            assert row["saving_quarter"].endswith("quarter")
+        assert body["totals"]["rows"] == sum(r["rows"] for r in body["cpses"])
+        assert body["totals"]["estimated_saving_inr"] >= 0
+        assert "quarter among its peers" in body["redaction_note"]
+
+    def test_the_html_prints_and_the_steward_is_refused(self, client, pipeline_run):
+        client.post("/api/auth/login", json={"email": "registrar@min.gov.in", "password": "demo"})
+        html = client.get("/api/reports/rollup?format=html")
+        assert html.status_code == 200 and "Ministry roll-up" in html.text
+        assert "quarter" in html.text
+        client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
+        assert client.get("/api/reports/rollup").status_code == 403

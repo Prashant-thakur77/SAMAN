@@ -1450,3 +1450,235 @@ def listing(db: Session) -> dict:
             for code, name, email, items in rows
         ],
     }
+
+
+# --------------------------------------------------------------------------
+# The ministry roll-up: every CPSE on one page, attribution kept in bands
+# --------------------------------------------------------------------------
+
+#: What the roll-up tells a reader about each CPSE's money. The reader above
+#: the CPSEs sees the estate's totals exactly; each CPSE's own savings and
+#: spend are shown as a band among its peers, not as a number beside its
+#: name, so the document ranks effort without publishing one company's
+#: purchasing to another (§0.9b).
+ROLLUP_BANDS = (
+    (0.0, 0.25, "lowest quarter"),
+    (0.25, 0.5, "second quarter"),
+    (0.5, 0.75, "third quarter"),
+    (0.75, 1.01, "top quarter"),
+)
+
+
+def _quarter(value: float, values: list[float]) -> str:
+    """Which quarter of its peers a value sits in, as words."""
+    if not values or value is None:
+        return "—"
+    below = sum(1 for v in values if v < value)
+    share = below / max(len(values) - 1, 1)
+    for low, high, label in ROLLUP_BANDS:
+        if low <= share < high:
+            return label
+    return ROLLUP_BANDS[-1][2]
+
+
+def rollup(db: Session, scope: Scope | None = None, today: date | None = None) -> dict:
+    """The same report across every CPSE, for the reader above them.
+
+    Built from the per-CPSE reports so no figure can disagree with the page a
+    CPSE received. Totals are exact. Each CPSE's spend and attributable saving
+    are shown as a quarter among its peers; the rest of its row (catalogue,
+    coded share, duplicates, review queue, quality, prevention) is the
+    coverage the ministry is entitled to read in full.
+    """
+    today = today or date.today()
+    asked_by = scope.role if scope else "system"
+    cpses = db.execute(select(Cpse).order_by(Cpse.code)).scalars().all()
+    per = [cpse_report(db, c.code, scope, today) for c in cpses]
+    spends = [r["procurement"]["your_spend_inr"] or 0.0 for r in per]
+    savings = [r["procurement"]["joint_tenders"]["estimated_saving_yours_inr"] or 0.0 for r in per]
+    rows = []
+    for r, spend, saving in zip(per, spends, savings, strict=True):
+        cat, dup, rev, qual, prev = (
+            r["catalogue"],
+            r["duplicates"],
+            r["review"],
+            r["quality"],
+            r["prevention"],
+        )
+        rows.append(
+            {
+                "cpse": r["cpse"]["code"],
+                "name": r["cpse"]["name"],
+                "rows": cat["rows"],
+                "coded": cat["coded"],
+                "coded_share": cat["coded_share"],
+                "internal_duplicate_rows": dup["internal"]["surplus_rows"],
+                "shared_rows": dup["cross_cpse"]["rows"],
+                "pending_review": rev["pending_total"],
+                "conflicts": rev["conflicts"],
+                "decisions_in_period": rev["decisions_in_period"]["total"],
+                # A CPSE registered but not yet loaded has no scorecard row.
+                "quality_score": (qual.get("row") or {}).get("score"),
+                "quality_rank": qual.get("rank") or {"position": None, "of": None},
+                "weakest": {
+                    "label": (qual.get("weakest") or {}).get("label"),
+                    "value": (qual.get("weakest") or {}).get("value"),
+                },
+                "prevented": prev["prevented"],
+                "created_anyway": prev["created_anyway"],
+                "spend_quarter": _quarter(spend, spends),
+                "saving_quarter": _quarter(saving, savings),
+                "actions": len(r["actions"]),
+                "contact_email": r["cpse"]["contact_email"],
+            }
+        )
+    # A pending pair touches two CPSEs and appears under both; the estate's
+    # queue is counted once here rather than summed from the rows.
+    pending_estate = (
+        db.execute(select(func.count(ReviewTask.id)).where(ReviewTask.state == "pending")).scalar()
+        or 0
+    )
+    conflicts_estate = (
+        db.execute(
+            select(func.count(ReviewTask.id))
+            .join(Pair, Pair.id == ReviewTask.pair_id)
+            .where(ReviewTask.state == "pending", Pair.verdict == "conflict")
+        ).scalar()
+        or 0
+    )
+    totals = {
+        "cpses": len(rows),
+        "rows": sum(x["rows"] for x in rows),
+        "coded": sum(x["coded"] for x in rows),
+        "internal_duplicate_rows": sum(x["internal_duplicate_rows"] for x in rows),
+        "pending_review": pending_estate,
+        "conflicts": conflicts_estate,
+        "decisions_in_period": sum(x["decisions_in_period"] for x in rows),
+        "prevented": sum(x["prevented"] for x in rows),
+        "created_anyway": sum(x["created_anyway"] for x in rows),
+        "spend_inr": sum(spends),
+        "estimated_saving_inr": sum(savings),
+        "capture_assumption": per[0]["procurement"]["joint_tenders"]["capture_assumption"]
+        if per
+        else None,
+    }
+    totals["coded_share"] = totals["coded"] / totals["rows"] if totals["rows"] else 0.0
+    period = per[0]["period"] if per else {"from": None, "to": today.isoformat(), "months": None}
+    return {
+        "kind": "rollup",
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "requested_by": asked_by,
+        "period": period,
+        "synthetic_note": SYNTHETIC_NOTE,
+        "redaction_note": (
+            "Each CPSE's spend and attributable saving are shown as a quarter among "
+            "its peers, never as a figure beside its name; the estate's totals are "
+            "exact. Coverage, review and quality are shown in full. A pending pair "
+            "touches two CPSEs and is listed under both, so the review column does "
+            "not sum to the estate's queue."
+        ),
+        "totals": totals,
+        "cpses": rows,
+    }
+
+
+def render_rollup_html(doc: dict) -> str:
+    """The roll-up as one printable page, in the per-CPSE report's dress."""
+    t = doc["totals"]
+    period = doc["period"]
+    parts: list[str] = []
+    parts.append(
+        "<header>"
+        '<div class="kicker">SAMAN · ministry roll-up · every CPSE</div>'
+        f"<h1>Catalogue harmonisation across {_n(t['cpses'])} CPSEs</h1>"
+        f'<div class="meta">Generated {_e(doc["generated_at"])} · period '
+        f'{_e(period.get("from"))} to {_e(period.get("to"))} · '
+        f'requested by {_e(doc["requested_by"])}</div>'
+        "</header>"
+    )
+    parts.append(f'<div class="synthetic">{_e(doc["synthetic_note"])}</div>')
+    parts.append("<section><h2>The estate</h2>")
+    parts.append(
+        '<div class="tiles">'
+        + _tile("catalogue rows", _n(t["rows"]))
+        + _tile("coded", _n(t["coded"]), _pct(t["coded_share"]))
+        + _tile("internal duplicate rows", _n(t["internal_duplicate_rows"]))
+        + _tile("pending review", _n(t["pending_review"]), f"{_n(t['conflicts'])} conflicts")
+        + _tile("decisions in period", _n(t["decisions_in_period"]))
+        + _tile(
+            "duplicates prevented",
+            _n(t["prevented"]),
+            f"{_n(t['created_anyway'])} created anyway",
+        )
+        + _tile("spend in window", _inr(t["spend_inr"]))
+        + _tile(
+            "estimated saving",
+            _inr(t["estimated_saving_inr"]),
+            f"at {_pct(t['capture_assumption'])} capture",
+        )
+        + "</div>"
+    )
+    parts.append(
+        _assumption(
+            "The saving assumes the stated share of the observed price spread is "
+            "capturable at combined volume; it is an estimate, not a forecast."
+        )
+    )
+    parts.append("</section>")
+
+    parts.append("<section><h2>By CPSE</h2>")
+    parts.append(f'<p class="note">{_e(doc["redaction_note"])}</p>')
+    columns: list[Col] = [
+        ("CPSE", "code"),
+        ("Rows", "num"),
+        ("Coded", "num"),
+        ("Internal dup. rows", "num"),
+        ("Shared rows", "num"),
+        ("Pending review", "num"),
+        ("Quality", "num"),
+        ("Weakest rate", "desc"),
+        ("Prevented / overrode", "num"),
+        ("Spend among peers", "desc"),
+        ("Saving among peers", "desc"),
+        ("Actions", "num"),
+    ]
+    body = [
+        [
+            f"{row['cpse']}",
+            _n(row["rows"]),
+            f"{_n(row['coded'])} ({_pct(row['coded_share'])})",
+            _n(row["internal_duplicate_rows"]),
+            _n(row["shared_rows"]),
+            f"{_n(row['pending_review'])} ({_n(row['conflicts'])} conflicts)",
+            (
+                f"{row['quality_score']:.3f} · #{row['quality_rank']['position']} "
+                f"of {row['quality_rank']['of']}"
+                if row["quality_score"] is not None
+                else "no rows yet"
+            ),
+            (
+                f"{row['weakest']['label']} {_pct(row['weakest']['value'])}"
+                if row["weakest"]["label"]
+                else "—"
+            ),
+            f"{_n(row['prevented'])} / {_n(row['created_anyway'])} overrode",
+            row["spend_quarter"],
+            row["saving_quarter"],
+            _n(row["actions"]),
+        ]
+        for row in doc["cpses"]
+    ]
+    parts.append(_table(columns, body))
+    parts.append("</section>")
+    parts.append(
+        "<footer>Every figure is computed from the database at generation time, from the "
+        "same per-CPSE reports each company received; nothing on this page can disagree "
+        "with theirs.</footer>"
+    )
+    title = f"Ministry roll-up · {period.get('to')}"
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{_e(title)}</title><style>{CSS}</style></head>"
+        f'<body><div class="page">{"".join(parts)}</div></body></html>'
+    )

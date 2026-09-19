@@ -1260,6 +1260,8 @@ export type ReportSendResult = {
 export const getReports = () => api.get<ReportListing>('/reports')
 /** The printable page, for a new tab. */
 export const reportHtmlUrl = (code: string) => `/api/reports/cpse/${code}?format=html`
+/** Every CPSE on one page for the reader above them; money as a quarter among peers. */
+export const rollupHtmlUrl = '/api/reports/rollup?format=html'
 export const sendReport = (code: string, to: string[] | null = null) =>
   api.post<ReportSendResult>(`/reports/cpse/${code}/send`, { to })
 
