@@ -8,6 +8,8 @@ SAMAN is for, what each of them has today, what they would still be missing
 on the day a CPSE switched it on, and the order in which to close those gaps.
 `KNOWN_GAPS.md` records what the build spec asked for and what was built;
 this is the list of what the spec never asked for and a deployment would.
+`REFINEMENT_PLAN.md`, beside this file, turns it into stages with gates,
+items and effort.
 
 ## Who it is for
 

@@ -1146,9 +1146,10 @@ Stick it on the bin, and the next scan is the code itself, check digit and
 all. The round trip, from the label's QR through the camera path to the
 lookup, is tested end to end in a real browser.
 
-The gaps and the plan from here are in [`docs/ROADMAP.md`](docs/ROADMAP.md):
-who each screen is for, what a deployment would still need, and the order in
-which to close it.
+The gaps and the plan from here are in [`docs/ROADMAP.md`](docs/ROADMAP.md),
+who each screen is for and what a deployment would still need, and in
+[`docs/REFINEMENT_PLAN.md`](docs/REFINEMENT_PLAN.md), four stages with gates,
+items and effort against every capability in the problem statement.
 
 ---
 
