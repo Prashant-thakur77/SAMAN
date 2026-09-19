@@ -151,8 +151,8 @@ never a feeling.
 | P2 | Richer, still readable features: 24 named features (the 15 plus identity coverage, held-for-review, equivalence flag, brand equal/differs, same CPSE, part number differs, token overlap, length ratio), kept because held-out AUC rose 0.9974 → 0.9986 and grey-band AUC 0.9655 → 0.9764 on the same labels; an old 15-feature model still loads by name | done | More signal for the same one-screen explanation, measured |
 | P3 | Per-class held-out AUC, precision and recall on the admin page | done | The bearing queue and the chemical queue are different problems |
 | P4 | Threshold suggestions per class from the labels, shown as suggestions with "not applied"; a registrar changes thresholds deliberately | done | The model may advise on policy; it may not set it |
-| P5 | Retrain on real labels only once they outnumber the simulated ones; show a confusion matrix on real labels | next | Judged on people's decisions, not the generator's |
-| P6 | Active learning in the queue: mix the most uncertain pairs with a few random ones so the model's blind spots are sampled too | next | Uncertainty sampling alone forgets what it never sees |
+| P5 | Retrain on real labels only once they outnumber the simulated ones; show a confusion matrix on real labels | done | Judged on people's decisions, not the generator's |
+| P6 | Active learning in the queue: mix the most uncertain pairs with a few random ones so the model's blind spots are sampled too | done | Uncertainty sampling alone forgets what it never sees |
 
 ### More automation, with a human gate on each
 

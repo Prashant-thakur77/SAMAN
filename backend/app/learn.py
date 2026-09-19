@@ -276,6 +276,9 @@ class Model:
     holdout: dict | None = None
     #: The newest label the model has seen; "labels since" counts past it.
     last_label_id: int = 0
+    #: "reviewer" when the model was fitted on people's decisions alone,
+    #: "all" when the simulated labels were still needed to make the numbers.
+    trained_on: str = "all"
 
     def vector(self, x: dict[str, float | None] | list[float | None]) -> list[float | None]:
         """A row in this model's feature order. A dict is matched by name, so
@@ -317,6 +320,7 @@ class Model:
             "cv": self.cv,
             "holdout": self.holdout,
             "last_label_id": self.last_label_id,
+            "trained_on": self.trained_on,
         }
 
 
@@ -673,13 +677,36 @@ class NotEnoughLabels(ValueError):
     pass
 
 
-def fit(db: Session) -> Model:
-    """Fit a model on every label; nothing is saved and nothing is measured
-    against the held-out split. `train` and the retrain loop build on this."""
+def _enough(rows) -> bool:
+    y = [1 if label else 0 for _, _, label, _ in rows]
+    return len(rows) >= MIN_LABELS and min(sum(y), len(y) - sum(y)) >= MIN_PER_CLASS
+
+
+def training_rows(db: Session) -> tuple[list, str]:
+    """The labels a model should learn from, and which set that is.
+
+    Simulated labels exist so the demo has a model on day one. Once people's
+    own decisions outnumber them and are enough to train on by themselves,
+    the simulated ones are left out: a model judged on reviewers should be a
+    model taught by reviewers, and the generator's answers stop shaping it.
+    Until then every label counts, and the model says so (`trained_on`).
+    """
     rows = labelled(db)
+    reviewer = [row for row in rows if row[3] == SOURCE_REVIEWER]
+    simulated = len(rows) - len(reviewer)
+    if len(reviewer) > simulated and _enough(reviewer):
+        return reviewer, SOURCE_REVIEWER
+    return rows, "all"
+
+
+def fit(db: Session) -> Model:
+    """Fit a model on the training labels; nothing is saved and nothing is
+    measured against the held-out split. `train` and the retrain loop build
+    on this."""
+    rows, trained_on = training_rows(db)
     y = [1 if label else 0 for _, _, label, _ in rows]
     n_pos, n_neg = sum(y), len(y) - sum(y)
-    if len(rows) < MIN_LABELS or min(n_pos, n_neg) < MIN_PER_CLASS:
+    if not _enough(rows):
         raise NotEnoughLabels(
             f"{len(rows)} labelled pairs ({n_pos} yes, {n_neg} no); training needs at least "
             f"{MIN_LABELS} with {MIN_PER_CLASS} of each. Decide more pairs in the Workbench."
@@ -701,7 +728,58 @@ def fit(db: Session) -> Model:
         labels=by_source,
         cv=cv,
         last_label_id=db.execute(select(func.max(PairLabel.id))).scalar() or 0,
+        trained_on=trained_on,
     )
+
+
+#: Fewer reviewer labels than this and a confusion matrix is noise; the page
+#: shows nothing rather than a 3×3 that a judge would read as a result.
+CONFUSION_MIN_LABELS = 20
+
+
+def reviewer_confusion(db: Session) -> dict | None:
+    """How the model does on people's own decisions, out of sample.
+
+    Cross-validated predictions over the reviewer labels alone (five folds,
+    each label predicted by a model that never saw it), read as a confusion
+    matrix at 0.5: duplicates the model agreed were duplicates, the ones it
+    would have called distinct, and the other way round. None until there
+    are enough real labels with both answers present; simulated labels never
+    enter it, since they are the generator's decisions, not people's.
+    """
+    import numpy as np
+    from sklearn.model_selection import StratifiedKFold
+
+    rows = [row for row in labelled(db) if row[3] == SOURCE_REVIEWER]
+    y = np.asarray([1 if label else 0 for _, _, label, _ in rows], dtype=int)
+    if len(rows) < CONFUSION_MIN_LABELS or min(int(y.sum()), int(len(y) - y.sum())) < CV_FOLDS:
+        return None
+    X = np.asarray(_matrix([x for _, x, _, _ in rows], FEATURES), dtype=float)
+    predicted = np.zeros(len(y), dtype=int)
+    for train_idx, test_idx in StratifiedKFold(CV_FOLDS, shuffle=True, random_state=0).split(X, y):
+        mean, scale, coef, intercept = _fit(X[train_idx], y[train_idx])
+        model = Model(list(FEATURES), mean, scale, coef, intercept, "", 0)
+        predicted[test_idx] = [
+            1 if model.probability(list(row)) >= 0.5 else 0 for row in X[test_idx]
+        ]
+    tp = int(((predicted == 1) & (y == 1)).sum())
+    tn = int(((predicted == 0) & (y == 0)).sum())
+    fp = int(((predicted == 1) & (y == 0)).sum())
+    fn = int(((predicted == 0) & (y == 1)).sum())
+    return {
+        "labels": int(len(y)),
+        "folds": CV_FOLDS,
+        "tp": tp,
+        "tn": tn,
+        "fp": fp,
+        "fn": fn,
+        "agreement": round((tp + tn) / len(y), 4),
+        "note": (
+            "Reviewer labels only, each predicted by a model that never saw it "
+            f"({CV_FOLDS} folds). Rows are what the reviewer said; columns are what the "
+            "model would have said at 0.5."
+        ),
+    }
 
 
 def train(db: Session) -> Model:
@@ -1081,12 +1159,17 @@ def status(db: Session) -> dict:
                 "weights": model.weights(),
                 "cv": model.cv,
                 "holdout": model.holdout,
+                "trained_on": model.trained_on,
                 "path": str(model_path()),
             }
             if model
             else None
         ),
         "labels": counts,
+        # How the model does on people's own decisions; None while there are
+        # too few to say. Simulated labels never enter it.
+        "reviewer_confusion": reviewer_confusion(db),
+        "next_training_uses": training_rows(db)[1],
         "labels_since_training": since,
         "min_labels": MIN_LABELS,
         "decides": False,

@@ -1086,10 +1086,20 @@ saved with the original fifteen features still loads, because features are
 matched by name; one this version cannot score is refused with a note to
 retrain rather than scored wrongly.
 
+Simulated labels exist so the demo has a model on day one; they are marked
+`simulated` and never mistaken for a decision. Once reviewers' own labels
+outnumber them and are enough to train on alone, training uses reviewer
+labels only, and the model records which (`trained_on`). The admin page then
+shows a confusion matrix over reviewer labels, each predicted by a model that
+never saw it (five folds), and shows nothing while the labels are the
+generator's: a 3×3 built on simulated answers would be read as a result.
+
 What it is allowed to do is deliberately narrow. It **never decides**: the
 veto layer stays absolute and the pipeline's confidence stays the number a
 merge is judged by. It orders the grey queue by uncertainty (**Most
-informative first** on the Workbench) so a reviewer's next ten minutes teach
+informative first** on the Workbench), with one card in five drawn at random
+from the rest of the queue and marked as such, because uncertainty sampling
+alone never shows the model the pairs it is confidently wrong about, so a reviewer's next ten minutes teach
 it the most, and it shows its probability on every card beside the pipeline's,
 marked when the two disagree.
 

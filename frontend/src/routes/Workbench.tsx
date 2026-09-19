@@ -528,6 +528,13 @@ export default function Workbench() {
                 {task.verdict === 'conflict' && (
                   <StatusChip tone="danger">Specification conflict</StatusChip>
                 )}
+                {task.picked_for === 'random' && (
+                  <StatusChip tone="neutral">
+                    <span title="One in five cards in this order is drawn at random from the rest of the queue, so the model's blind spots are sampled too.">
+                      random sample
+                    </span>
+                  </StatusChip>
+                )}
                 {task.learned && (
                   <div
                     className="text-right"

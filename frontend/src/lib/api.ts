@@ -193,6 +193,8 @@ export type TaskCard = {
   items?: [ItemCard, ItemCard]
   /** The learned pairwise model's opinion. It never decides. */
   learned?: LearnedOpinion | null
+  /** In the uncertainty order: why this card is on the page. */
+  picked_for?: 'uncertain' | 'random' | null
 }
 
 export type LearnedOpinion = {
@@ -224,6 +226,8 @@ export type QueueResponse = {
   model_available?: boolean
   /** How long a reviewer may take a decision back, in seconds. */
   undo_window_s?: number
+  /** In the uncertainty order: how many cards are the model's doubts and how many a random sample. */
+  mix?: { uncertain: number; random: number; share: number } | null
   tasks: TaskCard[]
 }
 
@@ -265,9 +269,24 @@ export type LearnStatus = {
       grey_pipeline_auc?: number | null
       per_class?: LearnClassRow[]
     } | null
+    /** "reviewer" once people's decisions alone taught it; "all" while simulated labels were needed. */
+    trained_on?: 'reviewer' | 'all'
     path: string
   } | null
   labels: Record<string, number>
+  /** Out-of-sample confusion matrix over reviewer labels only; null while too few. */
+  reviewer_confusion?: {
+    labels: number
+    folds: number
+    tp: number
+    tn: number
+    fp: number
+    fn: number
+    agreement: number
+    note: string
+  } | null
+  /** Which label set the next training would use. */
+  next_training_uses?: 'reviewer' | 'all'
   labels_since_training: number
   min_labels: number
   decides: false

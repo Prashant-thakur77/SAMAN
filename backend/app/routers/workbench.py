@@ -296,12 +296,13 @@ def queues(
             opinion = learn.score(pair, model, facts=facts)
             scored.append((opinion["uncertainty"] if opinion else -1.0, task.id, task))
         scored.sort(key=lambda row: (-row[0], row[1]))
-        tasks = [task for _, _, task in scored[offset : offset + limit]]
+        tasks, picked_for = _mixed_page(scored, offset, limit, seed=f"{band}:{state}")
     else:
         order = "id"
         tasks = (
             db.execute(query.order_by(ReviewTask.id).offset(offset).limit(limit)).scalars().all()
         )
+        picked_for = {}
     total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
 
     return {
@@ -315,8 +316,46 @@ def queues(
         "facets": _facets(db, band, state),
         "model_available": model is not None,
         "undo_window_s": get_settings().saman_undo_window_s,
-        "tasks": [_task_card(db, task, rephrase=i == 0) for i, task in enumerate(tasks)],
+        "mix": (
+            {
+                "uncertain": sum(1 for v in picked_for.values() if v == "uncertain"),
+                "random": sum(1 for v in picked_for.values() if v == "random"),
+                "share": RANDOM_SHARE,
+            }
+            if order == "uncertainty"
+            else None
+        ),
+        "tasks": [
+            {**_task_card(db, task, rephrase=i == 0), "picked_for": picked_for.get(task.id)}
+            for i, task in enumerate(tasks)
+        ],
     }
+
+
+#: In the uncertainty order, this share of each page is drawn at random from
+#: the rest of the queue. Uncertainty sampling alone keeps showing the model
+#: the pairs it already finds hard and never the ones it is confidently wrong
+#: about; a few random cards sample those blind spots, and a reviewer sees
+#: which cards are which.
+RANDOM_SHARE = 0.2
+
+
+def _mixed_page(scored: list, offset: int, limit: int, seed: str) -> tuple[list, dict]:
+    """A page of the uncertainty order with a random fifth mixed in.
+
+    The random picks come from beyond the page's own slice and are seeded by
+    the page, so reloading the same page shows the same cards. A queue that
+    fits in one page has nothing beyond it and gets no random picks.
+    """
+    import random
+
+    k = int(limit * RANDOM_SHARE) if len(scored) > offset + limit else 0
+    top = scored[offset : offset + limit - k]
+    pool = scored[offset + limit - k :]
+    picks = random.Random(f"{seed}:{offset}:{len(scored)}").sample(pool, min(k, len(pool)))
+    picked_for = {task.id: "uncertain" for _, _, task in top}
+    picked_for.update({task.id: "random" for _, _, task in picks})
+    return [task for _, _, task in top] + [task for _, _, task in picks], picked_for
 
 
 @router.post("/decisions")

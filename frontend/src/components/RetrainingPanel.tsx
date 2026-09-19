@@ -97,6 +97,33 @@ export function RetrainingPanel({ status }: { status: LearnStatus }) {
         )}
       </div>
 
+      {status.reviewer_confusion && (
+        <div className="space-y-2">
+          <p className="micro-label">
+            on reviewers' own decisions · {status.reviewer_confusion.labels} labels, out of sample
+          </p>
+          <div className="grid max-w-md grid-cols-[auto_1fr_1fr] gap-px overflow-hidden rounded-xl border border-hairline bg-hairline text-sm">
+            <div className="bg-surface p-3" />
+            <div className="micro-label bg-surface p-3 text-right">model: duplicate</div>
+            <div className="micro-label bg-surface p-3 text-right">model: distinct</div>
+            <div className="micro-label bg-surface p-3">reviewer: duplicate</div>
+            <div className="bg-surface p-3 text-right font-mono tabular-nums">{status.reviewer_confusion.tp}</div>
+            <div className="bg-surface p-3 text-right font-mono tabular-nums text-muted">{status.reviewer_confusion.fn}</div>
+            <div className="micro-label bg-surface p-3">reviewer: distinct</div>
+            <div className="bg-surface p-3 text-right font-mono tabular-nums text-muted">{status.reviewer_confusion.fp}</div>
+            <div className="bg-surface p-3 text-right font-mono tabular-nums">{status.reviewer_confusion.tn}</div>
+          </div>
+          <p className="max-w-prose text-xs text-muted">
+            Agreement {pct(status.reviewer_confusion.agreement)}. {status.reviewer_confusion.note}
+            {status.model?.trained_on === 'reviewer'
+              ? ' The current model was trained on reviewer labels alone.'
+              : status.next_training_uses === 'reviewer'
+                ? ' Reviewer labels now outnumber the simulated ones; the next training uses them alone.'
+                : ' Simulated labels still take part in training until reviewer labels outnumber them.'}
+          </p>
+        </div>
+      )}
+
       {perClass.length > 0 && (
         <div className="space-y-2">
           <p className="micro-label">held-out, per class · model beside the pipeline's score</p>

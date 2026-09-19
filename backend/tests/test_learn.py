@@ -153,8 +153,21 @@ class TestEndpoints:
             as_registrar.post("/api/learn/train")
         body = as_registrar.get("/api/queues?band=grey&order=uncertainty&limit=10").json()
         assert body["order"] == "uncertainty" and body["model_available"] is True
-        opinions = [t["learned"]["uncertainty"] for t in body["tasks"] if t.get("learned")]
+        # The uncertain part of the page is in order; a random fifth follows it,
+        # marked as such, so the model's blind spots are sampled too.
+        uncertain = [t for t in body["tasks"] if t["picked_for"] == "uncertain"]
+        random_picks = [t for t in body["tasks"] if t["picked_for"] == "random"]
+        opinions = [t["learned"]["uncertainty"] for t in uncertain if t.get("learned")]
         assert opinions == sorted(opinions, reverse=True)
+        assert body["mix"] == {
+            "uncertain": len(uncertain),
+            "random": len(random_picks),
+            "share": 0.2,
+        }
+        assert len(random_picks) == 2 and len(uncertain) == 8
+        # Reloading the same page shows the same cards.
+        again = as_registrar.get("/api/queues?band=grey&order=uncertainty&limit=10").json()
+        assert [t["task_id"] for t in again["tasks"]] == [t["task_id"] for t in body["tasks"]]
         assert as_registrar.get("/api/queues?band=grey&order=sideways").status_code == 422
 
     def test_a_decision_is_also_a_label(self, as_registrar, db, pipeline_run):
@@ -437,3 +450,73 @@ class TestSuggestions:
         # Thirty labels that all say "yes" cannot place a cut.
         suggestions = learn.suggest_thresholds(db, min_labels=10**6)
         assert suggestions["classes"] == [] and suggestions["applied"] is False
+
+
+class TestRealLabelsFirst:
+    """Once people's decisions outnumber the simulated ones, the model is
+    taught by people alone, and is judged on them out of sample."""
+
+    def _reviewer_labels_from_truth(self, db, n: int) -> list[int]:
+        """Reviewer labels written straight from the tuning split's truth, as
+        many stewards' afternoons would have; returns the label ids."""
+        truth = learn._truth(db, "tuning")
+        labelled = {(a, b) for a, b in db.execute(select(PairLabel.item_a, PairLabel.item_b)).all()}
+        ids: list[int] = []
+        yes = no = 0
+        for pair in db.execute(select(Pair).where(Pair.evidence_json != "{}")).scalars():
+            if pair.item_a not in truth or pair.item_b not in truth:
+                continue
+            key = tuple(sorted((pair.item_a, pair.item_b)))
+            if key in labelled:
+                continue
+            same = truth[pair.item_a] == truth[pair.item_b]
+            # Keep the two answers roughly balanced, as a real queue is not.
+            if (same and yes > no + 5) or (not same and no > yes + 5):
+                continue
+            yes += int(same)
+            no += int(not same)
+            row = learn.record_label(db, pair, same, 1, learn.SOURCE_REVIEWER)
+            db.flush()
+            ids.append(row.id)
+            labelled.add(key)
+            if len(ids) >= n:
+                break
+        db.commit()
+        return ids
+
+    def test_simulated_labels_alone_train_on_everything_and_show_no_matrix(self, db, pipeline_run):
+        if learn.label_counts(db).get(learn.SOURCE_SIMULATED, 0) < learn.MIN_LABELS:
+            learn.simulate_labels(db, 200)
+        rows, which = learn.training_rows(db)
+        assert which == "all"
+        # The handful of reviewer labels other tests wrote do not make a matrix.
+        if learn.label_counts(db).get(learn.SOURCE_REVIEWER, 0) < learn.CONFUSION_MIN_LABELS:
+            assert learn.reviewer_confusion(db) is None
+
+    def test_reviewer_labels_take_over_once_they_outnumber_the_simulated(self, db, pipeline_run):
+        counts = learn.label_counts(db)
+        simulated = counts.get(learn.SOURCE_SIMULATED, 0)
+        need = max(simulated + 1, learn.MIN_LABELS, learn.CONFUSION_MIN_LABELS) - counts.get(
+            learn.SOURCE_REVIEWER, 0
+        )
+        ids = self._reviewer_labels_from_truth(db, need + 5)
+        try:
+            rows, which = learn.training_rows(db)
+            assert which == learn.SOURCE_REVIEWER
+            assert all(source == learn.SOURCE_REVIEWER for _, _, _, source in rows)
+            model = learn.fit(db)
+            assert model.trained_on == learn.SOURCE_REVIEWER
+            assert set(model.labels) == {learn.SOURCE_REVIEWER}
+
+            matrix = learn.reviewer_confusion(db)
+            assert matrix is not None
+            assert matrix["tp"] + matrix["tn"] + matrix["fp"] + matrix["fn"] == matrix["labels"]
+            assert 0.0 <= matrix["agreement"] <= 1.0
+            assert "never saw it" in matrix["note"]
+            status = learn.status(db)
+            assert status["next_training_uses"] == learn.SOURCE_REVIEWER
+            assert status["reviewer_confusion"]["labels"] == matrix["labels"]
+        finally:
+            db.execute(delete(PairLabel).where(PairLabel.id.in_(ids)))
+            db.commit()
+            learn.forget_model()
