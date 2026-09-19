@@ -49,9 +49,12 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     // The shell: network first, cached copy when the network is away.
+    // A host mid-restart answers 502/503: the cached shell and its cached
+    // assets are a working application, which a bad gateway page is not.
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .then(async (response) => {
+          if (!response.ok) return (await caches.match('/')) || response
           const copy = response.clone()
           caches.open(VERSION).then((cache) => cache.put('/', copy))
           return response

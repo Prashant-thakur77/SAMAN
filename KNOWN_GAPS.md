@@ -613,6 +613,16 @@ that could not be true:
 - **Compare called a valve and a bearing "probably the same".** The
   adjudicator only ever saw grey pairs; a `distinct` verdict now leans split
   with the matcher's own reason.
+- **A blank white page after "Sign in" on a first visit.** Seen on the free
+  host during a day with six deploys: a page loaded from one build asked for
+  a chunk the next build no longer served, and a script that fails to load
+  leaves React with nothing to say. Three defences now: `index.html` shows a
+  plain "the application has not started" notice with a reload button when
+  a script fails or nothing has mounted after twelve seconds; a stale chunk
+  reloads the page once (`vite:preloadError`); and the service worker serves
+  the cached shell on a 502/503 from a host mid-restart. The front page and
+  the sign-in page also no longer wait for each other's exit animation, so
+  there is never an instant with nothing mounted.
 - **The Audit page's first screen was sign-ins.** Folded by default, with a
   checkbox and a count; the chain is untouched.
 

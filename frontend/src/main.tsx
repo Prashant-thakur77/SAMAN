@@ -21,6 +21,22 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 const root = document.getElementById('root')
 if (!root) throw new Error('#root not found in index.html')
+// The application is here; the "has not started" notice in index.html is not needed.
+document.getElementById('boot')?.remove()
+
+// A screen's chunk that no longer exists on the server (the application was
+// updated since this page loaded) fails to import. One reload fetches the
+// current version; the flag stops a broken deploy from reloading forever.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  try {
+    if (sessionStorage.getItem('saman.reloaded-for-update')) return
+    sessionStorage.setItem('saman.reloaded-for-update', '1')
+  } catch {
+    /* storage blocked: reload once anyway */
+  }
+  window.location.reload()
+})
 
 createRoot(root).render(
   <StrictMode>

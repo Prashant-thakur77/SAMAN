@@ -29,6 +29,53 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Shown only if the application has not mounted: a bundle that failed
+         to load mid-deploy, a blocked script, a host still waking. A blank
+         page says nothing; this says what to do. main.tsx removes it. -->
+    <div
+      id="boot"
+      hidden
+      style="font: 15px/1.5 system-ui, sans-serif; max-width: 32rem; margin: 6rem auto; padding: 0 1.5rem; color: #333"
+    >
+      <p style="font-weight: 600; letter-spacing: 0.2em">SAMAN</p>
+      <p id="boot-why">The application has not started.</p>
+      <p>
+        <button
+          onclick="location.reload()"
+          style="font: inherit; padding: 0.5rem 1rem; border: 1px solid #999; border-radius: 999px; background: #fff; cursor: pointer"
+        >
+          Reload the page
+        </button>
+      </p>
+    </div>
+    <script>
+      ;(function () {
+        var shown = false
+        function show(why) {
+          if (shown || document.getElementById('root').childElementCount) return
+          shown = true
+          var boot = document.getElementById('boot')
+          if (why) document.getElementById('boot-why').textContent = why
+          boot.hidden = false
+        }
+        // A script that failed to load is the usual cause of a blank page.
+        window.addEventListener(
+          'error',
+          function (e) {
+            if (e.target && e.target.tagName === 'SCRIPT')
+              show('Part of the application failed to load, usually because it was updated a moment ago. Reloading fetches the current version.')
+          },
+          true,
+        )
+        window.addEventListener('vite:preloadError', function () {
+          show('Part of the application failed to load, usually because it was updated a moment ago. Reloading fetches the current version.')
+        })
+        // Nothing mounted after a while: the host may still be waking up.
+        setTimeout(function () {
+          show('The application has not started yet. If the host was asleep, it can take up to a minute; reloading is safe.')
+        }, 12000)
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -89,9 +89,13 @@ export default function App() {
   // Without it the first screen anybody sees fades up from nothing, which on a
   // cold bundle takes long enough to look like a slow application rather than a
   // deliberate animation.
+  // Not `mode="wait"` here: the sign-in page mounts at once and the front
+  // page is popped out of the flow while it fades. Waiting for the front
+  // page's exit would leave a moment with nothing on screen, and on a slow
+  // phone that moment is long enough to read as a blank page.
   if (location.pathname === '/login' || showLanding) {
     return (
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="popLayout" initial={false}>
         <RouteTransition key={showLanding ? 'landing' : 'login'}>
           <ErrorBoundary>{showLanding ? <Landing /> : <Login />}</ErrorBoundary>
         </RouteTransition>
