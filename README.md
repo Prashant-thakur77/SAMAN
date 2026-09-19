@@ -30,6 +30,11 @@ none of them can drift from what the application actually renders.*
 
 ## Run it
 
+Installing in a CPSE, sizing the machine and the optional language model, and
+every setting, are in [docs/INSTALL.md](docs/INSTALL.md); a one-page brief for
+anyone joining the project is [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
+
+
 Needs Python 3.12 (or [uv](https://docs.astral.sh/uv/)) and Node 22 or newer;
 the frontend test runner uses jsdom 30, which will not start on Node 20.
 
