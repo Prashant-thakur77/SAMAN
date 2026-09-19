@@ -31,17 +31,20 @@ export default function DashOpportunity() {
   const [error, setError] = useState<string | null>(null)
   const [capture, setCapture] = useState(0.6)
   const [tab, setTab] = useState<Tab>('tenders')
+  // The purchase window behind the money sections; stock is a position and
+  // does not move with it.
+  const [months, setMonths] = useState(12)
 
   useEffect(() => {
     let alive = true
-    // Fetched once at the baseline assumption; the slider rescales locally.
-    getOpportunity(0.6)
+    // Fetched once per window at the baseline assumption; the slider rescales locally.
+    getOpportunity(0.6, months)
       .then((d) => alive && setData(d))
       .catch((err) => alive && setError(err instanceof ApiError ? err.message : 'Unavailable.'))
     return () => {
       alive = false
     }
-  }, [])
+  }, [months])
 
   const scaled = useMemo(() => {
     if (!data) return null
@@ -114,6 +117,26 @@ export default function DashOpportunity() {
             {entry.label}
           </button>
         ))}
+        <label className="ml-auto flex items-center gap-2 pb-1 text-xs text-muted">
+          purchases over
+          <select
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+            className="h-8 rounded-full border border-hairline bg-surface px-3 text-xs text-ink"
+            title="The window the joint-tender and price-variance sections are read over. Stock is a position and does not move with it."
+          >
+            {[6, 12, 24, 36].map((m) => (
+              <option key={m} value={m}>
+                {m} months
+              </option>
+            ))}
+          </select>
+          {data.window && (
+            <span className="font-mono">
+              since {data.window.since} · {data.window.purchases.toLocaleString('en-IN')} lines
+            </span>
+          )}
+        </label>
       </div>
 
       {tab === 'tenders' && (

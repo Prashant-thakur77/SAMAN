@@ -946,6 +946,8 @@ export type JointTender = {
 
 export type OpportunityDashboard = {
   provenance?: DashboardProvenance
+  /** The purchase window the money sections were read over. */
+  window?: { months: number; since: string; purchases: number }
   joint_tenders: {
     window_months: number
     capture_assumption: number
@@ -997,8 +999,8 @@ export type OpportunityDashboard = {
 }
 
 export const getExecutive = () => api.get<ExecutiveDashboard>('/dashboard/executive')
-export const getOpportunity = (capture: number) =>
-  api.get<OpportunityDashboard>(`/dashboard/opportunity?capture=${capture}`)
+export const getOpportunity = (capture: number, months = 12) =>
+  api.get<OpportunityDashboard>(`/dashboard/opportunity?capture=${capture}&months=${months}`)
 
 // ---- copilot (§6.9) ----
 

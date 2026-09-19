@@ -347,3 +347,17 @@ class TestProvenance:
     def test_the_opportunity_dashboard_too(self, as_registrar, pipeline_run):
         body = as_registrar.get("/api/dashboard/opportunity").json()
         assert body["provenance"]["rows"]["purchases"] >= 0
+
+
+class TestPurchaseWindow:
+    def test_the_money_sections_can_be_read_over_a_window(self, as_registrar, pipeline_run):
+        year = as_registrar.get("/api/dashboard/opportunity?months=12").json()
+        half = as_registrar.get("/api/dashboard/opportunity?months=6").json()
+        assert year["window"]["months"] == 12 and half["window"]["months"] == 6
+        assert half["window"]["since"] > year["window"]["since"]
+        assert half["window"]["purchases"] <= year["window"]["purchases"]
+        # Stock is a position, not a flow: the same in both windows.
+        assert half["inventory"]["totals"] == year["inventory"]["totals"]
+
+    def test_an_odd_window_is_refused(self, as_registrar, pipeline_run):
+        assert as_registrar.get("/api/dashboard/opportunity?months=7").status_code == 422

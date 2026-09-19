@@ -260,9 +260,11 @@ def joint_tender_candidates(
     }
 
 
-def price_variance(db: Session, scope: Scope, limit: int = 20) -> dict:
+def price_variance(
+    db: Session, scope: Scope, limit: int = 20, purchases: list[Purchase] | None = None
+) -> dict:
     """The same material bought at very different prices per base unit (§6.8b)."""
-    grouped = _group(load_purchases(db))
+    grouped = _group(load_purchases(db) if purchases is None else purchases)
     rows = []
 
     for cluster_id, purchases in grouped.items():

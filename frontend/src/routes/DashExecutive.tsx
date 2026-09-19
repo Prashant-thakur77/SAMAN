@@ -22,6 +22,7 @@ import { StatusChip } from '../components/primitives/Chip'
 import { ApiError, getExecutive, type ExecutiveDashboard, type QualityRate, type QualityScorecard} from '../lib/api'
 import { cn } from '../lib/cn'
 import { listItemVariants, listVariants } from '../lib/motion'
+import { useSession } from '../lib/session'
 
 /** Where each tile's rows are: an executive's next question is always "which ones". */
 const KPI_TARGET: Record<string, { to: string; label: string }> = {
@@ -51,6 +52,13 @@ export default function DashExecutive() {
   const [data, setData] = useState<ExecutiveDashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const reduce = useReducedMotion() ?? false
+  const { user } = useSession()
+  // The same page serves a steward and a ministry reader: a steward can fold
+  // the per-CPSE sections down to their own company. The national figures
+  // above them do not change; what they see less of is other companies.
+  const own = user?.cpse_code ?? null
+  const [mineOnly, setMineOnly] = useState(false)
+  const showCpse = (cpse: string) => !mineOnly || !own || cpse === own
 
   useEffect(() => {
     let alive = true
@@ -153,10 +161,32 @@ export default function DashExecutive() {
           </motion.dl>
 
           <section className="space-y-4">
-            <h2 className="micro-label">Progress by CPSE</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="micro-label">Progress by CPSE</h2>
+              {own && (
+                <button
+                  type="button"
+                  aria-pressed={mineOnly}
+                  onClick={() => setMineOnly((m) => !m)}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs',
+                    mineOnly ? 'border-inverse bg-inverse text-bg' : 'border-hairline text-muted hover:text-ink',
+                  )}
+                  title={`Fold the per-CPSE sections down to ${own}. The national figures stay.`}
+                >
+                  Only {own}
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
-              {data.per_cpse.map((row) => (
-                <div key={row.cpse} className="grid grid-cols-[5rem_1fr_9rem] items-center gap-4">
+              {data.per_cpse.filter((row) => showCpse(row.cpse)).map((row) => (
+                <div
+                  key={row.cpse}
+                  className={cn(
+                    'grid grid-cols-[5rem_1fr_9rem] items-center gap-4',
+                    own === row.cpse && 'rounded-md bg-surface py-1 ring-1 ring-hairline',
+                  )}
+                >
                   <Link
                     to={`/search?cpse=${encodeURIComponent(row.cpse)}`}
                     className="font-mono text-sm underline-offset-2 hover:underline"
@@ -194,7 +224,7 @@ export default function DashExecutive() {
                 <thead>
                   <tr>
                     <th className="micro-label px-3 py-2 text-left font-medium">Class</th>
-                    {data.heatmap.cpses.map((cpse) => (
+                    {data.heatmap.cpses.filter(showCpse).map((cpse) => (
                       <th key={cpse} className="micro-label px-3 py-2 text-center font-medium">
                         {cpse}
                       </th>
@@ -205,7 +235,7 @@ export default function DashExecutive() {
                   {data.heatmap.classes.map((klass) => (
                     <tr key={klass}>
                       <td className="whitespace-nowrap px-3 py-1 font-mono">{klass}</td>
-                      {data.heatmap.cpses.map((cpse) => {
+                      {data.heatmap.cpses.filter(showCpse).map((cpse) => {
                         const cell = data.heatmap.cells.find(
                           (c) => c.class_code === klass && c.cpse === cpse,
                         )

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
@@ -271,35 +271,59 @@ def _executive(db: Session, scope: Scope) -> dict:
     }
 
 
+#: The purchase windows the money sections can be read over. Twelve months is
+#: the demand-aggregation window (§9A); the others are for a reader who asks
+#: "and over the last two years?" without a new query being written.
+WINDOWS = (6, 12, 24, 36)
+
+
 @router.get("/opportunity")
 def opportunity_dashboard(
     user: Annotated[User | None, Depends(current_user_optional)],
     capture: float = Query(default=opportunity.DEFAULT_CAPTURE, ge=0.4, le=0.8),
+    months: int = Query(default=opportunity.WINDOW_MONTHS),
     db: Session = Depends(get_db),
 ) -> dict:
     """Joint tenders, price variance and inventory sharing (§6.8, §2E).
 
     `capture` is the what-if slider's discount assumption. It is a parameter
     rather than a constant precisely because it is an assumption, and the
-    response repeats it so no figure travels without it.
+    response repeats it so no figure travels without it. `months` scopes the
+    purchase-based sections (joint tenders, price variance) to a window; the
+    stock sections are a position, not a flow, and ignore it.
     """
-    return opportunity_for(db, scope_for(user), capture)
+    if months not in WINDOWS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"months must be one of {', '.join(str(m) for m in WINDOWS)}.",
+        )
+    return opportunity_for(db, scope_for(user), capture, months)
 
 
 def opportunity_for(
-    db: Session, scope: Scope, capture: float = opportunity.DEFAULT_CAPTURE
+    db: Session,
+    scope: Scope,
+    capture: float = opportunity.DEFAULT_CAPTURE,
+    months: int = opportunity.WINDOW_MONTHS,
 ) -> dict:
     return cache.memo(
         db,
-        ("opportunity", scope.role, scope.cpse_code, capture),
-        lambda: cache.stamped(db, lambda: _opportunity(db, scope, capture)),
+        ("opportunity", scope.role, scope.cpse_code, capture, months),
+        lambda: cache.stamped(db, lambda: _opportunity(db, scope, capture, months)),
     )
 
 
-def _opportunity(db: Session, scope: Scope, capture: float) -> dict:
+def _opportunity(db: Session, scope: Scope, capture: float, months: int) -> dict:
+    from datetime import date, timedelta
+
+    since = date.today() - timedelta(days=months * 31)
+    purchases = opportunity.load_purchases(db, since)
     return {
-        "joint_tenders": opportunity.joint_tender_candidates(db, scope, capture=capture),
-        "price_variance": opportunity.price_variance(db, scope),
+        "window": {"months": months, "since": since.isoformat(), "purchases": len(purchases)},
+        "joint_tenders": opportunity.joint_tender_candidates(
+            db, scope, capture=capture, purchases=purchases
+        ),
+        "price_variance": opportunity.price_variance(db, scope, purchases=purchases),
         "vendor_overlap": opportunity.vendor_overlap(db),
         "inventory": {
             "transfers": inventory.transfer_suggestions(db, scope),

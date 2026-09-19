@@ -950,7 +950,12 @@ band behind it; a CPSE's progress bar, a family's bar and a class × CPSE cell
 open the search already filtered to them; the veto chart opens the refusals.
 Every table exports as CSV as shown, the page prints to PDF, and a line under
 the header says when the figures were computed, from how many rows and at
-which audit sequence.
+which audit sequence. The same page serves two readers: a steward can fold
+the per-CPSE sections down to their own company (the national figures above
+them stay), and the Opportunity page's money sections can be read over six,
+twelve, twenty-four or thirty-six months of purchases, with the window and
+its line count stated; stock is a position, not a flow, and does not move
+with it.
 
 ---
 
