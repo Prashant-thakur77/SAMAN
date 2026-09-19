@@ -52,7 +52,11 @@ def executive(
 def executive_for(db: Session, scope: Scope) -> dict:
     """The executive dashboard as `scope` sees it, memoised on the estate's
     version (see `cache`): computed once per change, not once per visitor."""
-    return cache.memo(db, ("executive", scope.role, scope.cpse_code), lambda: _executive(db, scope))
+    return cache.memo(
+        db,
+        ("executive", scope.role, scope.cpse_code),
+        lambda: cache.stamped(db, lambda: _executive(db, scope)),
+    )
 
 
 def _executive(db: Session, scope: Scope) -> dict:
@@ -288,7 +292,7 @@ def opportunity_for(
     return cache.memo(
         db,
         ("opportunity", scope.role, scope.cpse_code, capture),
-        lambda: _opportunity(db, scope, capture),
+        lambda: cache.stamped(db, lambda: _opportunity(db, scope, capture)),
     )
 
 

@@ -31,6 +31,9 @@ import {
 import { cn } from '../lib/cn'
 import { useSession } from '../lib/session'
 
+/** The API's timestamps are UTC; the naive ones carry no zone marker. */
+const utc = (iso: string) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`)
+
 /**
  * /admin — users, sovereign mode and the health panel (spec §6.13).
  *
@@ -320,6 +323,9 @@ export default function Admin() {
             <TH>Name</TH>
             <TH>Email</TH>
             <TH>CPSE</TH>
+            <TH>Last sign-in</TH>
+            <TH align="right">Decisions</TH>
+            <TH align="right">Reports</TH>
             <TH>Role</TH>
             <TH>Status</TH>
           </THead>
@@ -329,6 +335,37 @@ export default function Admin() {
                 <TD>{user.name}</TD>
                 <TD mono>{user.email}</TD>
                 <TD mono>{user.cpse_code ?? '—'}</TD>
+                <TD
+                  mono
+                  className="whitespace-nowrap text-xs"
+                  title={
+                    user.activity
+                      ? `${user.activity.sign_ins} sign-in${user.activity.sign_ins === 1 ? '' : 's'} on record`
+                      : 'Never signed in'
+                  }
+                >
+                  {user.activity?.last_sign_in
+                    ? utc(user.activity.last_sign_in).toLocaleString('en-IN', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })
+                    : 'never'}
+                </TD>
+                <TD
+                  mono
+                  align="right"
+                  className="tabular-nums"
+                  title={
+                    user.activity?.last_decision
+                      ? `Last on ${utc(user.activity.last_decision).toLocaleString('en-IN')}${user.activity.undos ? ` · ${user.activity.undos} taken back` : ''}`
+                      : undefined
+                  }
+                >
+                  {user.activity?.decisions ?? 0}
+                </TD>
+                <TD mono align="right" className="tabular-nums">
+                  {user.activity?.reports_sent ?? 0}
+                </TD>
                 <TD>
                   <select
                     value={user.role}

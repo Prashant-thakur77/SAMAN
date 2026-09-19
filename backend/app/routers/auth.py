@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import audit
 from ..auth import (
     authenticate,
     clear_login_failures,
@@ -61,6 +62,15 @@ def login(
 
     clear_login_failures(client, email)
     issue_session(response, user)
+    # A sign-in is an event on the chain like any other: the admin page reads
+    # each account's last sign-in from here, and an auditor can see who was in.
+    audit.record(
+        db,
+        action="auth.login",
+        entity=f"user:{user.id}",
+        payload={"role": user.role, "cpse_id": user.cpse_id, "client": client},
+        user=user.email,
+    )
     return _to_out(user)
 
 

@@ -12,6 +12,7 @@ import { SavingsLadder } from '../components/charts/SavingsLadder'
 import { StockAge } from '../components/charts/StockAge'
 import { VetoAttributes } from '../components/charts/VetoAttributes'
 import { PageHeader } from '../components/PageHeader'
+import { ProvenanceLine, provenanceTitle } from '../components/charts/Provenance'
 import { AXIS_PROPS, CHART_INK, GRID_PROPS, TOOLTIP_PROPS } from '../components/charts/Chrome'
 import { formatDay } from '../components/charts/ChartParts'
 import { CountUp, formatRupees } from '../components/charts/CountUp'
@@ -79,6 +80,7 @@ export default function DashExecutive() {
         description="Harmonization progress across CPSEs. Every figure is computed from the database and reconciles with /api/metrics."
         actions={<StatusChip tone="neutral">{data.visibility.role}</StatusChip>}
       />
+      <ProvenanceLine provenance={data.provenance} />
 
       {!hasData ? (
         <EmptyState
@@ -100,7 +102,7 @@ export default function DashExecutive() {
                 className="space-y-2 bg-surface p-5"
               >
                 <dt className="micro-label">{kpi.label}</dt>
-                <dd className="font-mono text-xl text-ink">
+                <dd className="font-mono text-xl text-ink" title={provenanceTitle(data.provenance)}>
                   <CountUp value={kpi.value} format={kpi.format} />
                 </dd>
                 {kpi.note && <p className="text-xs text-muted">{kpi.note}</p>}

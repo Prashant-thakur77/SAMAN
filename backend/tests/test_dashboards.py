@@ -331,3 +331,19 @@ class TestVisibilityPolicyIsStated:
         stated = " ".join(r["who"] for r in visibility.POLICY["rules"])
         for role in visibility.UNRESTRICTED_ROLES:
             assert role in stated, f"{role} is exempt in code but unstated"
+
+
+class TestProvenance:
+    """Every dashboard says where its figures came from."""
+
+    def test_the_executive_dashboard_carries_its_provenance(self, as_registrar, pipeline_run):
+        body = as_registrar.get("/api/dashboard/executive").json()
+        prov = body["provenance"]
+        assert prov["computed_at"] and prov["seconds"] >= 0
+        assert prov["audit_seq"] > 0 and prov["match_run"] >= 1
+        assert prov["rows"]["items"] > 0
+        assert "synthetic" in prov["note"]
+
+    def test_the_opportunity_dashboard_too(self, as_registrar, pipeline_run):
+        body = as_registrar.get("/api/dashboard/opportunity").json()
+        assert body["provenance"]["rows"]["purchases"] >= 0

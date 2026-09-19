@@ -183,8 +183,8 @@ never a feeling.
 | "Why?" on every card and Copilot answer: the refusal or merge reason as one sentence, already computed | done | 1 d |
 | Keyboard shortcut help (`?`) on every screen | done | ½ d |
 | A "what runs where" panel on the health page listing each engine, its version and whether it is local or remote | done | ½ d |
-| Session activity per user on Admin (last sign-in, decisions, reports sent) | next | 1 d |
-| Provenance tooltip on every dashboard figure: computed at, from how many rows, memo version | next | 1 d |
+| Session activity per user on Admin (last sign-in, decisions, reports sent) | done | 1 d |
+| Provenance tooltip on every dashboard figure: computed at, from how many rows, memo version | done | 1 d |
 | Demo reset button for admins (restore the snapshot in under five seconds; exists as `make demo-restore`) | done | ½ d |
 
 ## What to improve in what already exists, regardless of stage

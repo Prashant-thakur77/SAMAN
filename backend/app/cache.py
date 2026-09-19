@@ -90,6 +90,49 @@ def memo(db: Session, key: tuple, compute: Callable[[], T]) -> T:
         return value
 
 
+def stamped(db: Session, compute: Callable[[], dict]) -> dict:
+    """`compute()`, with a `provenance` block on the result: when it was
+    computed, how long it took, which version of the estate it read (the
+    audit sequence and match run the memo is keyed on) and how many rows.
+    Every dashboard figure can then say where it came from; a reader who
+    asks "as of when?" is answered by the page itself."""
+    import time
+    from datetime import UTC, datetime
+
+    started = time.perf_counter()
+    value = compute()
+    current = version(db)
+    counts = dict(
+        zip(
+            (
+                "items",
+                "cnmcs",
+                "decisions",
+                "stock_rows",
+                "purchases",
+                "relations",
+                "substitute_approvals",
+                "labels",
+            ),
+            current[3:],
+            strict=True,
+        )
+    )
+    value["provenance"] = {
+        "computed_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "seconds": round(time.perf_counter() - started, 2),
+        "audit_seq": current[1],
+        "match_run": current[2],
+        "rows": counts,
+        "note": (
+            "Computed from the database at this audit sequence and kept until the "
+            "estate changes; every figure on the page reconciles with the API. "
+            "The estate is synthetic."
+        ),
+    }
+    return value
+
+
 def clear() -> None:
     with _guard:
         _entries.clear()

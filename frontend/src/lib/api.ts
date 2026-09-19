@@ -854,7 +854,27 @@ export type StockAge = {
   note: string
 }
 
+/** Where a dashboard's figures came from (cache.stamped). */
+export type DashboardProvenance = {
+  computed_at: string
+  seconds: number
+  audit_seq: number
+  match_run: number
+  rows: {
+    items: number
+    cnmcs: number
+    decisions: number
+    stock_rows: number
+    purchases: number
+    relations: number
+    substitute_approvals: number
+    labels: number
+  }
+  note: string
+}
+
 export type ExecutiveDashboard = {
+  provenance?: DashboardProvenance
   kpis: Kpi[]
   per_cpse: { cpse: string; name: string; items: number; coded: number; progress: number }[]
   heatmap: {
@@ -904,6 +924,7 @@ export type JointTender = {
 }
 
 export type OpportunityDashboard = {
+  provenance?: DashboardProvenance
   joint_tenders: {
     window_months: number
     capture_assumption: number
@@ -1096,6 +1117,15 @@ export type PipelineStatus = {
 export const runPipeline = () => api.post<PipelineStatus>('/pipeline/run')
 export const getPipelineStatus = () => api.get<PipelineStatus>('/pipeline/status')
 
+export type UserActivity = {
+  sign_ins: number
+  last_sign_in: string | null
+  decisions: number
+  last_decision: string | null
+  reports_sent: number
+  undos: number
+}
+
 export type AdminUser = {
   id: number
   email: string
@@ -1103,6 +1133,8 @@ export type AdminUser = {
   role: Role
   cpse_code: string | null
   active: boolean
+  /** From the audit chain and the decision table; null for an account that never signed in. */
+  activity?: UserActivity | null
 }
 
 export const getUsers = () => api.get<{ roles: Role[]; count: number; users: AdminUser[] }>('/users')

@@ -53,13 +53,65 @@ def _user_row(user: User) -> dict:
     }
 
 
+def _activity(db: Session) -> dict[str, dict]:
+    """What each account has done, from the records that already exist: the
+    audit chain for sign-ins and reports, the decision table for decisions.
+    Keyed by e-mail, which is how the chain names its actor."""
+    from ..models import AuditEvent, Decision
+
+    out: dict[str, dict] = {}
+
+    def row(email: str) -> dict:
+        return out.setdefault(
+            email,
+            {
+                "sign_ins": 0,
+                "last_sign_in": None,
+                "decisions": 0,
+                "last_decision": None,
+                "reports_sent": 0,
+                "undos": 0,
+            },
+        )
+
+    for email, action, n, last in db.execute(
+        select(
+            AuditEvent.user, AuditEvent.action, func.count(AuditEvent.id), func.max(AuditEvent.ts)
+        )
+        .where(AuditEvent.action.in_(("auth.login", "report.sent", "decision.undo")))
+        .group_by(AuditEvent.user, AuditEvent.action)
+    ):
+        entry = row(email)
+        if action == "auth.login":
+            entry["sign_ins"] = n
+            entry["last_sign_in"] = last.isoformat() if last else None
+        elif action == "report.sent":
+            entry["reports_sent"] = n
+        else:
+            entry["undos"] = n
+    for email, n, last in db.execute(
+        select(User.email, func.count(Decision.id), func.max(Decision.ts))
+        .join(User, User.id == Decision.user_id)
+        .group_by(User.email)
+    ):
+        entry = row(email)
+        entry["decisions"] = n
+        entry["last_decision"] = last.isoformat() if last else None
+    return out
+
+
 @router.get("/users")
 def list_users(
     _user: Annotated[User, Depends(require_roles(*ADMIN_ROLES))],
     db: Session = Depends(get_db),
 ) -> dict:
     users = db.execute(select(User).order_by(User.id)).scalars().all()
-    return {"roles": list(ROLES), "count": len(users), "users": [_user_row(u) for u in users]}
+    activity = _activity(db)
+    return {
+        "roles": list(ROLES),
+        "count": len(users),
+        "users": [{**_user_row(u), "activity": activity.get(u.email)} for u in users],
+    }
 
 
 @router.post("/users")

@@ -317,3 +317,24 @@ class TestDemoSnapshot:
         assert {"Python", "SQLite", "rapidfuzz", "scikit-learn", "tesseract.js"} <= engines
         assert all(row["where"] in ("local", "browser") or row["where"].startswith("remote") for row in rows)
         assert next(row for row in rows if row["engine"] == "Python")["version"].startswith("3.12")
+
+
+class TestUserActivity:
+    def test_a_sign_in_is_on_the_chain_and_each_account_shows_its_activity(
+        self, as_registrar, db, pipeline_run
+    ):
+        from app.models import AuditEvent
+
+        login = db.execute(
+            select(AuditEvent)
+            .where(AuditEvent.action == "auth.login", AuditEvent.user == "registrar@min.gov.in")
+            .order_by(AuditEvent.seq.desc())
+        ).scalars().first()
+        assert login is not None and login.entity.startswith("user:")
+        body = as_registrar.get("/api/users").json()
+        me = next(u for u in body["users"] if u["email"] == "registrar@min.gov.in")
+        assert me["activity"]["sign_ins"] >= 1 and me["activity"]["last_sign_in"]
+        assert set(me["activity"]) >= {"decisions", "last_decision", "reports_sent", "undos"}
+        # An account that never signed in has no activity row, not a row of zeros.
+        never = [u for u in body["users"] if u["activity"] is None]
+        assert all(u["email"] != "registrar@min.gov.in" for u in never)

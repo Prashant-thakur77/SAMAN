@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
+import { ProvenanceLine } from '../components/charts/Provenance'
 import { formatRupees } from '../components/charts/CountUp'
 import { StatusChip } from '../components/primitives/Chip'
 import { EmptyState } from '../components/primitives/EmptyState'
@@ -84,6 +85,7 @@ export default function DashOpportunity() {
           ) : undefined
         }
       />
+      <ProvenanceLine provenance={data.provenance} />
 
       <div className="flex flex-wrap items-center gap-1 border-b border-hairline">
         {TABS.map((entry) => (
