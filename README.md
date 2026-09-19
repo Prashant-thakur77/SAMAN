@@ -661,6 +661,16 @@ rather than a separate estimate that could drift from it. Ingest then runs the
 pipeline with a determinate progress bar, and the new rows arrive in the review
 queue.
 
+Real extracts are `.xlsx` as often as CSV, so the wizard takes both. A
+workbook's first sheet (or the one you pick) is the table, and any other
+sheet that carries a material code and a text column, the way SAP keeps the
+long text apart from the forty-character `MAKTX`, is joined onto the
+descriptions by code before normalisation, so the matcher reads what the buyer
+wrote. Numeric codes stay codes, blank rows Excel leaves behind are skipped,
+and the header step asks the API rather than parsing the file in the browser,
+so the mapping shown is the mapping the dry run uses. Every rejected row, with
+its reason and its original columns, downloads as a CSV.
+
 ### Copilot
 
 The pattern is vanna's (retrieve, generate, **validate before execute**) with

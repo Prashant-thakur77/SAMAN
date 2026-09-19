@@ -1,8 +1,15 @@
-"""CSV ingest with a validation report — spec §5, §6.11.
+"""CSV and Excel ingest with a validation report — spec §5, §6.11.
 
 Column names differ across CPSEs, so the header is auto-mapped against a set of
 known aliases. The onboarding wizard (M7) lets a user override that mapping;
 this endpoint accepts the override through `mapping`.
+
+Real extracts are `.xlsx` as often as CSV, and a SAP extract keeps the short
+text (MAKTX) in one sheet and the long text in another, keyed by material.
+An Excel upload reads the first sheet (or `sheet`) as the table and, when
+another sheet maps to a material code and a text column, appends that
+sheet's text to each row's description, so the matcher sees what the buyer
+wrote and not only the forty-character short text.
 
 `dry_run` returns exactly the same report without writing, which is what the
 wizard's step 3 shows before the user commits.
@@ -55,15 +62,30 @@ async def _read_capped(file: UploadFile) -> bytes:
         chunks.append(chunk)
     return b"".join(chunks)
 
+
 #: Target field -> header spellings seen in real CPSE extracts.
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "legacy_code": (
-        "legacy_code", "material_code", "material", "matnr", "code", "item_code",
-        "material number", "material no", "sap code", "part code",
+        "legacy_code",
+        "material_code",
+        "material",
+        "matnr",
+        "code",
+        "item_code",
+        "material number",
+        "material no",
+        "sap code",
+        "part code",
     ),
     "description": (
-        "description", "material_description", "desc", "maktx", "item_description",
-        "long text", "short text", "material text",
+        "description",
+        "material_description",
+        "desc",
+        "maktx",
+        "item_description",
+        "long text",
+        "short text",
+        "material text",
     ),
     "uom": ("uom", "unit", "unit_of_measure", "meins", "base uom", "uom_code"),
     "plant": ("plant", "werks", "location", "site", "store"),
@@ -72,6 +94,108 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 REQUIRED = ("legacy_code", "description")
+
+#: Header spellings for a long-text sheet's text column.
+LONG_TEXT_ALIASES = ("long text", "long_text", "ltext", "tdline", "text", "purchase order text")
+
+XLSX_MAGIC = b"PK\x03\x04"
+
+
+def _is_xlsx(filename: str | None, payload: bytes) -> bool:
+    name = (filename or "").lower()
+    return name.endswith((".xlsx", ".xlsm")) or payload[:4] == XLSX_MAGIC
+
+
+def _cell(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        # Excel stores 123456 as 123456.0; a material code is not a float.
+        return str(int(value))
+    return str(value).strip()
+
+
+def read_table(
+    payload: bytes, filename: str | None, sheet: str | None = None
+) -> tuple[list[str], list[dict[str, str]], dict]:
+    """Headers and rows from a CSV or an Excel upload, plus notes about how
+    the file was read (which sheet, whether a long-text sheet was joined)."""
+    notes: dict = {"format": "csv"}
+    if not _is_xlsx(filename, payload):
+        try:
+            text = payload.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            # Indian ERP extracts are frequently cp1252; fall back rather than reject.
+            text = payload.decode("cp1252", errors="replace")
+        reader = csv.DictReader(io.StringIO(text))
+        headers = list(reader.fieldnames or [])
+        return headers, [dict(row) for row in reader], notes
+
+    from openpyxl import load_workbook
+
+    try:
+        book = load_workbook(io.BytesIO(payload), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "The file is not a readable .xlsx workbook."
+        ) from exc
+    names = book.sheetnames
+    if sheet and sheet not in names:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"No sheet named {sheet!r}; the workbook has: {', '.join(names)}.",
+        )
+    main_name = sheet or names[0]
+    notes.update({"format": "xlsx", "sheet": main_name, "sheets": names})
+
+    def rows_of(name: str) -> tuple[list[str], list[dict[str, str]]]:
+        ws = book[name]
+        it = ws.iter_rows(values_only=True)
+        header_row = next(it, None)
+        if not header_row:
+            return [], []
+        heads = [_cell(h) for h in header_row]
+        out = []
+        for values in it:
+            if values is None or all(v is None or _cell(v) == "" for v in values):
+                continue
+            out.append({heads[i]: _cell(v) for i, v in enumerate(values) if i < len(heads)})
+        return heads, out
+
+    headers, rows = rows_of(main_name)
+
+    # A long-text sheet: another sheet with a material code and a text column.
+    for other in names:
+        if other == main_name:
+            continue
+        o_headers, o_rows = rows_of(other)
+        lowered = {h.lower(): h for h in o_headers}
+        code_col = next((lowered[a] for a in COLUMN_ALIASES["legacy_code"] if a in lowered), None)
+        text_col = next((lowered[a] for a in LONG_TEXT_ALIASES if a in lowered), None)
+        if not code_col or not text_col or not o_rows:
+            continue
+        long_text: dict[str, list[str]] = {}
+        for row in o_rows:
+            code = row.get(code_col, "")
+            line = row.get(text_col, "")
+            if code and line:
+                long_text.setdefault(code, []).append(line)
+        if not long_text:
+            continue
+        mapping, _ = guess_mapping(headers)
+        code_key, desc_key = mapping.get("legacy_code"), mapping.get("description")
+        if not code_key or not desc_key:
+            break
+        joined = 0
+        for row in rows:
+            extra = long_text.get(row.get(code_key, ""))
+            if extra:
+                row[desc_key] = " ".join([row.get(desc_key, ""), *extra]).strip()
+                joined += 1
+        notes["long_text"] = {"sheet": other, "column": text_col, "rows_joined": joined}
+        break
+    book.close()
+    return headers, rows, notes
 
 
 def guess_mapping(headers: list[str]) -> tuple[dict[str, str], list[str]]:
@@ -98,6 +222,29 @@ def _to_float(value: str | None) -> float | None:
         return None
 
 
+@router.post("/ingest/headers")
+async def ingest_headers(
+    _user: Annotated[User, Depends(require_roles("registrar", "admin", "steward"))],
+    file: Annotated[UploadFile, File()],
+    sheet: Annotated[str | None, Form()] = None,
+) -> dict:
+    """The file's header row and the mapping the API would guess for it, so
+    the wizard's mapping step shows exactly what the dry run will do, for a
+    CSV or a workbook alike. Nothing is written."""
+    payload = await _read_capped(file)
+    headers, rows, notes = read_table(payload, file.filename, sheet)
+    if not headers:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The file has no header row.")
+    mapping, unmapped = guess_mapping(headers)
+    return {
+        "headers": headers,
+        "mapping": mapping,
+        "unmapped": unmapped,
+        "rows": len(rows),
+        "source": notes,
+    }
+
+
 @router.post("/ingest", response_model=IngestReport)
 async def ingest(
     _user: Annotated[User, Depends(require_roles("registrar", "admin", "steward"))],
@@ -105,6 +252,7 @@ async def ingest(
     file: Annotated[UploadFile, File()],
     dry_run: Annotated[bool, Form()] = False,
     mapping: Annotated[str | None, Form()] = None,
+    sheet: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
 ) -> IngestReport:
     cpse = db.execute(select(Cpse).where(Cpse.code == cpse_code.upper())).scalar_one_or_none()
@@ -112,15 +260,7 @@ async def ingest(
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown CPSE code {cpse_code!r}.")
 
     payload = await _read_capped(file)
-
-    try:
-        text = payload.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        # Indian ERP extracts are frequently cp1252; fall back rather than reject.
-        text = payload.decode("cp1252", errors="replace")
-
-    reader = csv.DictReader(io.StringIO(text))
-    headers = reader.fieldnames or []
+    headers, table_rows, read_notes = read_table(payload, file.filename, sheet)
     if not headers:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "The file has no header row.")
 
@@ -142,9 +282,7 @@ async def ingest(
         )
 
     existing = set(
-        db.execute(
-            select(RawItem.legacy_code).where(RawItem.cpse_id == cpse.id)
-        ).scalars()
+        db.execute(select(RawItem.legacy_code).where(RawItem.cpse_id == cpse.id)).scalars()
     )
 
     accepted: list[dict] = []
@@ -155,23 +293,19 @@ async def ingest(
     already_present = 0
     rows_read = 0
 
-    for row_number, row in enumerate(reader, start=2):  # row 1 is the header
+    for row_number, row in enumerate(table_rows, start=2):  # row 1 is the header
         rows_read += 1
         legacy = (row.get(column_mapping["legacy_code"]) or "").strip()
         description = (row.get(column_mapping["description"]) or "").strip()
 
         if not legacy:
             rejected.append(
-                RejectedRow(
-                    row_number=row_number, reason="Missing material code.", raw=dict(row)
-                )
+                RejectedRow(row_number=row_number, reason="Missing material code.", raw=dict(row))
             )
             continue
         if not description:
             rejected.append(
-                RejectedRow(
-                    row_number=row_number, reason="Missing description.", raw=dict(row)
-                )
+                RejectedRow(row_number=row_number, reason="Missing description.", raw=dict(row))
             )
             continue
         if legacy in seen_in_file:
@@ -257,4 +391,5 @@ async def ingest(
         unmapped_columns=unmapped,
         rejected=rejected[:50],  # enough to diagnose without returning the file back
         samples=samples,
+        source=read_notes,
     )

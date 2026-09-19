@@ -47,7 +47,7 @@ and at a desk.*
 | Smart-Create | add · **done** | Barcode and part-number fields feeding the check; save a probe as a draft request | Most new-code requests start from a box in hand | 2 d |
 | Dashboards | add · **done** (CSV on every table, PDF via print) | Drill-down: every bar and tile opens the rows behind it; CSV and PDF export | An executive's next question is always "which ones" | 3 d |
 | Dashboards | improve | A steward's own-CPSE view; date scoping on the money sections | The same page must serve two readers | 2 d |
-| Onboard | improve | Excel input, long-text tables, a downloadable rejection report, progress for large files | Real extracts are .xlsx with MAKTX in one sheet and long text in another | 3 d |
+| Onboard | improve · **done** (progress bar: pipeline only) | Excel input, long-text tables, a downloadable rejection report, progress for large files | Real extracts are .xlsx with MAKTX in one sheet and long text in another | 3 d |
 | Item / Cluster | add · **compare done**, attachments next | Side-by-side compare of any two rows; attachments (datasheet, drawing) on a golden record | Approvers ask for the datasheet first | 3 d |
 | Assistant | improve · **done** | Hindi answers when asked in Hindi; clickable citations; the last five turns as context | The people at the bin do not write English questions | 2 d |
 | Whole site | improve | Hindi interface toggle; loading states on every fetch; an accessibility pass with a screen reader | A government instrument is used by everyone | 4 d |

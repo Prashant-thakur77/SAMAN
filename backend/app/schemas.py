@@ -59,6 +59,9 @@ class IngestReport(BaseModel):
     unmapped_columns: list[str] = Field(default_factory=list)
     rejected: list[RejectedRow] = Field(default_factory=list)
     samples: list[SampleNormalization] = Field(default_factory=list)
+    #: How the file was read: csv or xlsx, which sheet, and whether a
+    #: long-text sheet was joined onto the descriptions.
+    source: dict = Field(default_factory=dict)
 
 
 # --- pipeline ---

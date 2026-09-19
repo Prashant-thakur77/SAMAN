@@ -367,3 +367,81 @@ class TestSearchReadsTheQueryLikeADescription:
         ids = [i["item_id"] for i in newest["items"]]
         assert ids == sorted(ids, reverse=True)
         assert as_viewer.get("/api/items?search=BEARING&sort=sideways").json()["sort"] == "relevance"
+
+
+class TestExcelExtracts:
+    """Real extracts are .xlsx, with the long text in a second sheet."""
+
+    def _workbook(self, with_long_text=True) -> bytes:
+        from openpyxl import Workbook
+
+        book = Workbook()
+        ws = book.active
+        ws.title = "MARA"
+        ws.append(["MATNR", "MAKTX", "MEINS", "WERKS"])
+        ws.append([700001, "BRG,BALL,6205-2Z,SKF", "NOS", "KOCHI"])
+        ws.append(["XL0002", "GASKET SW 2IN 150#", "NOS", "KOCHI"])
+        ws.append([None, None, None, None])  # a blank row Excel leaves behind
+        if with_long_text:
+            lt = book.create_sheet("STXH")
+            lt.append(["MATNR", "LONG TEXT"])
+            lt.append([700001, "500 KG 120 C"])
+            lt.append([700001, "BORE 25MM"])
+        out = io.BytesIO()
+        book.save(out)
+        return out.getvalue()
+
+    def test_an_xlsx_is_read_like_a_csv_and_the_long_text_is_joined(self, as_registrar, pipeline_run):
+        response = as_registrar.post(
+            "/api/ingest",
+            data={"cpse_code": "CPCL", "dry_run": "true"},
+            files={
+                "file": (
+                    "extract.xlsx",
+                    self._workbook(),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["rows_read"] == 2 and body["rows_accepted"] == 2
+        assert body["column_mapping"]["legacy_code"] == "MATNR"
+        assert body["source"]["format"] == "xlsx" and body["source"]["sheet"] == "MARA"
+        assert body["source"]["long_text"] == {"sheet": "STXH", "column": "LONG TEXT", "rows_joined": 1}
+        # The numeric material code came through as a code, not a float, and
+        # the long text reached the description the matcher normalises.
+        joined = next(s for s in body["samples"] if s["legacy_code"] == "700001")
+        assert "BORE 25MM" in joined["original"] and "500 KG" in joined["original"]
+
+    def test_a_named_sheet_and_a_missing_one(self, as_registrar, pipeline_run):
+        xlsx = self._workbook(with_long_text=False)
+        ok = as_registrar.post(
+            "/api/ingest",
+            data={"cpse_code": "CPCL", "dry_run": "true", "sheet": "MARA"},
+            files={"file": ("x.xlsx", xlsx, "application/octet-stream")},
+        )
+        assert ok.status_code == 200 and "long_text" not in ok.json()["source"]
+        missing = as_registrar.post(
+            "/api/ingest",
+            data={"cpse_code": "CPCL", "dry_run": "true", "sheet": "MARC"},
+            files={"file": ("x.xlsx", xlsx, "application/octet-stream")},
+        )
+        assert missing.status_code == 422 and "MARA" in missing.json()["detail"]
+
+    def test_a_csv_still_reads_as_csv(self, as_registrar, pipeline_run):
+        body = as_registrar.post(
+            "/api/ingest",
+            data={"cpse_code": "CPCL", "dry_run": "true"},
+            files={"file": ("x.csv", b"code,description\nA1,BOLT HEX M10\n", "text/csv")},
+        ).json()
+        assert body["source"] == {"format": "csv"} and body["rows_accepted"] == 1
+
+    def test_the_wizard_reads_headers_from_the_api(self, as_registrar, pipeline_run):
+        body = as_registrar.post(
+            "/api/ingest/headers",
+            files={"file": ("x.xlsx", self._workbook(), "application/octet-stream")},
+        ).json()
+        assert body["headers"] == ["MATNR", "MAKTX", "MEINS", "WERKS"]
+        assert body["mapping"]["description"] == "MAKTX" and body["rows"] == 2
+        assert body["source"]["sheets"] == ["MARA", "STXH"]

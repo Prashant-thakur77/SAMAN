@@ -1105,7 +1105,14 @@ export type IngestReport = {
   already_present: number
   column_mapping: Record<string, string>
   unmapped_columns: string[]
-  rejected: { row_number: number; reason: string }[]
+  rejected: { row_number: number; reason: string; raw?: Record<string, string> }[]
+  /** How the file was read: csv or xlsx, which sheet, and any long-text sheet joined. */
+  source?: {
+    format: 'csv' | 'xlsx'
+    sheet?: string
+    sheets?: string[]
+    long_text?: { sheet: string; column: string; rows_joined: number }
+  }
   samples: {
     legacy_code: string
     original: string
@@ -1116,17 +1123,38 @@ export type IngestReport = {
   }[]
 }
 
+export type IngestHeaders = {
+  headers: string[]
+  mapping: Record<string, string>
+  unmapped: string[]
+  rows: number
+  source: NonNullable<IngestReport['source']>
+}
+
+/** The file's header row and the API's own guess at the mapping, for CSV or .xlsx. */
+export async function ingestHeaders(file: File, sheet?: string): Promise<IngestHeaders> {
+  const form = new FormData()
+  form.append('file', file)
+  if (sheet) form.append('sheet', sheet)
+  const res = await sendRaw('/api/ingest/headers', { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
+  return body as IngestHeaders
+}
+
 export async function ingestCsv(
   file: File,
   cpseCode: string,
   dryRun: boolean,
   mapping?: Record<string, string>,
+  sheet?: string,
 ): Promise<IngestReport> {
   const form = new FormData()
   form.append('file', file)
   form.append('cpse_code', cpseCode)
   form.append('dry_run', String(dryRun))
   if (mapping) form.append('mapping', JSON.stringify(mapping))
+  if (sheet) form.append('sheet', sheet)
   const res = await sendRaw('/api/ingest', { method: 'POST', body: form })
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)

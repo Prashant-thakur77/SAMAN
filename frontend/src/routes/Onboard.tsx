@@ -13,12 +13,15 @@ import {
   getCpses,
   getPipelineStatus,
   ingestCsv,
+  ingestHeaders,
   runPipeline,
+  type IngestHeaders,
   type IngestReport,
   type PipelineStatus,
 } from '../lib/api'
 import { cn } from '../lib/cn'
 import { guessMapping } from '../lib/columnAliases'
+import { downloadCsv, rowsToCsv } from '../lib/csv'
 import { EASE } from '../lib/motion'
 import { useSession } from '../lib/session'
 
@@ -37,6 +40,9 @@ export default function Onboard() {
   const [direction, setDirection] = useState(1)
   const [file, setFile] = useState<File | null>(null)
   const [headers, setHeaders] = useState<string[]>([])
+  // How the API read the file: which sheet of a workbook, any long text joined.
+  const [source, setSource] = useState<IngestHeaders['source'] | null>(null)
+  const [sheet, setSheet] = useState('')
   const [cpses, setCpses] = useState<{ code: string; name: string; items: number }[]>([])
   const [cpse, setCpse] = useState('')
   const [newCode, setNewCode] = useState('')
@@ -65,15 +71,24 @@ export default function Onboard() {
     setError(null)
   }
 
-  async function readHeaders(chosen: File) {
-    const text = await chosen.slice(0, 64_000).text()
-    const first = text.split(/\r?\n/)[0] ?? ''
-    const parsed = first.split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-    setHeaders(parsed)
-    // Pre-fill with the same guess the API will make, so what this screen
-    // shows is what the dry run does: an SAP header row (MATNR, MAKTX …) is
-    // read here as it is there.
-    setMapping(guessMapping(parsed))
+  async function readHeaders(chosen: File, chosenSheet?: string) {
+    // The API reads the header row and guesses the mapping, for a CSV or a
+    // workbook alike, so what this screen shows is what the dry run does.
+    try {
+      const read = await ingestHeaders(chosen, chosenSheet)
+      setHeaders(read.headers)
+      setMapping(read.mapping)
+      setSource(read.source)
+      setSheet(read.source.sheet ?? '')
+    } catch (err) {
+      // A CSV can still be read here when the API is unreachable.
+      const text = await chosen.slice(0, 64_000).text()
+      const parsed = (text.split(/\r?\n/)[0] ?? '').split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+      setHeaders(parsed)
+      setMapping(guessMapping(parsed))
+      setSource(null)
+      setError(err instanceof ApiError ? err.message : null)
+    }
   }
 
   async function dryRun() {
@@ -81,7 +96,7 @@ export default function Onboard() {
     setBusy(true)
     setError(null)
     try {
-      setReport(await ingestCsv(file, cpse, true, mapping))
+      setReport(await ingestCsv(file, cpse, true, mapping, sheet || undefined))
       go(2)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'The dry run failed.')
@@ -172,7 +187,7 @@ export default function Onboard() {
             <>
               <div className="space-y-3">
                 <label htmlFor="csv" className="micro-label block">
-                  Catalogue file (CSV)
+                  Catalogue file (CSV or Excel)
                 </label>
                 {/* The native file control carries the browser's own chrome,
                     which is the one place the interface stops looking like
@@ -181,7 +196,7 @@ export default function Onboard() {
                   id="csv"
                   ref={picker}
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,text/csv,.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   className="sr-only"
                   onChange={(e) => {
                     const chosen = e.target.files?.[0] ?? null
@@ -201,7 +216,35 @@ export default function Onboard() {
                 {file && (
                   <p className="text-xs text-muted">
                     {(file.size / 1024).toFixed(0)} KB · {headers.length} columns
+                    {source?.format === 'xlsx' && source.sheet && <> · sheet {source.sheet}</>}
+                    {source?.long_text && (
+                      <>
+                        {' '}
+                        · long text from sheet {source.long_text.sheet} joined onto{' '}
+                        {source.long_text.rows_joined.toLocaleString('en-IN')} rows
+                      </>
+                    )}
                   </p>
+                )}
+                {source?.format === 'xlsx' && (source.sheets?.length ?? 0) > 1 && (
+                  <label className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                    Table sheet
+                    <select
+                      value={sheet}
+                      onChange={(e) => {
+                        setSheet(e.target.value)
+                        if (file) void readHeaders(file, e.target.value)
+                      }}
+                      className="h-8 border border-hairline bg-bg px-2 text-xs text-ink"
+                    >
+                      {source.sheets!.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                    <span>The other sheets are checked for a long-text table by material code.</span>
+                  </label>
                 )}
               </div>
 
@@ -356,13 +399,42 @@ export default function Onboard() {
 
               {report.rejected.length > 0 && (
                 <div className="space-y-3">
-                  <h2 className="micro-label">Rejected rows</h2>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="micro-label">Rejected rows</h2>
+                    <button
+                      type="button"
+                      className="font-mono text-[11px] text-muted underline-offset-2 hover:text-ink hover:underline"
+                      title="Every rejected row with its reason and its original columns, as a CSV file"
+                      onClick={() =>
+                        downloadCsv(
+                          `rejected-${report.cpse_code}`,
+                          rowsToCsv(
+                            report.rejected.map((row) => ({
+                              row_number: row.row_number,
+                              reason: row.reason,
+                              ...(row.raw ?? {}),
+                            })),
+                          ),
+                        )
+                      }
+                    >
+                      Rejection report CSV ↓
+                    </button>
+                  </div>
                   <ul className="space-y-1">
                     {report.rejected.slice(0, 8).map((row) => (
                       <li key={row.row_number} className="font-mono text-xs text-danger">
                         row {row.row_number}: {row.reason}
                       </li>
                     ))}
+                    {report.rejected.length > 8 && (
+                      <li className="text-xs text-muted">
+                        …and {report.rejected.length - 8} more in the report
+                        {report.rows_rejected > report.rejected.length &&
+                          ` (the first ${report.rejected.length} of ${report.rows_rejected} are listed)`}
+                        .
+                      </li>
+                    )}
                   </ul>
                 </div>
               )}
