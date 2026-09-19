@@ -8,6 +8,62 @@ computed, every assumption shown, nothing decides unaccountably, and
 `KNOWN_GAPS.md` stays public. `ROADMAP.md` says who this is for and why; this
 file says what to build, in what order.
 
+## Plan forward, from 20 September 2026
+
+Stage 1 is closed and most of Stage 2's software items are done (the table
+below carries the detail). What follows is the order of work from here,
+split by what needs nothing but time and what needs an input from outside
+the repository. Each item states its finish line, so "done" is a check, not
+a feeling.
+
+### Done since the last refresh
+
+- Every screen checked at phone, tablet and desktop width in a real browser:
+  no sideways scroll, no page errors; wide tables scroll inside their card
+  with a note; the item drawer opens from the edge; the assistant launcher is
+  draggable and remembered per device.
+- Sign-in no longer recomputes every dashboard (the memo ignores ledger
+  events that change no figure); Home shows its parts as each lands.
+- Incremental runs are graded around their new rows; the estate's figures
+  read the last full run and name the increments since.
+- Per-class threshold sweep in `make tune`; price flags at 1.5× the others'
+  median with the rule printed beside them; the model harness measured on
+  local 3B and 7B models.
+
+### Next, needing nothing from outside (in order)
+
+| # | Item | Finish line | Effort |
+|---|---|---|---|
+| 1 | **Specification sheet** from a golden record: a printable page (and PDF via print) with the standard description, every attribute with unit and tolerance, the class's identity-critical fields marked, the CNMC and legacy codes, the equivalents, and a QR to the record; for a GeM bid | `/specs/:cnmc` prints on one A4 sheet; Copilot and the item page link to it | 1 d |
+| 2 | **Class-template drafting**: from a class's rows, propose attributes, units, tolerances and roles for an expert to approve in a form; nothing is used until approved and the approval is on the ledger | Ten classes drafted from the synthetic estate; the form round-trips; the matcher reads an approved template | 1 wk |
+| 3 | **Language model as equivalence proposer**: the spec's lowest-trust source; suggestions land in the substitutes queue marked *proposed by the model*, with the passage it read; never a merge, never auto-approved | Proposals appear with their evidence; precision of the model's proposals measured against planted equivalents and printed on the admin page | 3 d |
+| 4 | **Hindi attribute words inside extraction** (व्यास, दबाव, मोटाई…) and Odia and Tamil term tables in the transliterator | The extraction tests pass on a Hindi-tokened row for every class; the Search reads them | 2 d |
+| 5 | **Pipeline runs in the background with progress** on the Onboard screen and the Admin page, survivable across a page reload; a run that is already going is joined, not started twice | A full run on the demo estate shows its stage and elapsed time from any tab; two clicks do not make two runs | 2 d |
+| 6 | **Session list and revocation, password policy** on Admin; demo login off is a one-line setting already | A registrar sees every live session and can end one; a weak password is refused with the rule shown | 2 d |
+| 7 | **Signed chain exports and anchoring**: the audit head signed with a machine key and written outside the database on a schedule; export verifies offline | `make audit-export` produces a file that `audit verify --file` accepts and a tampered copy fails | 2 d |
+| 8 | **Realised-savings ledger**: post-consolidation POs against the baseline, entered by hand until the ERP feed exists; synthetic rows say so | The Opportunity page separates *identified* from *realised* and the roll-up carries both | 3 d |
+| 9 | **Offline Tier 2 option**: bundle MiniLM weights behind a flag and measure against TF-IDF on the same held-out split | A table in the README with both rows, same seed, same machine | 2 d |
+| 10 | **Phone polish, round two**: tab strips that scroll rather than wrap; the Workbench keyboard help hidden on touch (done) and swipe to approve/reject on a card, with an undo toast | The five demo moves pass at 390 px in `make e2e --mobile` | 2 d |
+
+### Next, needing an input from outside
+
+| Item | What is needed | From whom |
+|---|---|---|
+| Real-text measurement | A few thousand item descriptions from GeM or CPPP tender documents (text only) | the team, or a data request |
+| Nameplate OCR on real plates | Fifty photographs of real nameplates in bad light | a plant visit |
+| Class templates approved | An engineer to approve ten drafted templates | a domain expert |
+| SAP adapter | A sandbox client and a basis team for the BAdI | a CPSE IT department |
+| Identity | Which SSO the ministry uses (Parichay or the CPSE directory) | the ministry |
+| Database | The decision to move the registry node to PostgreSQL | the team |
+| Screen-reader walkthrough | An afternoon with NVDA or VoiceOver | a person who uses one |
+| Keys | Rotate the Groq and Render keys after the event | the team |
+
+### Not before the event
+
+PostgreSQL, SSO, the federation bundles and the GeM tender pack are Stage 3
+work; each is a week or more and none changes what a judge sees. They start
+after the demo, in that order.
+
 ## Where each problem-statement capability stands
 
 | PS capability | Built today | The refinement that moves it most |
@@ -179,7 +235,7 @@ never a feeling.
 | Item | Status | Effort |
 |---|---|---|
 | Export any table (search results, queue, dashboard section) as CSV | done | 1 d |
-| A printable specification sheet from a golden record, for a GeM bid | next | 1 d |
+| A printable specification sheet from a golden record, for a GeM bid | next (item 1 of the plan forward) | 1 d |
 | "Why?" on every card and Copilot answer: the refusal or merge reason as one sentence, already computed | done | 1 d |
 | Keyboard shortcut help (`?`) on every screen | done | ½ d |
 | A "what runs where" panel on the health page listing each engine, its version and whether it is local or remote | done | ½ d |

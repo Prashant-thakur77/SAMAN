@@ -325,10 +325,17 @@ per-class threshold sweeps in `make tune` (bearings would gain +0.03 F1 from a
 lower cut, other classes ~0; reported, not applied); price flags at 1.5× the
 other buyers' median with the rule printed beside them.
 
-**Next, from the plan:** class-template drafting for new families; a public
-GeM/CPPP corpus to measure on real text; signed bundles between CPSE nodes;
-realised-savings tracking once post-consolidation POs exist; a screen-reader
-walkthrough.
+Every screen has since been checked at phone, tablet and desktop width; the
+assistant launcher can be dragged anywhere; sign-in no longer recomputes the
+dashboards; incremental runs are graded honestly.
+
+**Next, from the plan (`docs/REFINEMENT_PLAN.md`, "Plan forward"):** a
+printable specification sheet from a golden record; class-template drafting
+for new families; the language model as an equivalence proposer into the
+queue; Hindi attribute words in extraction; background pipeline runs with
+progress; then the items that need an outside input: a public GeM/CPPP corpus
+to measure on real text, real nameplate photographs, an expert to approve
+templates, a screen-reader walkthrough.
 
 **Known limits worth saying out loud:** all data is synthetic (with full
 ground truth, which is what makes the metrics honest); no live SAP has been
