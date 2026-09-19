@@ -59,8 +59,8 @@ on the machine that will serve and read the numbers before choosing.
 
 | Model | Quantisation | RAM while loaded | Typical answer, CPU only | When |
 |---|---|---|---|---|
-| `qwen2.5:3b` (default) | Q4_K_M (Ollama's default pull) | ~2.5 GB | 5–8 s for a two-sentence answer on a 4-core laptop | a 4–8 GB machine; a pilot |
-| `qwen2.5:7b` | Q4_K_M | ~5 GB | 12–20 s CPU; 1–2 s with any 8 GB GPU | a workstation or server with 16 GB, or a GPU |
+| `qwen2.5:3b` (default) | Q4_K_M (Ollama's default pull) | ~2.5 GB | 5–8 s for a two-sentence answer on a 4-core laptop CPU; ~1.2 s on a 6 GB laptop GPU (measured: 15/16 accepted, 9/16 correct on the harness) | a 4–8 GB machine; a pilot |
+| `qwen2.5:7b` | Q4_K_M | ~5 GB | 12–20 s CPU; ~2.5 s on a 6 GB laptop GPU (measured: 16/16 accepted, 10/16 correct) | a workstation or server with 16 GB, or a GPU |
 | remote endpoint (`SAMAN_LLM_URL`) | — | none locally | under a second | a demo without a laptop; **questions and retrieved passages leave the machine**, and the health chip says so |
 | none | — | — | — | sovereign mode, or any machine where the above do not fit |
 

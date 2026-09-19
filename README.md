@@ -791,6 +791,24 @@ is appended to `data/eval/assistant-answers.jsonl` (`SAMAN_ANSWER_LOG`), and
 `make llm-eval` can replay the questions people actually asked with
 `python -m app.cli llm-eval --from-log`.
 
+The harness's sixteen questions, run against each model on the same laptop
+(i7-13650HX, RTX 3050 6 GB, so the local models ran on the GPU; the first
+question of each run includes the model load):
+
+| Model | Where | Accepted by the guards | Correct (expected words present) | Mean per question | After load |
+|---|---|---|---|---|---|
+| `qwen2.5:3b` (Q4, Ollama) | local | 15/16 | 9/16 | 3.3 s | ~1.2 s |
+| `qwen2.5:7b` (Q4, Ollama) | local | 16/16 | 10/16 | 4.0 s | ~2.5 s |
+| `qwen/qwen3.8-27b` (Groq) | remote | 14/16 | 12/16 | ~0.5 s | — |
+
+Read plainly: the 7B buys one more correct answer for roughly double the
+latency; the remote model is the most accurate and the only one that sends
+the question off the machine. The default stays `qwen2.5:3b`; a machine with
+16 GB or a GPU may prefer the 7B (`SAMAN_OLLAMA_PREFER=qwen2.5:7b,qwen2.5:3b`),
+and the numbers are why rather than a reputation. "Correct" is a strict
+word check; several of the misses are answers a reader would accept that
+use a synonym.
+
 A follow-up carries its context: the widget sends the last five turns with
 the question, the model sees them (trimmed) before the passages, and such
 answers are never memoised, since the same words later may mean something

@@ -125,7 +125,7 @@ never a feeling.
 
 | # | Item | Status | Why |
 |---|---|---|---|
-| L1 | A measured harness: `make llm-eval` runs sixteen questions from the documents (English, Hinglish, Hindi) and reports acceptance, correctness against expected words, and seconds, for whatever model is configured | done | Without it "better" is an opinion. Baseline, remote Qwen 27B on Groq: accepted 14/16, correct 12/16. Local 3B and 7B: run the harness with Ollama on and record the numbers here |
+| L1 | A measured harness: `make llm-eval` runs sixteen questions from the documents (English, Hinglish, Hindi) and reports acceptance, correctness against expected words, and seconds, for whatever model is configured | done | Without it "better" is an opinion. Baseline, remote Qwen 27B on Groq: accepted 14/16, correct 12/16. Local 3B: accepted 15/16, correct 9/16; 7B: 16/16, 10/16 (README, "Ask SAMAN") |
 | L2 | Wider corpus: the SAP integration guide, the roadmap and this plan join the README, gaps list and spec | done | Judges ask about integration and the future; the model should read the same pages they do |
 | L3 | Retrieval reads Hindi, Hinglish and house abbreviations by normalising the question the way a description is normalised before searching | done | "वीटो लेयर क्या करती है" and "BRG" now find the right passages |
 | L4 | Answer in the language of the question; Hindi in Devanagari, Hinglish as typed | done | The people at the bin do not ask in English |
@@ -135,7 +135,7 @@ never a feeling.
 | L8 | Figure guard reads sentences: a trailing full stop no longer makes "0.9775." a different number from "0.9775" | done | A correct answer was being thrown away for punctuation |
 | L9 | Prefer a larger local model when the machine has one: `SAMAN_OLLAMA_PREFER=qwen2.5:7b,qwen2.5:3b` picks the first present | done (opt-in) | This laptop has the 7B pulled; a workstation should use it, a 4 GB box should not |
 | L10 | One bounded retry on a rate-limited remote call | done | A free tier meters tokens per minute; the demo must stutter, not stop |
-| L11 | Run L1 for `qwen2.5:3b` and `qwen2.5:7b` locally; publish all three rows in the README; choose the default per machine size from the numbers | next | The decision the harness exists for |
+| L11 | Run L1 for `qwen2.5:3b` and `qwen2.5:7b` locally; publish all three rows in the README; choose the default per machine size from the numbers | done (3B 15/16 · 9/16 · 1.2 s; 7B 16/16 · 10/16 · 2.5 s; remote 14/16 · 12/16; default stays 3B) | The decision the harness exists for |
 | L12 | Stream the answer to the widget token by token | done | A 3B model reads as slow when the reader waits for the whole sentence; streaming makes seven seconds feel like two |
 | L13 | Warm the memo at start with the assistant's suggested questions | done | The first click in a demo should not pay the model's cold start |
 | L14 | Keep an eval log: every accepted answer with its sources, every refusal with its reason, so the harness grows from real questions people asked | done | A test set written by users beats one written by us |
