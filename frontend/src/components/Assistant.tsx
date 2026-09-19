@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ApiError,
   askAssistant,
+  streamAssistant,
   getVoice,
   speakText,
   transcribeAudio,
@@ -39,7 +40,12 @@ type Turn = {
   reply?: AssistantReply
   error?: boolean
   heard?: string
+  /** Still arriving from the model, a sentence at a time. */
+  streaming?: boolean
 }
+
+/** Ask for streamed answers where the browser can read server-sent events. */
+const STREAMING = typeof EventSource !== 'undefined'
 
 const OPENERS = [
   'Take me to the workbench',
@@ -494,11 +500,51 @@ export function Assistant() {
       const userId = ++counter.current
       setTurns((prev) => [...prev, { id: userId, role: 'user', text: question, heard }])
       try {
-        const reply = await askAssistant(question, location.pathname)
-        setTurns((prev) => [
-          ...prev,
-          { id: ++counter.current, role: 'assistant', text: reply.answer, reply },
-        ])
+        let reply = await askAssistant(question, location.pathname, STREAMING)
+        if (reply.kind === 'stream') {
+          // The model's answer arrives a checked sentence at a time; the card
+          // fills as it does. If a later sentence fails the guard the whole
+          // card is replaced by the assistant's own words, never left half
+          // said.
+          const id = ++counter.current
+          setTurns((prev) => [...prev, { id, role: 'assistant', text: '', streaming: true }])
+          const { done } = streamAssistant(question, location.pathname, (event) => {
+            if (event.type === 'delta') {
+              setTurns((prev) =>
+                prev.map((t) => (t.id === id ? { ...t, text: t.text + event.text } : t)),
+              )
+            }
+          })
+          const final = await done
+          if (final.accepted) {
+            reply = {
+              kind: 'answer',
+              answer: final.text,
+              action: null,
+              citations: [],
+              suggestions: [],
+              mode: 'llm',
+              matched: { sources: final.sources ?? [] },
+            }
+          } else {
+            reply = final.fallback ?? {
+              kind: 'answer',
+              answer: 'I would rather not guess at that. Try asking about a screen, a term, or the data.',
+              action: null,
+              citations: [],
+              suggestions: [],
+              mode: 'deterministic',
+            }
+          }
+          setTurns((prev) =>
+            prev.map((t) => (t.id === id ? { ...t, text: reply.answer, reply, streaming: false } : t)),
+          )
+        } else {
+          setTurns((prev) => [
+            ...prev,
+            { id: ++counter.current, role: 'assistant', text: reply.answer, reply },
+          ])
+        }
         // A spoken question is answered aloud whatever the toggle says: that
         // is what a conversation is. In talk mode the microphone reopens once
         // the reply has been read.
@@ -937,7 +983,17 @@ export function Assistant() {
                       turn.error && 'text-danger',
                     )}
                   >
-                    <p>{turn.text}</p>
+                    <p aria-live={turn.streaming ? 'polite' : undefined}>
+                      {turn.text || (turn.streaming ? 'Reading the documents…' : '')}
+                      {turn.streaming && turn.text && (
+                        <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-muted align-middle" />
+                      )}
+                    </p>
+                    {turn.streaming && (
+                      <p className="micro-label mt-1 opacity-70">
+                        each sentence is checked against the documents before it appears
+                      </p>
+                    )}
                     {turn.heard && <p className="micro-label mt-1 opacity-70">{turn.heard}</p>}
                     {turn.role === 'assistant' && !turn.error && voiceOut && (
                       <button

@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,9 @@ class Query(BaseModel):
     #: Where the asker is, so "open the workbench" from the workbench is
     #: answered rather than performed.
     path: str | None = Field(default=None, max_length=200)
+    #: The caller can read `/assistant/stream`; answers from the model then
+    #: arrive a sentence at a time instead of after the whole thing.
+    stream: bool = False
 
 
 @router.get("/suggestions")
@@ -63,12 +66,65 @@ def query(
     """
     scope = scope_for(user)
     reply = assistant.answer(
-        db, body.question, scope, current_path=body.path, signed_in=user is not None
+        db,
+        body.question,
+        scope,
+        current_path=body.path,
+        signed_in=user is not None,
+        stream=body.stream,
     )
     payload = reply.as_dict()
     payload["scope"] = scope.as_dict()
     payload["signed_in"] = user is not None
     return payload
+
+
+@router.get("/stream")
+def stream(
+    q: str,
+    path: str | None = None,
+    user: Annotated[User | None, Depends(current_user_optional)] = None,
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """The model's answer as server-sent events, a checked sentence at a time.
+
+    Opened by the widget after `/query` replied `kind: "stream"`. Events are
+    `sources`, then `delta` per released sentence, then `done`. When the
+    model's words fail a guard the `done` event carries `fallback`: the
+    reply the assistant gives without the model, so the widget always ends
+    with something to show and never with the refused text.
+    """
+    import json
+
+    scope = scope_for(user)
+    signed_in = user is not None
+    # The same routing as /query decides whether this question may reach the
+    # model at all: a navigation, a topic card, a Copilot question, or a
+    # visitor's data-shaped question is answered here without it.
+    routed = assistant.answer(db, q, scope, current_path=path, signed_in=signed_in, stream=True)
+
+    def events():
+        if routed.kind != "stream":
+            done = {"type": "done", "accepted": False, "reason": "routed", "text": ""}
+            payload = json.dumps({**done, "fallback": routed.as_dict()}, ensure_ascii=False)
+            yield f"data: {payload}\n\n"
+            return
+        accepted = False
+        for event in knowledge.stream(q):
+            if event.get("type") == "done":
+                accepted = bool(event.get("accepted"))
+                if not accepted:
+                    fallback = assistant.answer(
+                        db, q, scope, current_path=path, signed_in=signed_in, use_model=False
+                    )
+                    event = {**event, "fallback": fallback.as_dict()}
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 async def _read_capped(upload: UploadFile, cap: int) -> bytes:

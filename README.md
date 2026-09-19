@@ -745,6 +745,21 @@ is retrieval-grounding rather than fine-tuning: the model learns the project
 from its documents at question time, with sources attached, and nothing about
 it is trained.
 
+The model's answers arrive **a sentence at a time**. The widget asks for a
+stream; when the question is one the model would answer and the memo does not
+already hold it, `/api/assistant/query` replies `kind: "stream"` and the
+widget reads `GET /api/assistant/stream` as server-sent events. Each sentence
+is released only once it is complete and every figure in it is in the
+passages or the question, so nothing the guard would refuse is ever shown; if
+a later sentence fails, the stream ends with the assistant's own reply in its
+place, never a half-said one. A 3B model's seven seconds read as two. At start
+the demo's document questions are answered once into the memo
+(`SAMAN_WARM_ANSWERS`), so the first click does not pay the cold start. Every
+answer the model gives, with its sources, and every refusal, with its reason,
+is appended to `data/eval/assistant-answers.jsonl` (`SAMAN_ANSWER_LOG`), and
+`make llm-eval` can replay the questions people actually asked with
+`python -m app.cli llm-eval --from-log`.
+
 `POST /api/assistant/query` is public and scoped like every other endpoint.
 
 ### Commercial and inventory analytics

@@ -136,9 +136,9 @@ never a feeling.
 | L9 | Prefer a larger local model when the machine has one: `SAMAN_OLLAMA_PREFER=qwen2.5:7b,qwen2.5:3b` picks the first present | done (opt-in) | This laptop has the 7B pulled; a workstation should use it, a 4 GB box should not |
 | L10 | One bounded retry on a rate-limited remote call | done | A free tier meters tokens per minute; the demo must stutter, not stop |
 | L11 | Run L1 for `qwen2.5:3b` and `qwen2.5:7b` locally; publish all three rows in the README; choose the default per machine size from the numbers | next | The decision the harness exists for |
-| L12 | Stream the answer to the widget token by token | next | A 3B model reads as slow when the reader waits for the whole sentence; streaming makes seven seconds feel like two |
-| L13 | Warm the memo at start with the assistant's suggested questions | next | The first click in a demo should not pay the model's cold start |
-| L14 | Keep an eval log: every accepted answer with its sources, every refusal with its reason, so the harness grows from real questions people asked | next | A test set written by users beats one written by us |
+| L12 | Stream the answer to the widget token by token | done | A 3B model reads as slow when the reader waits for the whole sentence; streaming makes seven seconds feel like two |
+| L13 | Warm the memo at start with the assistant's suggested questions | done | The first click in a demo should not pay the model's cold start |
+| L14 | Keep an eval log: every accepted answer with its sources, every refusal with its reason, so the harness grows from real questions people asked | done | A test set written by users beats one written by us |
 | L15 | Quantisation and hardware notes per model size (Q4 for 3B and 7B on CPU; a GPU makes the 7B the default) in the install guide | next | The size question is a deployment question |
 | L16 | Fine-tuning, only when the corpus is real: reviewer decisions and the documented question–answer pairs from L14, exported as JSONL (`make learn-corpus` exists); a LoRA on the local Qwen scored on the same harness before it is allowed to replace the base model | later | Today the corpus is mostly simulated labels; a model trained on them learns our generator. The harness is the gate |
 | L17 | Distil the remote model's accepted answers into the local eval set, never into the local model's weights | later | A cheap way to grow L14 with good examples while keeping the local model honest |

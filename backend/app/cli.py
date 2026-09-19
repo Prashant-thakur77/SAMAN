@@ -229,6 +229,12 @@ def cmd_llm_eval(args: argparse.Namespace) -> int:
     from .config import REPO_ROOT
 
     cases = yaml.safe_load((REPO_ROOT / "backend" / "app" / "data" / "llm_eval.yaml").read_text())
+    if getattr(args, "from_log", False):
+        cases = _cases_from_log(args.limit)
+        if not cases:
+            print(f"no questions in the answer log ({knowledge.answer_log_path()})")
+            return 1
+        print(f"{len(cases)} distinct questions people asked, from the answer log")
     if not llm.available():
         print(f"no model answers ({llm.engine_label()}); nothing to measure")
         return 1
@@ -247,7 +253,13 @@ def cmd_llm_eval(args: argparse.Namespace) -> int:
             outcome = "accepted"
             accepted += 1
             text = result.text.lower()
-            ok = any(str(word).lower() in text for word in case["expect"])
+            # A question from the log carries no expected words: acceptance and
+            # latency are what it measures, and it counts as correct.
+            ok = (
+                any(str(word).lower() in text for word in case["expect"])
+                if case.get("expect")
+                else True
+            )
             correct += int(ok)
         else:
             outcome = "declined" if result is None else "refused"
@@ -264,6 +276,34 @@ def cmd_llm_eval(args: argparse.Namespace) -> int:
     )
     print("  (correct = an accepted answer that contains one of the expected words)")
     return 0
+
+
+def _cases_from_log(limit: int) -> list[dict]:
+    """The most recent distinct questions in the answer log, newest first.
+
+    A test set written by the people who asked. They carry no expected words,
+    so the harness reports acceptance and latency for them; a maintainer who
+    finds a good one moves it into `llm_eval.yaml` with the words it should
+    contain.
+    """
+    import json
+
+    from . import knowledge
+
+    path = knowledge.answer_log_path()
+    if path is None or not path.exists():
+        return []
+    seen: dict[str, None] = {}
+    for line in reversed(path.read_text(encoding="utf-8").splitlines()):
+        try:
+            question = str(json.loads(line).get("question") or "").strip()
+        except ValueError:
+            continue
+        if question and question not in seen:
+            seen[question] = None
+        if len(seen) >= limit:
+            break
+    return [{"question": q, "expect": []} for q in seen]
 
 
 def cmd_evaluate(_args: argparse.Namespace) -> int:
@@ -441,6 +481,12 @@ def main(argv: list[str] | None = None) -> int:
         "llm-eval", help="measure the configured language model on the project's own questions"
     )
     llm_eval.add_argument("--verbose", action="store_true", help="print each answer")
+    llm_eval.add_argument(
+        "--from-log",
+        action="store_true",
+        help="ask the questions people actually asked (the answer log) instead of the fixed set",
+    )
+    llm_eval.add_argument("--limit", type=int, default=30, help="how many log questions (newest)")
     llm_eval.set_defaults(func=cmd_llm_eval)
 
     report = sub.add_parser(

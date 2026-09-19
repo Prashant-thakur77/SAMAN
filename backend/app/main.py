@@ -168,17 +168,38 @@ def warm_dashboards():
 
     from .smart_create import probe_embedder
 
-    return cache.warm(
-        [
-            ("executive (visitor)", job(executive_for, ANONYMOUS)),
-            ("executive (registrar)", job(executive_for, registrar)),
-            ("metrics", job(metrics_for)),
-            ("opportunity (registrar)", job(opportunity_for, registrar)),
-            # Smart-Create's probe embedder: the pipeline's saved fit, loaded
-            # once here rather than on the first requester's click.
-            ("smart-create embedder", job(probe_embedder)),
-        ]
-    )
+    jobs = [
+        ("executive (visitor)", job(executive_for, ANONYMOUS)),
+        ("executive (registrar)", job(executive_for, registrar)),
+        ("metrics", job(metrics_for)),
+        ("opportunity (registrar)", job(opportunity_for, registrar)),
+        # Smart-Create's probe embedder: the pipeline's saved fit, loaded
+        # once here rather than on the first requester's click.
+        ("smart-create embedder", job(probe_embedder)),
+    ]
+    if get_settings().saman_warm_answers:
+        jobs.append(("assistant answers", warm_answers))
+    return cache.warm(jobs)
+
+
+def warm_answers() -> int:
+    """Answer the demo's document questions once, into the memo, so the first
+    person to ask gets the sentence at once rather than after the model's
+    cold start. Nothing when no model is configured; each question is one
+    call, and a refusal is simply not memoised."""
+    from . import knowledge
+    from .assistant import WARM_QUESTIONS
+
+    if not knowledge.available():
+        return 0
+    warmed = 0
+    for question in WARM_QUESTIONS:
+        try:
+            if knowledge.answer(question) is not None:
+                warmed += 1
+        except Exception:  # pragma: no cover - best effort, logged by cache.warm
+            continue
+    return warmed
 
 
 #: Where the built frontend lives when this process serves it itself, which

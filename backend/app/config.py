@@ -84,6 +84,17 @@ class Settings(BaseSettings):
     #: Compute the dashboards once at start, in the background, so the first
     #: visitor does not wait for them. On by the deployments, off in development.
     saman_warm_dashboards: bool = False
+    #: With the dashboards, answer the assistant's document questions once at
+    #: start so the first click in a demo does not pay the model's cold
+    #: start. Only when a model is configured; a 3B model's seven seconds a
+    #: question happen in the background, before anyone asks.
+    saman_warm_answers: bool = True
+    #: Every answer the assistant's model gave, with its sources, and every
+    #: refusal with its reason, one JSON line each (`knowledge`). Relative
+    #: paths are under the data directory; empty turns the log off. It is
+    #: what `llm-eval --from-log` replays: a test set written by the people
+    #: who asked beats one written by us.
+    saman_answer_log: str = "eval/assistant-answers.jsonl"
 
     #: Retrain the pairwise model on its own as reviewer decisions accumulate
     #: (learn.py). The new model replaces the old one only if it is not worse

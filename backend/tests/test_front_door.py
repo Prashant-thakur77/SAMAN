@@ -21,6 +21,9 @@ PUBLIC = {
     # The assistant on the front page: explains the system, never opens the
     # database for a visitor, sends them to sign in for anything inside.
     ("POST", "/api/assistant/query"),
+    # The streamed form of the same answer: the model reads the public
+    # documents; a visitor's data question never reaches it (assistant._answer).
+    ("GET", "/api/assistant/stream"),
     ("GET", "/api/assistant/suggestions"),
     ("GET", "/api/assistant/voice"),
 }

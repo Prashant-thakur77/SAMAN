@@ -185,6 +185,83 @@ def chat(
     return (response.json().get("message", {}).get("content") or "").strip()
 
 
+def stream_chat(
+    messages: list[dict], *, temperature: float = 0.1, timeout: float = 60.0, max_tokens: int = 260
+):
+    """The same call as `chat`, yielding the text as it arrives.
+
+    Yields plain text deltas; raises on transport failure like `chat`. The
+    caller is responsible for the guards: a streamed answer is still checked
+    sentence by sentence before any of it is shown (`knowledge.stream`).
+    """
+    import json as _json
+
+    settings = get_settings()
+    if settings.saman_llm_url:
+        body = {
+            "model": settings.saman_llm_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        url = f"{settings.saman_llm_url.rstrip('/')}/chat/completions"
+        headers = _auth(settings.saman_llm_key or "")
+        for attempt in (1, 2):
+            with httpx.stream("POST", url, headers=headers, json=body, timeout=timeout) as resp:
+                if resp.status_code == 429 and attempt == 1:
+                    import time
+
+                    try:
+                        wait = float(resp.headers.get("retry-after", "2"))
+                    except ValueError:
+                        wait = 2.0
+                    time.sleep(min(max(wait, 0.5), RETRY_AFTER_CAP))
+                    continue
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        return
+                    try:
+                        chunk = _json.loads(data)
+                    except ValueError:
+                        continue
+                    choices = chunk.get("choices") or []
+                    first = (choices[0].get("delta") or {}) if choices else {}
+                    delta = first.get("content") or ""
+                    if delta:
+                        yield delta
+                return
+        return
+    with httpx.stream(
+        "POST",
+        f"{(settings.ollama_url or '').rstrip('/')}/api/chat",
+        json={
+            "model": settings.ollama_model,
+            "stream": True,
+            "options": {"temperature": temperature, "num_predict": max_tokens},
+            "messages": messages,
+        },
+        timeout=timeout,
+    ) as resp:
+        resp.raise_for_status()
+        for line in resp.iter_lines():
+            if not line.strip():
+                continue
+            try:
+                chunk = _json.loads(line)
+            except ValueError:
+                continue
+            delta = (chunk.get("message") or {}).get("content") or ""
+            if delta:
+                yield delta
+            if chunk.get("done"):
+                return
+
+
 #: A free tier meters requests and tokens per minute. One wait, bounded, on a
 #: 429 is the difference between a demo that stutters and one that stops.
 RETRY_AFTER_CAP = 20.0

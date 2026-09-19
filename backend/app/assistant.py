@@ -758,6 +758,18 @@ SUGGESTIONS = (
     "Where is idle stock of bearings?",
 )
 
+#: The questions a demo asks the model, warmed into the answer memo at start
+#: (`SAMAN_WARM_ANSWERS`). Open questions about the system that no topic card
+#: or Copilot query answers, so each one is a model call the first time.
+WARM_QUESTIONS = (
+    "why was Luhn not used for the check digit?",
+    "how does SAMAN keep two different manufacturers' bearings apart?",
+    "what does the veto layer refuse on?",
+    "what stops the model inventing a number?",
+    "what is restricted mode and what does it exchange?",
+    "what is not built yet with SAP?",
+)
+
 
 @dataclass
 class Reply:
@@ -887,6 +899,8 @@ def answer(
     scope: Scope,
     current_path: str | None = None,
     signed_in: bool = True,
+    stream: bool = False,
+    use_model: bool = True,
 ) -> Reply:
     """Route one utterance. The order is navigation, knowledge, then the Copilot.
 
@@ -896,11 +910,32 @@ def answer(
     the destination so sign-in lands there; and a question about the data is
     not asked of the database at all. Explanations of the system, which are
     the public documents, are answered for anyone.
+
+    `stream=True` says the caller can read a streamed answer: when the
+    question would go to the language model and is not already memoised, the
+    reply is `kind="stream"` and the caller fetches it from
+    `/assistant/stream`, sentence by sentence. `use_model=False` answers
+    without the model at all, which is what the stream falls back to when the
+    model's words fail the guards.
     """
-    reply = _answer(db, question, scope, current_path, signed_in)
+    reply = _answer(db, question, scope, current_path, signed_in, stream, use_model)
     if signed_in:
         return reply
     return _for_a_visitor(reply)
+
+
+def _grounded(question: str, stream: bool, use_model: bool):
+    """The model's answer, a stream marker, or nothing.
+
+    Returns a `Reply` of kind "stream" when the caller asked for a stream and
+    the answer is not already known; a `Grounded` when the model answered
+    (or the memo had it); None when there is nothing safe to say.
+    """
+    if not use_model:
+        return None
+    if stream and knowledge.available() and knowledge.cached(question) is None:
+        return Reply("stream", "", mode="llm", matched={"question": question})
+    return knowledge.answer(question)
 
 
 def _for_a_visitor(reply: Reply) -> Reply:
@@ -927,7 +962,13 @@ def _for_a_visitor(reply: Reply) -> Reply:
 
 
 def _answer(
-    db: Session, question: str, scope: Scope, current_path: str | None, signed_in: bool
+    db: Session,
+    question: str,
+    scope: Scope,
+    current_path: str | None,
+    signed_in: bool,
+    stream: bool = False,
+    use_model: bool = True,
 ) -> Reply:
     question = (question or "").strip()
     if not question:
@@ -1015,7 +1056,11 @@ def _answer(
         # A data-shaped question never reaches the model either: the documents
         # quote example figures, and a visitor must not be told one of those
         # as if it were an answer about the live estate.
-        grounded = None if _looks_like_data_question(text) else knowledge.answer(question)
+        grounded = (
+            None if _looks_like_data_question(text) else _grounded(question, stream, use_model)
+        )
+        if isinstance(grounded, Reply):
+            return grounded
         if grounded and grounded.text:
             return Reply("answer", grounded.text, mode="llm", matched={"sources": grounded.sources})
         return Reply(
@@ -1033,7 +1078,9 @@ def _answer(
     # 5. Not a data question, not a screen, not a card: ask the local model,
     #    grounded in the project's own documents, if one is running.
     if not useful:
-        grounded = knowledge.answer(question)
+        grounded = _grounded(question, stream, use_model)
+        if isinstance(grounded, Reply):
+            return grounded
         if grounded and grounded.text:
             return Reply(
                 "answer",

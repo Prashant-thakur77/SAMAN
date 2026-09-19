@@ -1640,7 +1640,8 @@ export type AssistantCitation = {
   label?: string
 }
 export type AssistantReply = {
-  kind: 'navigate' | 'answer' | 'copilot' | 'refusal' | 'unknown'
+  /** `stream`: the answer is coming from the model; read it with `streamAssistant`. */
+  kind: 'navigate' | 'answer' | 'copilot' | 'refusal' | 'unknown' | 'stream'
   answer: string
   action: AssistantAction | null
   citations: AssistantCitation[]
@@ -1649,8 +1650,63 @@ export type AssistantReply = {
   mode: string
   matched?: Record<string, unknown> | null
 }
-export const askAssistant = (question: string, path?: string) =>
-  api.post<AssistantReply>('/assistant/query', { question, path })
+export const askAssistant = (question: string, path?: string, stream = false) =>
+  api.post<AssistantReply>('/assistant/query', { question, path, stream })
+
+export type StreamEvent =
+  | { type: 'sources'; sources: { source: string; heading: string; score: number }[] }
+  | { type: 'delta'; text: string }
+  | {
+      type: 'done'
+      accepted: boolean
+      text: string
+      reason?: string
+      note?: string
+      sources?: { source: string; heading: string; score: number }[]
+      /** What the assistant says instead when the model's words were refused. */
+      fallback?: AssistantReply
+    }
+
+/**
+ * The model's answer a checked sentence at a time (server-sent events).
+ * Resolves with the `done` event; `onEvent` sees every event as it arrives.
+ * Returns a function that abandons the stream.
+ */
+export function streamAssistant(
+  question: string,
+  path: string | undefined,
+  onEvent: (event: StreamEvent) => void,
+): { done: Promise<StreamEvent & { type: 'done' }>; cancel: () => void } {
+  const params = new URLSearchParams({ q: question })
+  if (path) params.set('path', path)
+  const source = new EventSource(`/api/assistant/stream?${params.toString()}`, {
+    withCredentials: true,
+  })
+  let settle: (value: StreamEvent & { type: 'done' }) => void = () => {}
+  let fail: (reason: unknown) => void = () => {}
+  const done = new Promise<StreamEvent & { type: 'done' }>((resolve, reject) => {
+    settle = resolve
+    fail = reject
+  })
+  source.onmessage = (message) => {
+    let event: StreamEvent
+    try {
+      event = JSON.parse(message.data) as StreamEvent
+    } catch {
+      return
+    }
+    onEvent(event)
+    if (event.type === 'done') {
+      source.close()
+      settle(event)
+    }
+  }
+  source.onerror = () => {
+    source.close()
+    fail(new ApiError(0, 'The answer stream was interrupted.'))
+  }
+  return { done, cancel: () => source.close() }
+}
 
 export type Transcript = {
   text: string

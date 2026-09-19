@@ -205,7 +205,7 @@ def answer(question: str) -> Grounded | None:
     """
     if not available():
         return None
-    key = (" ".join(question.lower().split()), llm.provider(), llm.model_name())
+    key = _key(question)
     if key in _answers:
         return _answers[key]
     result = _answer(question)
@@ -217,40 +217,218 @@ def answer(question: str) -> Grounded | None:
 _answers: dict[tuple[str, str, str], Grounded] = {}
 
 
+def answer_log_path():
+    """Where the answer log goes, or None when it is turned off."""
+    from pathlib import Path
+
+    from .config import get_settings
+
+    settings = get_settings()
+    raw = (settings.saman_answer_log or "").strip()
+    if not raw:
+        return None
+    path = Path(raw)
+    return path if path.is_absolute() else settings.db_file.parent / path
+
+
+def _outcome(
+    outcome: str,
+    question: str,
+    *,
+    note: str | None = None,
+    sources: list[dict] | None = None,
+    text: str = "",
+    seconds: float | None = None,
+) -> None:
+    """Count the outcome (`llm.stats`) and write it to the answer log: what
+    was asked, which model, what happened, and the sources behind an accepted
+    answer, so the eval harness can grow from real questions."""
+    import json
+    from datetime import UTC, datetime
+
+    llm.record("assistant", outcome)
+    path = answer_log_path()
+    if path is None:
+        return
+    row = {
+        "ts": datetime.now(UTC).isoformat(timespec="seconds"),
+        "question": question,
+        "provider": llm.provider(),
+        "model": llm.model_name(),
+        "outcome": outcome,
+        "note": note,
+        "seconds": round(seconds, 2) if seconds is not None else None,
+        "answer_chars": len(text),
+        "sources": [f"{s.get('source')} · {s.get('heading')}" for s in (sources or [])],
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:  # a read-only data directory must not break an answer
+        pass
+
+
+def _key(question: str) -> tuple[str, str, str]:
+    return (" ".join(question.lower().split()), llm.provider(), llm.model_name())
+
+
+def cached(question: str) -> Grounded | None:
+    """The memoised answer, if this question has been answered by this model
+    in this process. Lets a caller skip the stream and reply at once."""
+    return _answers.get(_key(question))
+
+
 def forget_answers() -> None:
     _answers.clear()
 
 
-def _answer(question: str) -> Grounded | None:
+#: Where one sentence ends while the text is still arriving: a full stop,
+#: question or exclamation mark, or the Devanagari danda, followed by
+#: whitespace. Not the end of the text: a delta can stop at the "." inside
+#: "0.004", and reading "0." as a finished sentence would refuse a correct
+#: answer for a figure it never contained. The last sentence is checked whole
+#: once the stream has ended.
+_SENTENCE_END = re.compile(r"[.!?।](?=\s)")
+
+
+def stream(question: str):
+    """`answer`, delivered a sentence at a time, with the same guards.
+
+    Yields dict events: `sources` first, then a `delta` for each sentence
+    that has passed the figure check, then one `done`. A sentence is released
+    only after it is complete and every figure in it is in the passages or
+    the question, so nothing the guard would have refused is ever shown; if a
+    later sentence fails, the stream ends with `done.accepted = False` and the
+    caller replaces what was shown with its own words. The accepted answer is
+    memoised exactly as `answer` memoises it.
+    """
+    if not available():
+        yield {"type": "done", "accepted": False, "reason": "no_model", "text": ""}
+        return
+    hit = cached(question)
+    if hit is not None:
+        yield {"type": "sources", "sources": hit.sources}
+        yield {"type": "delta", "text": hit.text}
+        yield {"type": "done", "accepted": True, "text": hit.text, "sources": hit.sources}
+        return
     passages = retrieve(question)
     if not passages:
-        llm.record("assistant", "no_passages")
+        _outcome("no_passages", question)
+        yield {"type": "done", "accepted": False, "reason": "no_passages", "text": ""}
+        return
+    sources = [
+        {"source": c.source, "heading": c.heading, "score": round(s, 3)} for c, s in passages[:3]
+    ]
+    yield {"type": "sources", "sources": sources}
+
+    known = _numbers(" ".join(c.text for c, _ in passages)) | _numbers(question)
+    context = "\n\n".join(
+        f"[{i + 1}] ({c.source} · {c.heading}) {c.text}" for i, (c, _) in enumerate(passages)
+    )
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT.format(dont_know=DONT_KNOW)},
+        {"role": "user", "content": f"Passages:\n{context}\n\nQuestion: {question}"},
+    ]
+    import time
+
+    full = ""
+    released = 0
+    dont_know = DONT_KNOW.lower()
+    started = time.time()
+
+    def check(piece: str):
+        invented = _numbers(piece) - known
+        if invented:
+            note = f"the model introduced figures not in the documents: {sorted(invented)[:3]}"
+            _outcome(
+                "invented_figure", question, note=note, text=full, seconds=time.time() - started
+            )
+            return {
+                "type": "done",
+                "accepted": False,
+                "reason": "invented_figure",
+                "note": note,
+                "text": "",
+            }
         return None
+
+    try:
+        for delta in llm.stream_chat(messages, temperature=0.1, timeout=60.0, max_tokens=260):
+            full += delta
+            if dont_know in full.lower():
+                _outcome("declined", question, seconds=time.time() - started)
+                yield {"type": "done", "accepted": False, "reason": "declined", "text": ""}
+                return
+            if len(full) > MAX_ANSWER_CHARS:
+                _outcome("too_long", question, text=full, seconds=time.time() - started)
+                yield {"type": "done", "accepted": False, "reason": "too_long", "text": ""}
+                return
+            # Release every sentence that is now complete, if its figures check out.
+            while True:
+                end = _SENTENCE_END.search(full, released)
+                if end is None:
+                    break
+                sentence = full[released : end.end()]
+                failed = check(sentence)
+                if failed:
+                    yield failed
+                    return
+                yield {"type": "delta", "text": sentence}
+                released = end.end()
+    except Exception as exc:
+        note = f"model unavailable ({type(exc).__name__})"
+        _outcome("unavailable", question, note=note, seconds=time.time() - started)
+        yield {"type": "done", "accepted": False, "reason": "unavailable", "note": note, "text": ""}
+        return
+
+    tail = full[released:]
+    if tail.strip():
+        failed = check(tail)
+        if failed:
+            yield failed
+            return
+        yield {"type": "delta", "text": tail}
+    text = full.strip()
+    if not text:
+        _outcome("declined", question, seconds=time.time() - started)
+        yield {"type": "done", "accepted": False, "reason": "declined", "text": ""}
+        return
+    _outcome("accepted", question, sources=sources, text=text, seconds=time.time() - started)
+    _answers[_key(question)] = Grounded(text, sources=sources, mode="llm")
+    yield {"type": "done", "accepted": True, "text": text, "sources": sources}
+
+
+def _answer(question: str) -> Grounded | None:
+    import time
+
+    passages = retrieve(question)
+    if not passages:
+        _outcome("no_passages", question)
+        return None
+    started = time.time()
     try:
         text = _call_model(question, passages)
     except Exception as exc:
-        llm.record("assistant", "unavailable")
-        return Grounded(
-            "", mode="llm", note=f"model unavailable ({type(exc).__name__})", refused=True
-        )
+        note = f"model unavailable ({type(exc).__name__})"
+        _outcome("unavailable", question, note=note, seconds=time.time() - started)
+        return Grounded("", mode="llm", note=note, refused=True)
+    seconds = time.time() - started
 
     if not text or DONT_KNOW.lower() in text.lower():
-        llm.record("assistant", "declined")
+        _outcome("declined", question, seconds=seconds)
         return None
     if len(text) > MAX_ANSWER_CHARS:
-        llm.record("assistant", "too_long")
+        _outcome("too_long", question, seconds=seconds, text=text)
         return None
     context_text = " ".join(c.text for c, _ in passages)
     invented = _numbers(text) - _numbers(context_text) - _numbers(question)
     if invented:
-        llm.record("assistant", "invented_figure")
-        return Grounded(
-            "",
-            note=f"the model introduced figures not in the documents: {sorted(invented)[:3]}",
-            refused=True,
-        )
-    llm.record("assistant", "accepted")
+        note = f"the model introduced figures not in the documents: {sorted(invented)[:3]}"
+        _outcome("invented_figure", question, note=note, seconds=seconds, text=text)
+        return Grounded("", note=note, refused=True)
     sources = [
         {"source": c.source, "heading": c.heading, "score": round(s, 3)} for c, s in passages[:3]
     ]
+    _outcome("accepted", question, sources=sources, text=text, seconds=seconds)
     return Grounded(text, sources=sources, mode="llm")

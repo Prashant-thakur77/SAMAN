@@ -19,6 +19,7 @@ data/*.db-wal
 data/*.db-shm
 data/uploads/
 data/snapshot/
+data/eval/
 *.log
 
 # Env
