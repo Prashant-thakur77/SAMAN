@@ -216,3 +216,19 @@ class TestAVisitorBeforeSignIn:
 
     def test_speech_stays_behind_a_session(self, client, pipeline_run):
         assert client.post("/api/assistant/speak", json={"text": "hi"}).status_code == 401
+
+
+class TestVoiceForAVisitor:
+    def test_the_engines_are_offered_only_to_a_signed_in_person(self, client, seeded):
+        before = client.get("/api/assistant/voice").json()
+        assert before["available"] is False and before["tts"]["available"] is False
+        assert before["signed_in"] is False
+        r = client.post("/api/auth/login", json={"email": "viewer@min.gov.in", "password": "demo"})
+        assert r.status_code == 200
+        after = client.get("/api/assistant/voice").json()
+        assert after["signed_in"] is True
+        # Whatever the machine has is now reported truthfully.
+        from app import stt, tts
+
+        assert after["available"] == stt.available()
+        assert after["tts"]["available"] == tts.available()

@@ -85,15 +85,24 @@ async def _read_capped(upload: UploadFile, cap: int) -> bytes:
 
 
 @router.get("/voice")
-def voice() -> dict:
-    """Whether speech can be transcribed on this machine, and by what."""
+def voice(user: Annotated[User | None, Depends(current_user_optional)] = None) -> dict:
+    """Whether speech can be transcribed on this machine, and by what.
+
+    The engines are reported as available only to a signed-in person: they
+    are the ones who may call them (`/transcribe` and `/speak` need a
+    session), and a visitor told otherwise would press the microphone and
+    hear nothing back. A visitor's widget falls back to the browser's own
+    engines where it has them, and says so where it has none.
+    """
+    signed_in = user is not None
     return {
-        "available": stt.available(),
-        "mode": stt.mode(),
-        "engine": stt.engine_label(),
+        "available": stt.available() and signed_in,
+        "mode": stt.mode() if signed_in else "browser",
+        "engine": stt.engine_label() if signed_in else "sign in for the server's recogniser",
         "languages": list(stt.LANGUAGES),
+        "signed_in": signed_in,
         "tts": {
-            "available": tts.available(),
+            "available": tts.available() and signed_in,
             "mode": tts.mode(),
             "engine": tts.engine_label(),
             "note": (

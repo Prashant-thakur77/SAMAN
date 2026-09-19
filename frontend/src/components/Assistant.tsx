@@ -93,7 +93,11 @@ type SpeechRecognitionLike = {
   lang: string
   interimResults: boolean
   maxAlternatives: number
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onresult:
+    | ((event: {
+        results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }>
+      }) => void)
+    | null
   onend: (() => void) | null
   onerror: ((event: { error?: string }) => void) | null
   start: () => void
@@ -690,14 +694,29 @@ export function Assistant() {
     if (!Ctor) return
     const rec = new Ctor()
     rec.lang = 'en-IN'
-    rec.interimResults = false
+    // Partial results too, so the words appear in the box as they are said,
+    // the way the server path shows its running transcript.
+    rec.interimResults = true
     rec.maxAlternatives = 1
     rec.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript ?? ''
+      let heard = ''
+      let final = false
+      for (let i = 0; i < event.results.length; i++) {
+        heard += event.results[i]?.[0]?.transcript ?? ''
+        if (event.results[i]?.isFinal) final = true
+      }
+      if (!final) {
+        setInterim(heard.trim())
+        return
+      }
+      setInterim('')
       setListening(false)
-      if (transcript) void ask(transcript, 'heard · browser')
+      if (heard.trim()) void ask(heard.trim(), 'heard · browser')
     }
-    rec.onend = () => setListening(false)
+    rec.onend = () => {
+      setListening(false)
+      setInterim('')
+    }
     rec.onerror = (event) => {
       setListening(false)
       pushError(
