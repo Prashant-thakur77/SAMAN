@@ -179,6 +179,11 @@ def warm_dashboards():
         # once here rather than on the first requester's click.
         ("smart-create embedder", job(probe_embedder)),
     ]
+    # The ministry roll-up computes every CPSE's report; on a small host that
+    # is half a minute the first reader should not pay.
+    from .reports import rollup
+
+    jobs.append(("reports (roll-up)", job(rollup, registrar)))
     if get_settings().saman_warm_answers:
         jobs.append(("assistant answers", warm_answers))
     return cache.warm(jobs)
