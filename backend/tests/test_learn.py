@@ -25,15 +25,40 @@ class TestFeatures:
                 ],
             },
         }
-        x = learn.features(
+        row = learn.features(
             {"tier0_anchor": 0.9, "tier0_key": "mpn", "tier1_fuzzy": 0.8}, evidence, None
         )
-        row = dict(zip(learn.FEATURES, x, strict=False))
+        assert set(row) == set(learn.FEATURES) and len(learn.FEATURES) <= 24
         assert row["has_anchor"] == 1 and row["tier1_fuzzy"] == 0.8
         assert row["identity_match"] == 1 and row["identity_unknown"] == 1
         assert row["performance_in_band"] == 1 and row["cosmetic_match"] == 1
         assert row["compared"] == 4 and row["route_tiered"] == 1 and row["vetoed"] == 0
         assert row["attribute_agreement"] == 0.75
+        # Two identity attributes seen, one compared.
+        assert row["identity_coverage"] == 0.5
+        assert row["brand_equal"] == 1 and row["brand_differs"] == 0
+        # Without the items' facts the item-derived features are unknown, not zero.
+        assert row["same_cpse"] is None and row["token_jaccard"] is None
+
+    def test_item_facts_feed_the_pair_features(self):
+        a = learn.ItemFacts(
+            1, "bearing", "6205ZZ", None, frozenset("BEARING 6205 ZZ SKF".split()), 19
+        )
+        b = learn.ItemFacts(
+            2, "bearing", "6206ZZ", None, frozenset("BEARING 6206 ZZ SKF".split()), 19
+        )
+        row = learn.features({}, {"route": "tiered"}, None, a, b)
+        assert row["same_cpse"] == 0 and row["mpn_differs"] == 1
+        assert row["token_jaccard"] == pytest.approx(3 / 5) and row["length_ratio"] == 1.0
+        same = learn.features({}, {"route": "tiered"}, None, a, a)
+        assert same["same_cpse"] == 1 and same["mpn_differs"] == 0 and same["token_jaccard"] == 1
+
+    def test_facts_load_in_one_batch(self, db, pipeline_run):
+        pair = db.execute(select(Pair).where(Pair.evidence_json != "{}")).scalars().first()
+        facts = learn.item_facts(db, (pair.item_a, pair.item_b))
+        assert set(facts) == {pair.item_a, pair.item_b}
+        row = learn.pair_features(pair, facts)
+        assert row is not None and row["same_cpse"] in (0.0, 1.0)
 
     def test_a_pair_without_evidence_has_no_row(self, db, pipeline_run):
         pair = db.execute(select(Pair).where(Pair.evidence_json == "{}")).scalars().first()
@@ -77,6 +102,14 @@ class TestTraining:
         assert model.holdout["pairs"] > 0
         assert model.holdout["model_auc"] > 0.7
         assert 0.0 <= model.probability([0.0] * len(learn.FEATURES)) <= 1.0
+        # Per class, the same three numbers the README quotes overall.
+        per_class = model.holdout["per_class"]
+        assert per_class and {"class_code", "model_auc", "precision", "recall"} <= set(per_class[0])
+        assert sum(row["pairs"] for row in per_class) == model.holdout["pairs"]
+        # Manual training is an attempt like any other, and is written down.
+        last = learn.history(1)[0]
+        assert last["trigger"] == "manual" and last["promoted"] is True
+        assert last["weights"] == model.weights()
 
     def test_the_opinion_never_decides(self, db, pipeline_run):
         if learn.load_model() is None:
@@ -163,3 +196,244 @@ class TestEndpoints:
         review_task.state = "pending"
         db.execute(delete(Decision).where(Decision.task_id == task["task_id"]))
         db.commit()
+
+
+# --------------------------------------------------------------------------
+# Old models, the champion/challenger loop, and threshold suggestions
+# --------------------------------------------------------------------------
+
+
+OLD_FEATURES = list(learn.FEATURES[:15])
+
+
+def _write_model(features: list[str], **overrides) -> None:
+    n = len(features)
+    raw = {
+        "features": features,
+        "mean": [0.0] * n,
+        "scale": [1.0] * n,
+        "coef": [0.1] * n,
+        "intercept": 0.0,
+        "trained_at": "2026-09-03T00:00:00+00:00",
+        "n_labels": 400,
+        "labels": {"simulated": 400},
+        "cv": {"folds": 5, "auc": 0.99, "precision": 0.95, "recall": 0.95},
+        "holdout": {"pairs": 1, "model_auc": 0.9},
+        "last_label_id": 0,
+    }
+    raw.update(overrides)
+    learn.model_path().parent.mkdir(parents=True, exist_ok=True)
+    learn.model_path().write_text(json.dumps(raw))
+    learn._cache = None
+
+
+class TestOldModels:
+    def test_a_fifteen_feature_model_still_loads_and_scores(self, db, pipeline_run):
+        _write_model(OLD_FEATURES)
+        try:
+            model = learn.load_model()
+            assert model is not None and model.features == OLD_FEATURES
+            pair = db.execute(select(Pair).where(Pair.evidence_json != "{}")).scalars().first()
+            opinion = learn.score(pair, model, db=db)
+            assert opinion and 0.0 <= opinion["probability"] <= 1.0
+            # The richer row is matched by name; the extra features are ignored.
+            row = learn.pair_features(pair, learn.item_facts(db, (pair.item_a, pair.item_b)))
+            assert model.probability(row) == pytest.approx(
+                model.probability([row[name] for name in OLD_FEATURES])
+            )
+            assert learn.status(db)["trained"] is True
+        finally:
+            learn.forget_model()
+
+    def test_an_unknown_or_broken_model_is_refused_with_a_retrain_note(self, db, pipeline_run):
+        try:
+            _write_model(["tier0_anchor", "something_this_version_never_computes"])
+            assert learn.load_model() is None
+            status = learn.status(db)
+            assert status["trained"] is False and "retrain" in status["note"].lower()
+            _write_model(OLD_FEATURES, coef=[0.1] * 3)
+            assert learn.load_model() is None and "retrain" in learn.status(db)["note"].lower()
+            learn.model_path().write_text("not json")
+            learn._cache = None
+            assert learn.load_model() is None and "retrain" in learn.status(db)["note"].lower()
+        finally:
+            learn.forget_model()
+
+
+def _ensure_champion(db) -> learn.Model:
+    if sum(learn.label_counts(db).values()) < learn.MIN_LABELS:
+        learn.simulate_labels(db, 200)
+    model = learn.load_model()
+    return model if model is not None else learn.train(db)
+
+
+def _reject_a_grey_pair(as_registrar, db) -> dict:
+    """One reviewer decision, then the derived layer put back so later suites
+    see what the pipeline built. The label and the audit event stay."""
+    from app.models import Decision, ReviewTask
+
+    queue = as_registrar.get("/api/queues?band=grey&limit=50").json()
+    task = next(
+        t
+        for t in queue["tasks"]
+        if t.get("pair_id") and t["items"][0]["cluster_id"] != t["items"][1]["cluster_id"]
+    )
+    response = as_registrar.post(
+        "/api/decisions", json={"task_id": task["task_id"], "action": "reject"}
+    )
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    pair = db.get(Pair, task["pair_id"])
+    pair.verdict = task["verdict"]
+    review_task = db.get(ReviewTask, task["task_id"])
+    review_task.state = "pending"
+    db.execute(delete(Decision).where(Decision.task_id == task["task_id"]))
+    db.commit()
+    return task
+
+
+class TestAutoRetrain:
+    @pytest.fixture(autouse=True)
+    def _loop_on(self, monkeypatch):
+        from app.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "saman_auto_retrain", True)
+        monkeypatch.setattr(get_settings(), "saman_retrain_every", 2)
+        learn.forget_history()
+        yield
+        learn.wait_for_retrain()
+        learn.forget_history()
+
+    def test_reviewer_decisions_trigger_a_retrain_that_is_recorded(
+        self, as_registrar, db, pipeline_run
+    ):
+        from app.models import AuditEvent
+
+        champion = _ensure_champion(db)
+        before = learn.auto_retrain_status(db)
+        assert before["enabled"] and before["every"] == 2 and before["due"] is False
+
+        _reject_a_grey_pair(as_registrar, db)
+        assert learn.auto_retrain_status(db)["labels_since"] == 1
+        _reject_a_grey_pair(as_registrar, db)
+        learn.wait_for_retrain()
+
+        attempts = learn.history()
+        assert attempts and attempts[0]["trigger"] == "auto"
+        last = attempts[0]
+        assert last["n_labels"] >= champion.n_labels
+        # Labels are counted per pair (the latest answer wins), so one is enough.
+        assert last["labels"].get(learn.SOURCE_REVIEWER, 0) >= 1
+        assert isinstance(last["promoted"], bool) and last["reason"]
+        assert last["holdout_auc"] is not None and last["champion_auc"] is not None
+        assert learn.history_path().exists()
+        # The attempt moved the watermark: the loop is not due again at once.
+        assert learn.auto_retrain_status(db)["due"] is False
+        event = (
+            db.execute(
+                select(AuditEvent)
+                .where(AuditEvent.entity == "model:pairwise")
+                .where(AuditEvent.action.in_(("model.retrained", "model.kept")))
+                .order_by(AuditEvent.seq.desc())
+            )
+            .scalars()
+            .first()
+        )
+        assert event is not None and event.user == "system"
+        assert json.loads(event.payload_json)["promoted"] == last["promoted"]
+        status = learn.status(db)
+        assert status["history"][0]["ts"] == last["ts"]
+        assert set(status["auto_retrain"]) >= {"enabled", "every", "labels_since", "due"}
+
+    def test_simulated_labels_do_not_count(self, db, pipeline_run):
+        _ensure_champion(db)
+        before = learn.auto_retrain_status(db)["labels_since"]
+        added = learn.simulate_labels(db, 20)["added"]
+        assert added > 0
+        after = learn.auto_retrain_status(db)
+        assert after["labels_since"] == before
+        assert learn.schedule_retrain(db) is None
+
+    def test_a_worse_challenger_is_kept_not_promoted(self, db, pipeline_run, monkeypatch):
+        from app.models import AuditEvent
+
+        champion = _ensure_champion(db)
+        saved_before = learn.model_path().read_text()
+
+        def poor(_db, _model):
+            # Same held-out set as the champion's, so its stored AUC stands.
+            return {
+                "pairs": champion.holdout["pairs"],
+                "positives": 1,
+                "model_auc": 0.51,
+                "pipeline_auc": 0.5,
+                "grey_pairs": 0,
+                "grey_model_auc": None,
+                "grey_pipeline_auc": None,
+                "per_class": [],
+            }
+
+        monkeypatch.setattr(learn, "evaluate_holdout", poor)
+        attempt = learn.maybe_retrain(db)
+        assert attempt["promoted"] is False and "champion kept" in attempt["reason"]
+        assert attempt["weights"] is None and attempt["champion_auc"] == champion.holdout_auc()
+        assert learn.model_path().read_text() == saved_before
+        assert learn.load_model().trained_at == champion.trained_at
+        event = (
+            db.execute(
+                select(AuditEvent)
+                .where(AuditEvent.entity == "model:pairwise")
+                .order_by(AuditEvent.seq.desc())
+            )
+            .scalars()
+            .first()
+        )
+        assert event.action == "model.kept"
+        assert learn.history(1)[0]["promoted"] is False
+
+    def test_a_challenger_that_is_not_worse_is_promoted(self, db, pipeline_run):
+        champion = _ensure_champion(db)
+        attempt = learn.maybe_retrain(db)
+        assert attempt["promoted"] is True
+        assert attempt["holdout_auc"] >= champion.holdout_auc() - learn.PROMOTION_TOLERANCE
+        assert attempt["weights"] == learn.load_model().weights()
+
+    def test_only_one_round_runs_at_a_time(self, db, pipeline_run):
+        _ensure_champion(db)
+        with learn._retrain_lock:
+            assert learn.maybe_retrain(db) == {"skipped": "a retrain is already running"}
+            assert learn.schedule_retrain(db) is None
+
+    def test_a_failing_retrain_never_raises_into_the_decision(self, db, pipeline_run, monkeypatch):
+        _ensure_champion(db)
+        monkeypatch.setattr(learn, "fit", lambda _db: 1 / 0)
+        assert learn.maybe_retrain(db) is None
+        monkeypatch.setattr(learn, "auto_retrain_status", lambda _db: 1 / 0)
+        assert learn.schedule_retrain(db) is None
+
+
+class TestSuggestions:
+    def test_suggestions_are_explicit_about_not_being_applied(self, db, pipeline_run):
+        from app import match
+
+        t_high_before = match.T_HIGH
+        _ensure_champion(db)
+        suggestions = learn.suggest_thresholds(db)
+        assert suggestions["applied"] is False
+        assert suggestions["current_t_high"] == t_high_before
+        assert "not applied" in suggestions["note"]
+        for row in suggestions["classes"]:
+            assert row["applied"] is False
+            assert row["labelled_pairs"] >= learn.SUGGESTION_MIN_LABELS
+            assert 0 < row["positives"] < row["labelled_pairs"]
+            assert 0.0 <= row["suggested_t_high"] <= 1.0
+            assert 0.0 <= row["suggested_precision"] <= 1.0 and 0.0 <= row["suggested_f1"] <= 1.0
+            assert row["current_t_high"] == t_high_before
+        assert t_high_before == match.T_HIGH
+        status = learn.status(db)
+        assert status["suggestions"]["applied"] is False
+
+    def test_a_class_with_one_answer_only_gets_no_suggestion(self, db, pipeline_run):
+        # Thirty labels that all say "yes" cannot place a cut.
+        suggestions = learn.suggest_thresholds(db, min_labels=10**6)
+        assert suggestions["classes"] == [] and suggestions["applied"] is False

@@ -387,6 +387,13 @@ def apply_decision(
     )
     db.commit()
 
+    if pair is not None and action in ("approve", "reject"):
+        # Enough reviewer labels since the last model: retrain in the
+        # background. The decision is committed; nothing here can undo it.
+        from .learn import schedule_retrain
+
+        schedule_retrain(db)
+
     outcome["decision_id"] = decision.id
     outcome["task_id"] = task.id
     return outcome

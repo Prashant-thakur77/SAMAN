@@ -145,7 +145,7 @@ def _task_card(db: Session, task: ReviewTask, rephrase: bool = True) -> dict:
             "items": [left, right],
             # The learned model's opinion, beside the pipeline's. It never
             # decides; it is here so a reviewer can see when the two disagree.
-            "learned": learn.score(pair),
+            "learned": learn.score(pair, db=db),
             # Tier 3 (§0.4): a recommendation with its reasons, so the reviewer
             # starts from a position rather than from a score. It never decides.
             "adjudication": adjudicate(
@@ -207,12 +207,17 @@ def queues(
         # Score every pending task in the band, then page the sorted list.
         # A few thousand pairs of stored JSON; measured in tens of milliseconds.
         scored = []
-        for task, pair in db.execute(
+        rows = db.execute(
             select(ReviewTask, Pair)
             .join(Pair, Pair.id == ReviewTask.pair_id)
             .where(query.whereclause)
-        ).all():
-            opinion = learn.score(pair, model)
+        ).all()
+        # The items' few fields the features read, in one query for the band.
+        facts = learn.item_facts(
+            db, {p.item_a for _, p in rows} | {p.item_b for _, p in rows}
+        )
+        for task, pair in rows:
+            opinion = learn.score(pair, model, facts=facts)
             scored.append((opinion["uncertainty"] if opinion else -1.0, task.id, task))
         scored.sort(key=lambda row: (-row[0], row[1]))
         tasks = [task for _, _, task in scored[offset : offset + limit]]
