@@ -55,6 +55,11 @@ class PipelineStatus:
     started_at: float | None = None
     finished_at: float | None = None
     error: str | None = None
+    #: An incremental run: only rows that arrived since the last run are
+    #: embedded and scored; the clusters are rebuilt from the whole pair graph.
+    incremental: bool = False
+    new_item_ids: list[int] = field(default_factory=list, repr=False)
+    note: str | None = None
 
     @property
     def eta_seconds(self) -> float | None:
@@ -77,6 +82,9 @@ class PipelineStatus:
             "eta_seconds": self.eta_seconds,
             "elapsed_seconds": round(time.time() - self.started_at, 1) if self.started_at else None,
             "error": self.error,
+            "incremental": self.incremental,
+            "new_items": len(self.new_item_ids),
+            "note": self.note,
         }
 
 
@@ -203,14 +211,33 @@ def _stage_normalize_extract(db: Session, status: PipelineStatus) -> None:
     status.rows_total = len(pending)
     status.rows_done = 0
     build_items(db, pending, on_progress=lambda n: setattr(status, "rows_done", n))
+    if status.incremental:
+        # The rows this run is about: the items just built, plus any that an
+        # interrupted earlier run left without a vector.
+        from .models import Item as ItemModel
+
+        status.new_item_ids = list(
+            db.execute(select(ItemModel.id).where(ItemModel.embed_vector.is_(None))).scalars()
+        )
+        if not status.new_item_ids:
+            status.note = "nothing new since the last run"
 
 
-def run_pipeline(db: Session, stages: list[str] | None = None) -> PipelineStatus:
+def run_pipeline(
+    db: Session, stages: list[str] | None = None, incremental: bool = False
+) -> PipelineStatus:
     """Run the registered stages in order, recording progress as we go.
 
     The claim below is what makes a second concurrent run a no-op rather than a
     corruption: the match stage deletes and rebuilds the pair and cluster
     tables, so two runs interleaving would not be a slow demo but a wrong one.
+
+    `incremental` is for an upload of a few hundred rows into an estate that
+    was already run: the new rows are normalised, embedded with the saved
+    fit, blocked against everything and scored only in pairs that touch
+    them; their pairs are appended and the clusters and queue rebuilt from
+    the whole graph. It needs a saved embedder and an earlier run; without
+    them it falls back to a full run and says so.
     """
     status = get_status()
     with _lock:
@@ -221,6 +248,19 @@ def run_pipeline(db: Session, stages: list[str] | None = None) -> PipelineStatus
         status.finished_at = None
         status.error = None
         status.stages_done = []
+        status.incremental = False
+        status.new_item_ids = []
+        status.note = None
+
+    if incremental:
+        from .embed import embedder_path
+        from .models import MatchRun
+
+        has_run = db.execute(select(func.count(MatchRun.id))).scalar() or 0
+        if has_run and embedder_path().exists():
+            status.incremental = True
+        else:
+            status.note = "no earlier run or saved embedder: a full run instead"
 
     names = stages if stages is not None else list(STAGES)
     try:
@@ -262,6 +302,30 @@ def _stage_embed(db: Session, status: PipelineStatus) -> None:
 
     from .embed import Embedder, embedder_path, pack
     from .models import Item as ItemModel
+
+    if status.incremental:
+        # New rows only, projected into the saved fit so their vectors live
+        # in the same space as everyone else's; no refit, no rewrite.
+        if not status.new_item_ids:
+            return
+        saved = Embedder.load(embedder_path())
+        if saved is None:
+            raise RuntimeError("incremental run without a saved embedder")
+        rows = db.execute(
+            select(ItemModel.id, ItemModel.norm_text).where(ItemModel.id.in_(status.new_item_ids))
+        ).all()
+        status.rows_total = len(rows)
+        status.rows_done = 0
+        vectors = saved.transform([text or "" for _, text in rows])
+        status.stage = "embed (incremental)"
+        updates = [
+            {"id": item_id, "embed_vector": pack(vectors[i])} for i, (item_id, _) in enumerate(rows)
+        ]
+        for i in range(0, len(updates), BATCH):
+            db.execute(update(ItemModel), updates[i : i + BATCH])
+            db.commit()
+        status.rows_done = len(updates)
+        return
 
     rows = db.execute(select(ItemModel.id, ItemModel.norm_text).order_by(ItemModel.id)).all()
     status.rows_total = len(rows)
@@ -496,12 +560,24 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
 
     pairs, blocking_stats = generate_candidates(keys, vectors, index_by_id)
 
+    incremental = status.incremental
+    if incremental:
+        if not status.new_item_ids:
+            return
+        # Only the pairs that touch a new row are scored; everything else was
+        # scored by the run before and keeps its verdict, including the ones
+        # a person has since decided.
+        fresh = set(status.new_item_ids)
+        pairs = [(a, b) for a, b in pairs if a in fresh or b in fresh]
+
     # Tier 1: train the probabilistic model once for the whole run. Returns
     # None when splink is unavailable or fails, in which case every pair falls
-    # back to rapidfuzz (spec §0.4).
+    # back to rapidfuzz (spec §0.4). An incremental run's few hundred pairs
+    # are too few to fit a model on; they take the rapidfuzz path and the run
+    # record says so.
     status.stage = "match (tier-1 linkage)"
-    linkage = run_linkage(db, pairs)
-    status.stage = "match"
+    linkage = None if incremental else run_linkage(db, pairs)
+    status.stage = "match (incremental)" if incremental else "match"
 
     status.rows_total = len(pairs)
     status.rows_done = 0
@@ -581,9 +657,34 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
 
     status.rows_done = len(pairs)
 
-    # Review tasks reference pairs, so the derived layer goes first.
-    db.query(ReviewTask).delete()
-    db.query(Pair).delete()
+    if incremental:
+        # Append: the existing pairs stand. A pair touching a new row cannot
+        # already exist, but an interrupted earlier run could have left some;
+        # those are replaced.
+        fresh = set(status.new_item_ids)
+        db.query(Pair).filter(Pair.item_a.in_(fresh) | Pair.item_b.in_(fresh)).delete(
+            synchronize_session=False
+        )
+    else:
+        # A pair a person decided keeps its row, its task and its decision;
+        # everything the machine alone scored is rebuilt. Pending tasks go
+        # first because they reference the pairs being replaced.
+        decided_pairs = select(ReviewTask.pair_id).where(ReviewTask.state == "done")
+        kept = {
+            (a, b)
+            for a, b in db.execute(
+                select(Pair.item_a, Pair.item_b).where(Pair.id.in_(decided_pairs))
+            ).all()
+        }
+        db.query(ReviewTask).filter(ReviewTask.state == "pending").delete(synchronize_session=False)
+        db.query(Pair).filter(Pair.id.notin_(decided_pairs)).delete(synchronize_session=False)
+        if kept:
+            persist = [
+                row
+                for row in persist
+                if (row["item_a"], row["item_b"]) not in kept
+                and (row["item_b"], row["item_a"]) not in kept
+            ]
     for i in range(0, len(persist), BATCH):
         db.execute(insert(Pair), persist[i : i + BATCH])
     db.commit()
@@ -617,7 +718,12 @@ def _stage_match(db: Session, status: PipelineStatus) -> None:
 
     stats = {
         "blocking": {**blocking_stats.as_dict(), **measure_blocking_recall(db, pairs)},
-        "linkage": linkage.as_stats() if linkage else {"engine": "rapidfuzz"},
+        "linkage": linkage.as_stats()
+        if linkage
+        else {"engine": "rapidfuzz", **({"incremental": True} if incremental else {})},
+        "incremental": {"new_items": len(status.new_item_ids), "pairs_scored": len(pairs)}
+        if incremental
+        else None,
         "bands": bands,
         "verdicts": verdicts,
         "accepted_pairs": len(accepted),
@@ -744,7 +850,14 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
 
     # Rebuild the derived layer for everything not pinned by an issued code.
     # Order matters: review tasks reference pairs, codes reference goldens.
-    db.query(ReviewTask).delete()
+    # Decided tasks stay: a decision references its task, and a person's
+    # afternoon is not undone by a rerun.
+    db.query(ReviewTask).filter(ReviewTask.state == "pending").delete(synchronize_session=False)
+    # The decided tasks point at clusters about to be rebuilt; they are
+    # re-pointed by their pair's rows once the new clusters exist.
+    db.query(ReviewTask).filter(ReviewTask.state == "done").update(
+        {ReviewTask.cluster_id: None}, synchronize_session=False
+    )
     frozen_goldens = (
         set(
             db.execute(select(GoldenRecord.id).where(GoldenRecord.cluster_id.in_(frozen_clusters)))
@@ -840,6 +953,18 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     # confirmed or overturned.
     cluster_of = dict(db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all())
 
+    # Decided tasks follow their rows into the rebuilt clusters.
+    for task_id, item_a in db.execute(
+        select(ReviewTask.id, Pair.item_a)
+        .join(Pair, Pair.id == ReviewTask.pair_id)
+        .where(ReviewTask.state == "done")
+    ).all():
+        db.execute(
+            update(ReviewTask)
+            .where(ReviewTask.id == task_id)
+            .values(cluster_id=cluster_of.get(item_a))
+        )
+
     def _task(pair_id, item_a, band, verdict, role, reason):
         return {
             "pair_id": pair_id,
@@ -850,6 +975,30 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
             "reason": reason,
         }
 
+    # A pair a person has already decided is not asked again: their answer
+    # is on the pair's verdict and in the label table, and a rerun that put
+    # it back in the queue would throw their afternoon away.
+    from .learn import SOURCE_REVIEWER
+    from .models import PairLabel
+
+    decided = {
+        (a, b)
+        for a, b in db.execute(
+            select(PairLabel.item_a, PairLabel.item_b).where(PairLabel.source == SOURCE_REVIEWER)
+        ).all()
+    }
+    decided |= {
+        tuple(sorted((a, b)))
+        for a, b in db.execute(
+            select(Pair.item_a, Pair.item_b)
+            .join(ReviewTask, ReviewTask.pair_id == Pair.id)
+            .where(ReviewTask.state == "done")
+        ).all()
+    }
+
+    def _undecided(item_a: int, item_b: int) -> bool:
+        return tuple(sorted((item_a, item_b))) not in decided
+
     tasks = [
         _task(
             pair_id,
@@ -859,18 +1008,20 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
             "approver" if verdict == "conflict" else "steward",
             REASON_CONFLICT if verdict == "conflict" else REASON_GREY,
         )
-        for pair_id, item_a, band, verdict in db.execute(
-            select(Pair.id, Pair.item_a, Pair.band, Pair.verdict).where(
+        for pair_id, item_a, item_b, band, verdict in db.execute(
+            select(Pair.id, Pair.item_a, Pair.item_b, Pair.band, Pair.verdict).where(
                 Pair.verdict.in_(("review", "conflict"))
             )
         ).all()
+        if _undecided(item_a, item_b)
     ]
 
     tasks += [
         _task(pair_id, item_a, "high", "duplicate", "approver", REASON_CONFIRM_MERGE)
-        for pair_id, item_a in db.execute(
-            select(Pair.id, Pair.item_a).where(Pair.band == "high")
+        for pair_id, item_a, item_b in db.execute(
+            select(Pair.id, Pair.item_a, Pair.item_b).where(Pair.band == "high")
         ).all()
+        if _undecided(item_a, item_b)
     ]
 
     # The most valuable low-band sample is the pairs that looked most alike and
@@ -887,6 +1038,13 @@ def _stage_cluster(db: Session, status: PipelineStatus) -> None:
     for i in range(0, len(tasks), BATCH):
         db.execute(insert(ReviewTask), tasks[i : i + BATCH])
     db.commit()
+
+    # What hangs off a cluster by row rather than by id follows the rows into
+    # the rebuilt clusters: attachments and bin bindings.
+    from . import attachments, stocktake
+
+    attachments.rehome(db)
+    stocktake.rehome(db)
 
 
 # --------------------------------------------------------------------------

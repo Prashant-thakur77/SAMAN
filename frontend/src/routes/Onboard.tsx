@@ -127,7 +127,8 @@ export default function Onboard() {
     setError(null)
     try {
       await ingestCsv(file, cpse, false, mapping)
-      await runPipeline()
+      // The rest of the estate was run already: only the new rows are scored.
+      await runPipeline(true)
       watchPipeline()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'The ingest failed.')
@@ -444,6 +445,8 @@ export default function Onboard() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="micro-label">
                       pipeline · {status.stage ?? status.state}
+                      {status.incremental && ` · incremental, ${status.new_items ?? 0} new rows`}
+                      {status.note && ` · ${status.note}`}
                     </p>
                     <StatusChip tone={status.state === 'error' ? 'danger' : status.state === 'done' ? 'ok' : 'neutral'}>
                       {status.state}

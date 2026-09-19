@@ -75,6 +75,20 @@ def init_db() -> None:
         if "item_a" not in columns:
             with engine.begin() as conn:
                 conn.execute(text("DROP TABLE pair_label"))
+    # Three tables from the same day first pointed at cluster/golden_record
+    # by foreign key, which a pipeline rerun (which rebuilds both) could not
+    # satisfy. They now hold plain ids and are re-homed after each run; a
+    # database with the earlier shape gets them recreated, empty.
+    for table, target in (
+        ("bin_binding", "cluster"),
+        ("stock_count", "cluster"),
+        ("golden_attachment", "golden_record"),
+    ):
+        if table in inspector.get_table_names():
+            refs = {fk["referred_table"] for fk in inspector.get_foreign_keys(table)}
+            if target in refs:
+                with engine.begin() as conn:
+                    conn.execute(text(f"DROP TABLE {table}"))
     Base.metadata.create_all(bind=engine)
     # `cpse.contact_email` arrived with the per-CPSE report; a database from
     # before it gains the column in place, empty, and loses nothing.

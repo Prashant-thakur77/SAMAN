@@ -77,3 +77,6 @@ class PipelineStatusOut(BaseModel):
     eta_seconds: float | None
     elapsed_seconds: float | None
     error: str | None
+    incremental: bool = False
+    new_items: int = 0
+    note: str | None = None

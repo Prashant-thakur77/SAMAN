@@ -292,3 +292,17 @@ def bindings(db: Session, user: User, plant: str | None = None) -> list[dict]:
         }
         for b in rows
     ]
+
+
+def rehome(db: Session) -> int:
+    """After a pipeline run rebuilt the clusters, refresh each binding's
+    cluster from the row it is bound to."""
+    current = dict(db.execute(select(ClusterMember.item_id, ClusterMember.cluster_id)).all())
+    moved = 0
+    for binding in db.execute(select(BinBinding)).scalars():
+        cluster_id = current.get(binding.item_id)
+        if cluster_id != binding.cluster_id:
+            binding.cluster_id = cluster_id
+            moved += 1
+    db.commit()
+    return moved

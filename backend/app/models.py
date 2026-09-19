@@ -422,7 +422,12 @@ class GoldenAttachment(Base):
     __tablename__ = "golden_attachment"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    golden_id: Mapped[int] = mapped_column(ForeignKey("golden_record.id"), index=True)
+    # Not a foreign key: a pipeline rerun rebuilds golden records with new
+    # ids, and the attachment must outlive that. `item_id` is the member row
+    # the file was attached beside; after a rerun the attachment is re-homed
+    # to whichever golden record that row now belongs to (attachments.rehome).
+    golden_id: Mapped[int] = mapped_column(Integer, index=True)
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("item.id"), nullable=True)
     filename: Mapped[str] = mapped_column(String(255))
     content_type: Mapped[str] = mapped_column(String(128))
     size: Mapped[int] = mapped_column(Integer)
@@ -450,7 +455,9 @@ class BinBinding(Base):
     cpse_id: Mapped[int] = mapped_column(ForeignKey("cpse.id"), index=True)
     plant: Mapped[str] = mapped_column(String(32))
     bin_code: Mapped[str] = mapped_column(String(64), index=True)
-    cluster_id: Mapped[int | None] = mapped_column(ForeignKey("cluster.id"), nullable=True)
+    #: The binding is to the row; the cluster is derived and refreshed after
+    #: every pipeline run (stocktake.rehome), so it is not a foreign key.
+    cluster_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("item.id"))
     bound_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     bound_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
@@ -476,7 +483,8 @@ class StockCount(Base):
     bin_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     code: Mapped[str] = mapped_column(String(64))
     item_id: Mapped[int | None] = mapped_column(ForeignKey("item.id"), nullable=True)
-    cluster_id: Mapped[int | None] = mapped_column(ForeignKey("cluster.id"), nullable=True)
+    #: The cluster at count time, kept as a number: it may be rebuilt later.
+    cluster_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     counted_qty: Mapped[float] = mapped_column(Float)
     system_qty: Mapped[float | None] = mapped_column(Float, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

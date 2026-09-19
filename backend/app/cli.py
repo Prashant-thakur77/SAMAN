@@ -40,14 +40,17 @@ def cmd_seed(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_pipeline(_args: argparse.Namespace) -> int:
+def cmd_pipeline(args: argparse.Namespace) -> int:
     init_db()
     started = time.time()
     with SessionLocal() as db:
-        status = run_pipeline(db)
+        status = run_pipeline(db, incremental=getattr(args, "incremental", False))
     print(
-        f"pipeline {status.state}: stages {', '.join(status.stages_done) or 'none'} "
+        f"pipeline {status.state}{' (incremental)' if status.incremental else ''}: "
+        f"stages {', '.join(status.stages_done) or 'none'} "
         f"({round(time.time() - started, 1)}s)"
+        + (f" · {len(status.new_item_ids)} new rows" if status.incremental else "")
+        + (f" · {status.note}" if status.note else "")
     )
     return 0 if status.state == "done" else 1
 
@@ -491,6 +494,11 @@ def main(argv: list[str] | None = None) -> int:
     seed.set_defaults(func=cmd_seed)
 
     run = sub.add_parser("pipeline", help="run the pipeline over any unprocessed rows")
+    run.add_argument(
+        "--incremental",
+        action="store_true",
+        help="score only the rows that arrived since the last run (seconds, not a minute)",
+    )
     run.set_defaults(func=cmd_pipeline)
 
     demo = sub.add_parser("demo", help="seed, run the pipeline, print metrics")

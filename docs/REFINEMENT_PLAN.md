@@ -161,7 +161,7 @@ never a feeling.
 | Auto-retrain (P1) | done | Promotion only if not worse; audited |
 | Scheduled per-CPSE report | done | Sent to the CPSE's contact; every figure computed; assumptions attached |
 | Auto-issue codes for clusters that pass every gate (anchored, all attributes agree, held-out precision above target for that class) | done | Registrar sets the policy per family; every issue audited; nothing issued for a class below target |
-| Nightly incremental pipeline over new rows | cron line documented; incremental rerun next | Runs record their stats; the dashboard shows the run id and time |
+| Nightly incremental pipeline over new rows | done (`make pipeline --incremental` on the nightly line) | Runs record their stats; the dashboard shows the run id and time |
 | Re-evaluate the held-out snapshot after each run | done | Already recorded on the run; the dashboard says when |
 | Retire an unused legacy code suggestion (no stock, no PO, no movement in 24 months) | done | Suggestion only; migration plan needs approval |
 
@@ -189,8 +189,8 @@ never a feeling.
 
 ## What to improve in what already exists, regardless of stage
 
-- **Reruns.** The pipeline re-embeds and re-matches everything; make it
-  incremental so an upload of 200 rows costs seconds.
+- **Reruns.** Incremental runs score only the rows that arrived since the
+  last run; decided pairs, attachments and bin bindings survive a rerun (done).
 - **Frontend test depth.** 135 unit tests cover the state machines; `make e2e`
   drives the five demo moves in a real browser (done).
 - **The learned model's story.** Show its confusion matrix on real labels and

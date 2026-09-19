@@ -666,6 +666,17 @@ rather than a separate estimate that could drift from it. Ingest then runs the
 pipeline with a determinate progress bar, and the new rows arrive in the review
 queue.
 
+An upload into an estate that has already been run does not rerun the
+estate. The wizard asks for an **incremental** run (`POST
+/api/pipeline/run?incremental=true`, `make pipeline` with `--incremental`):
+the new rows are normalised, embedded with the saved fit, blocked against
+everything and scored only in pairs that touch them, their pairs appended,
+and the clusters and queue rebuilt from the whole graph; a few hundred rows
+cost seconds. A rerun of either kind keeps what people decided: decided pairs
+and their tasks stay, decided pairs are not asked again, and attachments and
+bin bindings follow their rows into the rebuilt clusters. Without an earlier
+run to build on, the run is a full one and says so.
+
 Real extracts are `.xlsx` as often as CSV, so the wizard takes both. A
 workbook's first sheet (or the one you pick) is the table, and any other
 sheet that carries a material code and a text column, the way SAP keeps the

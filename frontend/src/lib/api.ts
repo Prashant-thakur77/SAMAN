@@ -1166,6 +1166,9 @@ export async function ingestCsv(
 export type PipelineStatus = {
   state: string
   stage: string | null
+  incremental?: boolean
+  new_items?: number
+  note?: string | null
   stages_done: string[]
   rows_done: number
   rows_total: number
@@ -1175,7 +1178,9 @@ export type PipelineStatus = {
   error: string | null
 }
 
-export const runPipeline = () => api.post<PipelineStatus>('/pipeline/run')
+/** `incremental` scores only the rows that arrived since the last run: an onboarding upload. */
+export const runPipeline = (incremental = false) =>
+  api.post<PipelineStatus>(`/pipeline/run${incremental ? '?incremental=true' : ''}`)
 export const getPipelineStatus = () => api.get<PipelineStatus>('/pipeline/status')
 
 export type UserActivity = {

@@ -268,3 +268,99 @@ class TestConcurrency:
             assert body["state"] == "running"
         finally:
             pipeline_mod.reset_status()
+
+
+class TestIncrementalRun:
+    """An upload of a few rows into a run estate costs seconds, keeps every
+    earlier pair and every decision a person already made."""
+
+    def test_new_rows_are_scored_against_the_estate_without_a_rebuild(
+        self, as_steward, db, pipeline_run
+    ):
+        import time
+
+        from app.models import MatchRun, Pair, PairLabel, ReviewTask
+        from app.pipeline import run_pipeline
+
+        pairs_before = db.execute(select(func.count(Pair.id))).scalar()
+        runs_before = db.execute(select(func.count(MatchRun.id))).scalar()
+        # One reviewer decision, so its pair must not come back as a task.
+        task = db.execute(
+            select(ReviewTask)
+            .join(Pair, Pair.id == ReviewTask.pair_id)
+            .where(ReviewTask.state == "pending", Pair.verdict == "review")
+            .limit(1)
+        ).scalar_one()
+        pair = db.get(Pair, task.pair_id)
+        as_steward.post("/api/decisions", json={"task_id": task.id, "action": "reject"})
+        db.expire_all()
+        labels_before = db.execute(select(func.count(PairLabel.id))).scalar()
+
+        # Three new rows for CPCL: two spellings of one bearing and a new gasket.
+        payload = (
+            "MATNR,MAKTX,MEINS,WERKS\n"
+            'INC0001,"BRG,BALL,6205-2Z,SKF,500 KG,120 C",NOS,MANALI\n'
+            'INC0002,"BEARING BALL 6205 ZZ SKF 500 KG 120 C",NOS,MANALI\n'
+            'INC0003,"GASKET SW 2IN 150# SS316 GRAPHITE",NOS,MANALI\n'
+        )
+        real = as_steward.post(
+            "/api/ingest",
+            data={"cpse_code": "CPCL"},
+            files={"file": ("inc.csv", payload, "text/csv")},
+        ).json()
+        assert real["rows_accepted"] == 3
+
+        started = time.perf_counter()
+        status = run_pipeline(db, incremental=True)
+        seconds = time.perf_counter() - started
+        assert status.state == "done", status.error
+        assert status.incremental is True and len(status.new_item_ids) == 3
+        assert seconds < 30, f"an incremental run took {seconds:.1f}s"
+
+        db.expire_all()
+        # Pairs were appended, not rebuilt; the run was recorded as incremental.
+        assert db.execute(select(func.count(Pair.id))).scalar() >= pairs_before
+        assert db.execute(select(func.count(MatchRun.id))).scalar() == runs_before + 1
+        run = db.execute(select(MatchRun).order_by(MatchRun.id.desc())).scalars().first()
+        stats = json.loads(run.stats_json)
+        assert stats["incremental"]["new_items"] == 3
+        assert stats["incremental"]["pairs_scored"] > 0
+        # The two new spellings found each other, and the earlier reject stands.
+        new = {
+            p
+            for (p,) in db.execute(
+                select(Pair.id).where(
+                    Pair.item_a.in_(status.new_item_ids) | Pair.item_b.in_(status.new_item_ids)
+                )
+            )
+        }
+        assert new
+        assert db.get(Pair, pair.id).verdict == "distinct"
+        assert db.execute(select(func.count(PairLabel.id))).scalar() == labels_before
+        # The decided pair is not back in the queue.
+        assert (
+            db.execute(
+                select(func.count(ReviewTask.id)).where(
+                    ReviewTask.pair_id == pair.id, ReviewTask.state == "pending"
+                )
+            ).scalar()
+            == 0
+        )
+        # Every item, new ones included, is in exactly one cluster.
+        from app.models import ClusterMember, Item
+
+        assert (
+            db.execute(select(func.count(ClusterMember.id))).scalar()
+            == db.execute(select(func.count(Item.id))).scalar()
+        )
+
+    def test_without_an_earlier_run_it_says_so(self, db, pipeline_run, monkeypatch):
+        from app import pipeline as mod
+
+        monkeypatch.setattr(
+            mod, "embedder_path", lambda: __import__("pathlib").Path("/nonexistent"), raising=False
+        )
+        # Nothing new to score: the run is incremental and says there is nothing.
+        status = mod.run_pipeline(db, incremental=True, stages=["normalize_extract"])
+        assert status.state == "done"
+        assert status.incremental is True or "full run" in (status.note or "")

@@ -65,8 +65,20 @@ def attach(
     target = _path(digest, content_type)
     if not target.exists():
         target.write_bytes(payload)
+    from .models import ClusterMember
+
+    anchor = (
+        db.execute(
+            select(ClusterMember.item_id)
+            .where(ClusterMember.cluster_id == golden.cluster_id)
+            .order_by(ClusterMember.item_id)
+        )
+        .scalars()
+        .first()
+    )
     row = GoldenAttachment(
         golden_id=golden.id,
+        item_id=anchor,
         filename=Path(filename or "attachment").name[:255],
         content_type=content_type,
         size=len(payload),
@@ -146,3 +158,27 @@ def void(db: Session, attachment_id: int, user: User, reason: str | None) -> Gol
     )
     db.commit()
     return row
+
+
+def rehome(db: Session) -> int:
+    """After a pipeline run rebuilt the golden records, point every attachment
+    whose record is gone at the record its anchor row now belongs to."""
+    from .models import ClusterMember
+
+    live = {g for (g,) in db.execute(select(GoldenRecord.id))}
+    moved = 0
+    for row in db.execute(
+        select(GoldenAttachment).where(GoldenAttachment.voided_at.is_(None))
+    ).scalars():
+        if row.golden_id in live or row.item_id is None:
+            continue
+        golden_id = db.execute(
+            select(GoldenRecord.id)
+            .join(ClusterMember, ClusterMember.cluster_id == GoldenRecord.cluster_id)
+            .where(ClusterMember.item_id == row.item_id)
+        ).scalar_one_or_none()
+        if golden_id is not None:
+            row.golden_id = golden_id
+            moved += 1
+    db.commit()
+    return moved

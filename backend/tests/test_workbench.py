@@ -770,7 +770,14 @@ class TestCompareAnyTwoRows:
     def test_two_rows_are_scored_like_the_pipeline_scores_them(self, as_viewer, db, pipeline_run):
         from app.models import Pair
 
-        pair = db.execute(select(Pair).where(Pair.verdict == "distinct").limit(1)).scalar_one()
+        # A pair the machine itself refused (a veto), not one a reviewer
+        # overturned: those keep the person's verdict across reruns.
+        decided = select(ReviewTask.pair_id).where(ReviewTask.state == "done")
+        pair = db.execute(
+            select(Pair)
+            .where(Pair.verdict == "distinct", Pair.veto_json.isnot(None), Pair.id.notin_(decided))
+            .limit(1)
+        ).scalar_one()
         body = as_viewer.get(f"/api/compare?a={pair.item_a}&b={pair.item_b}").json()
         assert body["verdict"] == pair.verdict
         assert body["pipeline"] == {
