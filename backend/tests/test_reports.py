@@ -170,6 +170,21 @@ class TestRedaction:
             assert row["your_unit_price"] > row["market_band"]["mean"]
             assert row["market_band"]["n"] >= 2
 
+    def test_price_flags_count_only_our_own_and_state_the_rule(self, cpcl, db_module):
+        """The flag is the Opportunity page's stated rule applied to CPCL's
+        own average; another buyer's flag is a price and stays out."""
+        pv = cpcl["procurement"]["price_variance"]
+        assert "not a finding" in pv["anomaly_rule"]
+        ours = sum(
+            1
+            for row in opportunity.price_variance(db_module, REGISTRAR, limit=10**6)["rows"]
+            for p in row["prices"]
+            if p["cpse"] == "CPCL" and "anomaly" in p
+        )
+        assert pv["materials_far_above_the_others"] == ours
+        for row in pv["rows"]:
+            assert row["far_above_the_others"] is None or row["far_above_the_others"] > 1.5
+
     def test_transfers_in_never_carry_the_holders_price(self, cpcl):
         for row in cpcl["inventory"]["transfers"]["as_receiver"]["rows"]:
             assert row["from_cpse"] != "CPCL"

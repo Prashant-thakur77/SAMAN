@@ -211,12 +211,23 @@ export default function DashOpportunity() {
       {tab === 'variance' && (
         <section className="space-y-4">
           <p className="text-sm text-muted">{price_variance.note}</p>
+          <p className="max-w-prose text-xs text-muted" data-testid="anomaly-rule">
+            <span className="font-medium text-ink">
+              {price_variance.items_with_anomaly === 0
+                ? 'No buyer is flagged.'
+                : `${price_variance.items_with_anomaly} ${
+                    price_variance.items_with_anomaly === 1 ? 'material has' : 'materials have'
+                  } one buyer far above the rest.`}
+            </span>{' '}
+            {price_variance.anomaly_rule}
+          </p>
           <Table exportAs="price-variance">
             <THead>
               <TH>Material</TH>
               <TH align="right">Variance</TH>
               <TH>Lowest</TH>
               <TH>Highest</TH>
+              <TH>Flag</TH>
             </THead>
             <TBody>
               {price_variance.rows.map((row) => (
@@ -240,6 +251,30 @@ export default function DashOpportunity() {
                   <TD mono>
                     {row.highest.cpse}{' '}
                     {row.highest.unit_price === null ? '—' : formatRupees(row.highest.unit_price)}
+                  </TD>
+                  <TD>
+                    {row.anomaly_count === 0 ? (
+                      <span className="text-muted">—</span>
+                    ) : row.anomalies.length > 0 ? (
+                      row.anomalies.map((a) => (
+                        <StatusChip
+                          key={a.cpse}
+                          tone="danger"
+                          className="whitespace-nowrap"
+                          title={`${a.cpse} pays ${a.times_median}× the median of the other CPSEs, per base unit. ${price_variance.anomaly_rule}`}
+                        >
+                          {a.cpse} · {a.times_median}×
+                        </StatusChip>
+                      ))
+                    ) : (
+                      <StatusChip
+                        tone="neutral"
+                        className="whitespace-nowrap"
+                        title="One CPSE is far above the others. Which one is a price, and outside your visibility scope."
+                      >
+                        {row.anomaly_count} flagged · withheld
+                      </StatusChip>
+                    )}
                   </TD>
                 </TR>
               ))}

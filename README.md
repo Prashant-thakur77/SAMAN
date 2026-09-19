@@ -833,6 +833,21 @@ per base unit, so a box of 100 is never compared with a single piece, and every
 modelled figure travels with the assumption that produced it: the what-if
 slider changes an assumption, so the number it yields says so.
 
+The variance table also **flags a buyer far above the rest**, under a rule
+printed above the table: a CPSE's average per base unit more than 1.5× the
+median of the *other* CPSEs (each price is judged against the others' median,
+so an outlier never drags its own reference), with at least two others to
+compare against. A wide but even spread is not a flag; one buyer far above an
+otherwise tight group is. The same rule marks a single order far above an
+item's other orders on the item page, and counts a CPSE's own flags in its
+weekly report. Every place it appears says the same thing: pack size is
+normalized, grade, quantity, vendor and date are not, so a flag is a place to
+look, not a finding of overpayment. A steward sees their own CPSE's flag and a
+count for the rest; which other CPSE is far above is a price by another route
+and is withheld like one. On the synthetic estate two of 1,776 materials with
+variance carry a flag (spiral-wound gaskets at 2.45× and 1.53×); the synthetic
+prices are drawn narrowly, so the flag is rare here by construction.
+
 Duplicate codes hide stock. Once items share a CNMC the same material held in
 several CPSEs becomes one visible position, which is what turns idle surplus in
 one CPSE and a shortage in another into a transfer suggestion with a rupee value

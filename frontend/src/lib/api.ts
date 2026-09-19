@@ -498,10 +498,21 @@ export type PurchaseTrend = {
   /** ABC class at this CPSE by 12-month consumption value; null without purchases. */
   abc?: 'A' | 'B' | 'C' | null
   orders: number
-  history: { po_date: string; unit_price: number; qty: number; vendor: string; cpse: string }[]
+  history: {
+    po_date: string
+    unit_price: number
+    qty: number
+    vendor: string
+    cpse: string
+    /** Times the median of this item's other orders, when far above them. */
+    anomaly?: number
+  }[]
   last: { po_date: string; unit_price: number; vendor: string; cpse: string } | null
   trend: { from: number; to: number; change_pct: number; direction: string } | null
   price_band: { label: string } | null
+  /** Lines flagged under the stated rule; the rule itself when any are. */
+  anomalies?: number
+  anomaly_rule?: string | null
 }
 
 export type ItemDetail = ItemCard & {
@@ -958,7 +969,11 @@ export type OpportunityDashboard = {
   }
   price_variance: {
     note: string
+    /** The flagging rule in words, with its factor, so a flag is never read as a verdict. */
+    anomaly_rule: string
+    anomaly_factor: number
     items_with_variance: number
+    items_with_anomaly: number
     rows: {
       cluster_id: number
       description?: string
@@ -966,6 +981,9 @@ export type OpportunityDashboard = {
       lowest: { cpse: string; unit_price: number | null }
       highest: { cpse: string; unit_price: number | null }
       market_band?: { label: string } | null
+      anomaly_count: number
+      /** Only the reader's own CPSE outside registrar scope. */
+      anomalies: { cpse: string; times_median: number }[]
     }[]
   }
   vendor_overlap: {

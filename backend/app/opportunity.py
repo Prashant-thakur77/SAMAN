@@ -260,12 +260,59 @@ def joint_tender_candidates(
     }
 
 
+#: A price is flagged when it is more than this many times the median of its
+#: peers. 1.5 is a deliberate, stated assumption, not a finding: pack, grade,
+#: quantity and date are not held constant, so a flag says "look", never
+#: "overpaid".
+ANOMALY_FACTOR = 1.5
+#: Below this many peers a median is not a reference, so nothing is flagged.
+ANOMALY_MIN_PEERS = 2
+
+ANOMALY_RULE = (
+    f"Flagged when a price per base unit is more than {ANOMALY_FACTOR}× the median of "
+    f"the others it is compared with (at least {ANOMALY_MIN_PEERS} of them). Pack size "
+    "is normalized; grade, quantity, vendor and date are not, so a flag is a place to "
+    "look, not a finding of overpayment."
+)
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    return ordered[mid] if n % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def price_anomalies(prices: dict[str, float]) -> dict[str, float]:
+    """The keys whose price exceeds ANOMALY_FACTOR × the median of the others.
+
+    Each price is judged against the median of everything *but* itself, so
+    one outlier cannot drag the reference it is measured against. Returns
+    ``{key: ratio}``.
+    """
+    flagged: dict[str, float] = {}
+    for key, value in prices.items():
+        peers = [v for k, v in prices.items() if k != key and v > 0]
+        if len(peers) < ANOMALY_MIN_PEERS or value <= 0:
+            continue
+        reference = _median(peers)
+        if reference > 0 and value > ANOMALY_FACTOR * reference:
+            flagged[key] = round(value / reference, 2)
+    return flagged
+
+
 def price_variance(
     db: Session, scope: Scope, limit: int = 20, purchases: list[Purchase] | None = None
 ) -> dict:
-    """The same material bought at very different prices per base unit (§6.8b)."""
+    """The same material bought at very different prices per base unit (§6.8b).
+
+    Beside the spread, each row carries the CPSEs whose average is anomalous
+    under the stated rule (:data:`ANOMALY_RULE`), so the reader can tell a wide
+    but even spread from one buyer far above the rest.
+    """
     grouped = _group(load_purchases(db) if purchases is None else purchases)
     rows = []
+    anomalies = 0
 
     for cluster_id, purchases in grouped.items():
         by_cpse: dict[str, list[float]] = {}
@@ -280,6 +327,8 @@ def price_variance(
         low, high = averages[low_cpse], averages[high_cpse]
         if high <= 0:
             continue
+        flagged = price_anomalies(averages)
+        anomalies += bool(flagged)
         rows.append(
             {
                 "cluster_id": cluster_id,
@@ -288,8 +337,16 @@ def price_variance(
                 "highest": {"cpse": high_cpse, "unit_price": round(high, 2)},
                 "variance_pct": round(100 * (high - low) / high, 1),
                 "prices": [
-                    {"cpse": cpse, "unit_price": round(value, 2)}
+                    {
+                        "cpse": cpse,
+                        "unit_price": round(value, 2),
+                        **({"anomaly": flagged[cpse]} if cpse in flagged else {}),
+                    }
                     for cpse, value in sorted(averages.items())
+                ],
+                "anomaly_count": len(flagged),
+                "anomalies": [
+                    {"cpse": cpse, "times_median": ratio} for cpse, ratio in flagged.items()
                 ],
             }
         )
@@ -309,10 +366,20 @@ def price_variance(
             for side in ("lowest", "highest"):
                 if not scope.owns(row[side]["cpse"]):
                     row[side] = {**row[side], "cpse": "withheld", "unit_price": None}
+            # Naming who is far above the rest is a price by another route; a
+            # steward sees the count and their own CPSE's flag, nothing else.
+            row["anomalies"] = [a for a in row["anomalies"] if scope.owns(a["cpse"])]
+            row["prices"] = [
+                p if scope.owns(p["cpse"]) else {k: v for k, v in p.items() if k != "anomaly"}
+                for p in row["prices"]
+            ]
 
     return {
         "note": "Prices are normalized to price per base unit, so pack sizes compare.",
+        "anomaly_rule": ANOMALY_RULE,
+        "anomaly_factor": ANOMALY_FACTOR,
         "items_with_variance": len(rows),
+        "items_with_anomaly": anomalies,
         "rows": top,
     }
 
@@ -403,6 +470,11 @@ def last_purchase_and_trend(db: Session, item_id: int, scope: Scope) -> dict:
         }
         for po_date, unit_price, qty, vendor, cpse in rows
     ]
+    # A line far above this item's other orders, under the same stated rule
+    # the Opportunity page uses across CPSEs.
+    flagged = price_anomalies({i: h["unit_price"] for i, h in enumerate(history)})
+    for i, ratio in flagged.items():
+        history[i]["anomaly"] = ratio
     first, last = history[0]["unit_price"], history[-1]["unit_price"]
     visible = scope.sees_all_prices or scope.owns(history[-1]["cpse"])
     return {
@@ -420,4 +492,6 @@ def last_purchase_and_trend(db: Session, item_id: int, scope: Scope) -> dict:
             else None
         ),
         "price_band": None if visible else price_band([h["unit_price"] for h in history]),
+        "anomalies": len(flagged) if visible else 0,
+        "anomaly_rule": ANOMALY_RULE if visible and flagged else None,
     }

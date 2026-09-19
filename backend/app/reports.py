@@ -625,11 +625,15 @@ def _procurement(db: Session, scope: Scope, purchases: list) -> dict:
     variance = opportunity.price_variance(db, scope, limit=10**6)
     above: list[dict] = []
     highest = 0
+    flagged = 0
     for row in variance["rows"]:
         mine = next((p for p in row["prices"] if p["cpse"] == code), None)
         band = row.get("market_band")
         if mine is None or band is None or mine["unit_price"] is None:
             continue
+        # The stated rule from the Opportunity page: far above the median of
+        # the other buyers, not merely above the mean.
+        flagged += "anomaly" in mine
         if mine["unit_price"] <= band["mean"]:
             continue
         is_highest = row["highest"]["cpse"] == code
@@ -648,6 +652,7 @@ def _procurement(db: Session, scope: Scope, purchases: list) -> dict:
                 if band["mean"]
                 else None,
                 "you_pay_the_most": is_highest,
+                "far_above_the_others": mine.get("anomaly"),
             }
         )
     above.sort(key=lambda r: r["premium_over_mean_pct"] or 0.0, reverse=True)
@@ -673,6 +678,8 @@ def _procurement(db: Session, scope: Scope, purchases: list) -> dict:
         "price_variance": {
             "materials_above_band_mean": len(above),
             "materials_where_you_pay_the_most": highest,
+            "materials_far_above_the_others": flagged,
+            "anomaly_rule": variance["anomaly_rule"],
             "rows": above[:EXAMPLES],
             "note": (
                 f"{variance['note']} Listed where your average price per base unit in the "
@@ -875,6 +882,17 @@ def _actions(report: dict) -> list[dict]:
             }
         )
     variance = report["procurement"]["price_variance"]
+    if variance.get("materials_far_above_the_others"):
+        n = variance["materials_far_above_the_others"]
+        actions.append(
+            {
+                "key": "price_flags",
+                "text": f"Look first at {n:,} material{'s' if n != 1 else ''} where you pay "
+                f"more than {opportunity.ANOMALY_FACTOR}× the median of the other buyers "
+                "(a place to look, not a finding).",
+                "count": n,
+            }
+        )
     if variance["materials_where_you_pay_the_most"]:
         actions.append(
             {
@@ -1406,7 +1424,14 @@ def render_html(report: dict) -> str:
     )
     parts.append(
         f'<p class="note">{_n(pv["materials_above_band_mean"])} materials above the band mean; '
-        f'{_n(pv["materials_where_you_pay_the_most"])} where you pay the most of any buyer.</p>'
+        f'{_n(pv["materials_where_you_pay_the_most"])} where you pay the most of any buyer'
+        + (
+            f'; {_n(pv["materials_far_above_the_others"])} far above the other buyers '
+            f"({html.escape(pv['anomaly_rule'])})"
+            if pv.get("materials_far_above_the_others")
+            else ""
+        )
+        + ".</p>"
     )
     parts.append("</section>")
 

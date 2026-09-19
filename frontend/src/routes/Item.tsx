@@ -168,6 +168,24 @@ export default function Item() {
                   <Sparkline points={detail.purchase_history.history} />
                 </div>
               )}
+              {detail.purchase_history.anomalies ? (
+                <div
+                  data-testid="price-flag"
+                  title={`A place to look, not a finding. ${detail.purchase_history.anomaly_rule ?? ''}`}
+                >
+                  <p className="micro-label">Flagged</p>
+                  <p className="font-mono text-lg text-danger">
+                    {detail.purchase_history.anomalies}{' '}
+                    {detail.purchase_history.anomalies === 1 ? 'order' : 'orders'}
+                  </p>
+                  <p className="micro-label mt-1">
+                    {detail.purchase_history.history
+                      .filter((h) => h.anomaly)
+                      .map((h) => `${h.po_date} · ${h.anomaly}× the others`)
+                      .join(', ')}
+                  </p>
+                </div>
+              ) : null}
               {detail.purchase_history.trend && (
                 <div>
                   <p className="micro-label">Trend</p>

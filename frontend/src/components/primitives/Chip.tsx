@@ -27,13 +27,16 @@ export function StatusChip({
   tone = 'neutral',
   children,
   className,
+  title,
 }: {
   tone?: StatusTone
   children: ReactNode
   className?: string
+  title?: string
 }) {
   return (
     <span
+      title={title}
       className={cn(
         'inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium',
         TEXT[tone],

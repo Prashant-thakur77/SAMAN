@@ -319,13 +319,16 @@ mode and bin binding on Scan; the Scan screen installable and working offline
 (counts queue on the device); attachments on golden records; incremental
 pipeline runs that keep every decision; vendors grouped by company and a
 Vendors tab; the interface in Hindi at a click; house abbreviations taught per
-CPSE; an install guide (`docs/INSTALL.md`).
+CPSE; an install guide (`docs/INSTALL.md`); the model harness measured on
+local 3B and 7B models (the default stays 3B, with the numbers as the reason);
+per-class threshold sweeps in `make tune` (bearings would gain +0.03 F1 from a
+lower cut, other classes ~0; reported, not applied); price flags at 1.5× the
+other buyers' median with the rule printed beside them.
 
-**Next, from the plan:** local 3B/7B rows for the model harness (`make
-llm-eval` with Ollama running); per-class threshold sweeps; price-anomaly
-flags; class-template drafting for new families; a public GeM/CPPP corpus to
-measure on real text; signed bundles between CPSE nodes; realised-savings
-tracking once post-consolidation POs exist; a screen-reader walkthrough.
+**Next, from the plan:** class-template drafting for new families; a public
+GeM/CPPP corpus to measure on real text; signed bundles between CPSE nodes;
+realised-savings tracking once post-consolidation POs exist; a screen-reader
+walkthrough.
 
 **Known limits worth saying out loud:** all data is synthetic (with full
 ground truth, which is what makes the metrics honest); no live SAP has been

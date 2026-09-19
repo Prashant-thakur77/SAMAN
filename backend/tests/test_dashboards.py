@@ -100,6 +100,68 @@ class TestPriceVariance:
                     assert entry["unit_price"] is None
 
 
+class TestPriceAnomalies:
+    """A flag is a stated rule applied to numbers, never a verdict."""
+
+    def test_one_buyer_far_above_the_rest_is_flagged_against_the_others_median(self):
+        flagged = opportunity.price_anomalies({"A": 100, "B": 110, "C": 105, "D": 400})
+        assert flagged == {"D": round(400 / 105, 2)}
+
+    def test_an_even_spread_is_not_an_anomaly(self):
+        assert opportunity.price_anomalies({"A": 100, "B": 130, "C": 145}) == {}
+
+    def test_the_outlier_is_left_out_of_its_own_reference(self):
+        # With two peers the reference is their median, not a mean the
+        # outlier itself would have dragged up.
+        assert "C" in opportunity.price_anomalies({"A": 10, "B": 10, "C": 16})
+
+    def test_too_few_peers_means_no_reference(self):
+        assert opportunity.price_anomalies({"A": 10, "B": 100}) == {}
+        assert opportunity.price_anomalies({"A": 0, "B": 0, "C": 100}) == {}
+
+    def test_the_rule_is_stated_with_the_rows(self, pipeline_run, db):
+        result = opportunity.price_variance(db, REGISTRAR, limit=10**6)
+        assert str(opportunity.ANOMALY_FACTOR) in result["anomaly_rule"]
+        assert "not a finding" in result["anomaly_rule"]
+        assert result["items_with_anomaly"] == sum(
+            1 for r in result["rows"] if r["anomaly_count"]
+        )
+        for row in result["rows"]:
+            assert len(row["anomalies"]) == row["anomaly_count"]
+            flagged = {p["cpse"] for p in row["prices"] if "anomaly" in p}
+            assert flagged == {a["cpse"] for a in row["anomalies"]}
+            for a in row["anomalies"]:
+                assert a["times_median"] > opportunity.ANOMALY_FACTOR
+
+    def test_a_steward_is_not_told_which_other_cpse_is_far_above(self, pipeline_run, db):
+        for row in opportunity.price_variance(db, CPCL_STEWARD, limit=10**6)["rows"]:
+            assert all(a["cpse"] == "CPCL" for a in row["anomalies"])
+            for entry in row["prices"]:
+                if entry["cpse"] != "CPCL":
+                    assert "anomaly" not in entry
+
+    def test_an_item_line_far_above_its_own_orders_is_flagged(self, pipeline_run, db):
+        item_id = db.execute(
+            select(PurchaseHistory.item_id)
+            .group_by(PurchaseHistory.item_id)
+            .having(func.count() >= 3)
+            .limit(1)
+        ).scalar()
+        rows = db.execute(
+            select(PurchaseHistory).where(PurchaseHistory.item_id == item_id)
+        ).scalars().all()
+        try:
+            rows[0].unit_price = 10 * max(r.unit_price for r in rows)
+            db.flush()
+            trend = opportunity.last_purchase_and_trend(db, item_id, REGISTRAR)
+            assert trend["anomalies"] == 1
+            assert "not a finding" in trend["anomaly_rule"]
+            flagged = [h for h in trend["history"] if "anomaly" in h]
+            assert len(flagged) == 1 and flagged[0]["anomaly"] > opportunity.ANOMALY_FACTOR
+        finally:
+            db.rollback()
+
+
 class TestPurchaseTrend:
     def test_the_last_purchase_and_direction_are_reported(self, pipeline_run, db):
         item_id = db.execute(
