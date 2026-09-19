@@ -249,6 +249,12 @@ def frontend(path: str) -> FileResponse:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found.")
     # Hashed assets may be cached for good; the shell must always be fresh,
     # or a redeploy leaves a browser asking for assets that no longer exist.
-    if page.name == "index.html":
-        return FileResponse(page, headers={"Cache-Control": "no-cache"})
+    # The service worker and the manifest are unhashed and must be re-checked
+    # on every load, like the shell, or an update never reaches an installed
+    # phone.
+    if not (path.startswith("assets/") or path.startswith("ocr/")):
+        headers = {"Cache-Control": "no-cache"}
+        if page.name == "sw.js":
+            headers["Service-Worker-Allowed"] = "/"
+        return FileResponse(page, headers=headers)
     return FileResponse(page, headers={"Cache-Control": "public, max-age=31536000, immutable"})

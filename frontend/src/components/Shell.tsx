@@ -34,6 +34,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false)
   const { unreachable } = useHealth()
   const location = useLocation()
+  // The Scan screen is installed on phones and used in stores with no signal:
+  // it renders from the device (recent scans, queued counts) and says so,
+  // rather than being replaced by the "start the backend" page.
+  const worksOffline = location.pathname.startsWith('/scan')
 
   const toggleSidebar = useCallback(() => {
     setCollapsed((c) => {
@@ -114,7 +118,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 explanation either. With the API down every screen renders
                 nothing at all, so say why once here rather than sixteen times
                 in sixteen routes (spec §8A). */}
-            {unreachable ? (
+            {unreachable && !worksOffline ? (
               <EmptyState
                 title="SAMAN cannot reach its API"
                 description="Every screen needs the backend on :8000. Start it with `make dev`, or `docker compose up` for both services, then reload. Nothing has been lost; the database is on disk."
@@ -125,7 +129,18 @@ export function Shell({ children }: { children: ReactNode }) {
                 }
               />
             ) : (
-              children
+              <>
+                {unreachable && (
+                  <p
+                    role="status"
+                    className="mb-6 border border-hairline bg-surface px-4 py-2 text-sm text-muted"
+                  >
+                    No signal. This screen keeps working from what is on the device; lookups
+                    need the connection back.
+                  </p>
+                )}
+                {children}
+              </>
             )}
           </div>
         </main>

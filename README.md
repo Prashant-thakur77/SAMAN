@@ -1365,6 +1365,15 @@ to the material it holds once (`POST /api/scan/bins`), after which scanning
 the bin answers with the material, its stock here and elsewhere, whether or
 not the part carries a code; rebinding replaces and is audited.
 
+The Scan screen **installs on a phone** (a web-app manifest and a service
+worker; "Add to Home Screen" opens at `/scan`). The worker caches the app
+shell and the browser OCR engine, never anything under `/api/`, so with no
+signal the screen still opens, keeps its session, reads nameplates, shows the
+recent scans and queues stock counts on the device; they post in order when
+the signal returns, and a refused line is named rather than blocking the
+rest. Lookups themselves need the connection, and the page says so instead of
+pretending. Verified in headless Chromium with the network switched off.
+
 On the shelf floor the screen keeps a list of the last scans on that device,
 turns the phone's torch on where the browser allows it (Chrome on Android;
 iOS shows no button), and carries a **Wrong item?** link under every result:

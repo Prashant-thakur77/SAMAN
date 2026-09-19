@@ -44,6 +44,7 @@ export default function Login() {
   const { refresh } = useSession()
   const [seeding, setSeeding] = useState<PipelineStatus | null>(null)
   const [seedError, setSeedError] = useState<string | null>(null)
+  const [unreachable, setUnreachable] = useState(false)
 
   // Demo picker or email field: the API decides (SAMAN_DEMO_LOGIN).
   const [mode, setMode] = useState<{ demo_login: boolean; has_users: boolean } | null>(null)
@@ -55,9 +56,11 @@ export default function Login() {
       setMode(loginMode)
       setEmail((current) => current || list[0]?.email || '')
       return loginMode.has_users ? Math.max(list.length, 1) : 0
-    } catch {
-      // No seeded users yet is a normal first-run state, not an error.
+    } catch (err) {
+      // No seeded users yet is a normal first-run state, not an error. An
+      // unreachable API is neither: say so rather than offer to seed.
       setUsers([])
+      setUnreachable(err instanceof ApiError && err.status === 0)
       return 0
     }
   }, [])
@@ -155,6 +158,11 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+              ) : unreachable ? (
+                <p className="card px-3 py-4 text-sm text-muted">
+                  The server cannot be reached from here. Check the connection and try
+                  again; nothing can be signed in to until it answers.
+                </p>
               ) : users.length > 0 ? (
                 <ul className="card divide-y divide-hairline overflow-hidden">
                   {users.map((u) => (

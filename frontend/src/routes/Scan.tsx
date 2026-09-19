@@ -69,6 +69,28 @@ function labelFor(result: ScanResult): string | null {
   return m.cnmc ?? m.std_description ?? m.members[0]?.description ?? null
 }
 
+/** Counts taken with no signal wait here until it returns; then they post in order. */
+type QueuedCount = { session_id: string; code: string; counted_qty: number; plant: string; at: number }
+const QUEUE_KEY = 'saman.scan.count-queue'
+
+function readQueue(): QueuedCount[] {
+  try {
+    const raw = localStorage.getItem(QUEUE_KEY)
+    const list = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(list) ? (list as QueuedCount[]) : []
+  } catch {
+    return []
+  }
+}
+
+function writeQueue(queue: QueuedCount[]) {
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
+  } catch {
+    /* nothing to be done; the count is still on screen */
+  }
+}
+
 /** One walk through the store: a session id kept on the device until "New walk". */
 const SESSION_KEY = 'saman.scan.count-session'
 
@@ -99,18 +121,87 @@ export default function Scan() {
   const [plant, setPlant] = useState('')
   const [session, setSession] = useState(() => readSession())
   const [walk, setWalk] = useState<CountSession | null>(null)
+  const [queued, setQueued] = useState<QueuedCount[]>(() => readQueue())
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
   const field = useRef<HTMLInputElement>(null)
   const { user: me } = useSession()
 
+  // Counts taken offline post themselves, in order, when the signal returns.
+  const flushQueue = useCallback(async () => {
+    const pending = readQueue()
+    if (pending.length === 0) return
+    const rest = [...pending]
+    while (rest.length) {
+      const next = rest[0]
+      try {
+        await postCount(next)
+        rest.shift()
+        writeQueue(rest)
+        setQueued([...rest])
+      } catch (err) {
+        // Unreachable still: keep the queue as it is and try later. A refused
+        // line (an unknown code) would block the rest, so drop it and say so.
+        if (err instanceof ApiError && err.status !== 0) {
+          rest.shift()
+          writeQueue(rest)
+          setQueued([...rest])
+          setError(`A queued count for ${next.code} was refused: ${err.message}`)
+          continue
+        }
+        return
+      }
+    }
+    getCountSession(session).then(setWalk).catch(() => undefined)
+  }, [session])
+
+  useEffect(() => {
+    const up = () => {
+      setOnline(true)
+      void flushQueue()
+    }
+    const down = () => setOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    if (navigator.onLine) void flushQueue()
+    return () => {
+      window.removeEventListener('online', up)
+      window.removeEventListener('offline', down)
+    }
+  }, [flushQueue])
+
+  // Plants are remembered on the device so the count screen still has them
+  // in a store with no signal.
   useEffect(() => {
     if (!me?.cpse_code) return
+    try {
+      const cached = JSON.parse(localStorage.getItem('saman.scan.plants') ?? '[]') as string[]
+      if (cached.length) {
+        setPlants(cached)
+        setPlant((p) => p || localStorage.getItem('saman.scan.plant') || cached[0] || '')
+      }
+    } catch {
+      /* fall through to the API */
+    }
     getPlants()
       .then((r) => {
         setPlants(r.plants)
         setPlant((p) => p || r.plants[0] || '')
+        try {
+          localStorage.setItem('saman.scan.plants', JSON.stringify(r.plants))
+        } catch {
+          /* fine */
+        }
       })
-      .catch(() => setPlants([]))
+      .catch(() => undefined)
   }, [me?.cpse_code])
+
+  useEffect(() => {
+    try {
+      if (plant) localStorage.setItem('saman.scan.plant', plant)
+    } catch {
+      /* fine */
+    }
+  }, [plant])
 
   useEffect(() => {
     try {
@@ -297,6 +388,12 @@ export default function Scan() {
             setWalk(next)
             scanAgain()
           }}
+          onQueued={(line) => {
+            const next = [...readQueue(), line]
+            writeQueue(next)
+            setQueued(next)
+            scanAgain()
+          }}
         />
       )}
 
@@ -316,6 +413,15 @@ export default function Scan() {
             <BindBin result={result} plant={plant} />
           )}
         </>
+      )}
+
+      {mode === 'count' && (queued.length > 0 || !online) && (
+        <p role="status" className="border border-hairline bg-surface px-4 py-2 text-sm">
+          {online ? '' : 'No signal. '}
+          {queued.length > 0
+            ? `${queued.length} count${queued.length === 1 ? '' : 's'} waiting on this device; they post in order when the signal returns.`
+            : 'Counts you take now are kept on this device and post when it returns.'}
+        </p>
       )}
 
       {mode === 'count' && walk && walk.lines.length > 0 && (
@@ -1523,6 +1629,7 @@ function CountBar({
   session,
   disabled = false,
   onRecorded,
+  onQueued,
 }: {
   result: ScanResult
   chosen: number | null
@@ -1531,6 +1638,8 @@ function CountBar({
   /** A lookup is in flight: the bar belongs to the previous scan until it lands. */
   disabled?: boolean
   onRecorded: (walk: CountSession) => void
+  /** The network was away: the line is kept on the device for later. */
+  onQueued: (line: QueuedCount) => void
 }) {
   const [qty, setQty] = useState('')
   const [state, setState] = useState<'idle' | 'sending' | 'failed'>('idle')
@@ -1564,6 +1673,11 @@ function CountBar({
       await postCount({ session_id: session, code: result.query, counted_qty: n, plant })
       onRecorded(await getCountSession(session))
     } catch (err) {
+      if (err instanceof ApiError && err.status === 0) {
+        // The store has no signal: keep the line and move on to the next bin.
+        onQueued({ session_id: session, code: result.query, counted_qty: n, plant, at: Date.now() })
+        return
+      }
       setState('failed')
       setMessage(err instanceof ApiError ? err.message : 'The count could not be recorded.')
     }

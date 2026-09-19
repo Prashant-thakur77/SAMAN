@@ -41,7 +41,7 @@ and at a desk.*
 | Workbench | add · **done** | Seconds per decision recorded on the card; shown on the dashboard | The first number a pilot is judged on | 2 d |
 | Workbench | improve · **done** | Filters (class, CPSE, band, assigned to me); undo within five minutes | Queues are worked by family, and everyone mis-clicks | 2 d |
 | Search | improve · **done** | Sort by relevance, recent searches, "did you mean" from the abbreviation table | Half of real queries are misspelt abbreviations | 2 d |
-| Scan | add | Installable app (PWA) with the OCR engine cached; works with no signal, syncs later | Stores have no signal; the phone must still answer | 3 d |
+| Scan | add · **done** | Installable app (PWA) with the OCR engine cached; works with no signal, syncs later | Stores have no signal; the phone must still answer | 3 d |
 | Scan | add · **done** | Stock-count mode (scan, count, next); bin binding ("this bin holds this code") | The storekeeper's real daily job | 3 d |
 | Scan | improve · **done** | Torch toggle, scan history, a "wrong item?" report | Dim stores; mistakes need a path back | 1 d |
 | Smart-Create | add · **done** | Barcode and part-number fields feeding the check; save a probe as a draft request | Most new-code requests start from a box in hand | 2 d |

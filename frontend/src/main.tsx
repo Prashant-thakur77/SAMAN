@@ -7,6 +7,17 @@ import { SessionProvider } from './lib/session'
 import { ThemeProvider } from './lib/theme'
 import './styles/index.css'
 
+// The service worker makes the Scan screen installable and keeps the shell
+// and the OCR engine available in a store with no signal. Production only:
+// in development it would cache Vite's modules and hide every edit.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* an old browser or a blocked origin still gets the ordinary page */
+    })
+  })
+}
+
 const root = document.getElementById('root')
 if (!root) throw new Error('#root not found in index.html')
 
