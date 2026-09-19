@@ -14,7 +14,7 @@ PYTEST      := $(VENV)/bin/pytest
 
 .PHONY: help setup venv deps deps-optional web-deps dev backend frontend test \
         lint build clean licenses licenses-check seed seed-large pipeline demo demo-splink \
-        demo-snapshot demo-restore tune test-web preview screenshots check deps-ocr deps-stt deps-tts \
+        demo-snapshot demo-restore tune test-web preview screenshots e2e check deps-ocr deps-stt deps-tts \
         evaluate report
 
 help:  ## Show available targets
@@ -132,6 +132,9 @@ link:  ## Public HTTPS link on your reserved ngrok domain (stable across restart
 
 screenshots:  ## Regenerate docs/screenshots from the running app (needs make preview)
 	cd backend && ../$(PY) scripts/screenshots.py
+
+e2e:  ## Drive the five demo moves through the UI in a real browser (needs make dev; BASE=http://127.0.0.1:4173 for the preview)
+	cd backend && ../$(PY) scripts/e2e_demo.py $(if $(BASE),--base-url $(BASE),)
 
 check:  ## Everything CI runs: lint, both test suites, type-check, licenses
 	cd backend && ../$(PY) -m ruff check .
