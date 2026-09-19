@@ -119,7 +119,7 @@ class TestConversation:
     def test_off_topic_gets_the_scope_not_a_failed_query(self, db, pipeline_run, monkeypatch):
         from app import knowledge
 
-        monkeypatch.setattr(knowledge, "answer", lambda q: None)
+        monkeypatch.setattr(knowledge, "answer", lambda q, history=None: None)
         reply = assistant.answer(db, "who is the president of india", REGISTRAR)
         assert reply.kind == "answer"
         assert reply.answer == assistant.OUT_OF_SCOPE

@@ -179,22 +179,47 @@ def _numbers(text: str) -> set[str]:
     return {m.replace(",", "").rstrip(".") for m in re.findall(r"\d[\d,.]*", text)}
 
 
-def _call_model(question: str, passages: list[tuple[Chunk, float]]) -> str:
+#: How much of the conversation the model sees: the last few turns, each
+#: trimmed, so "and in Hindi?" or "why not the other one?" has something to
+#: refer to without the prompt growing without bound.
+HISTORY_TURNS = 5
+HISTORY_CHARS = 300
+
+
+def _messages(
+    question: str, passages: list[tuple[Chunk, float]], history: list[dict] | None = None
+) -> list[dict]:
     context = "\n\n".join(
         f"[{i + 1}] ({c.source} · {c.heading}) {c.text}" for i, (c, _) in enumerate(passages)
     )
+    messages = [{"role": "system", "content": SYSTEM_PROMPT.format(dont_know=DONT_KNOW)}]
+    for turn in (history or [])[-HISTORY_TURNS:]:
+        role = "assistant" if turn.get("role") == "assistant" else "user"
+        text = str(turn.get("text") or "").strip()[:HISTORY_CHARS]
+        if text:
+            messages.append({"role": role, "content": text})
+    messages.append({"role": "user", "content": f"Passages:\n{context}\n\nQuestion: {question}"})
+    return messages
+
+
+def _call_model(
+    question: str, passages: list[tuple[Chunk, float]], history: list[dict] | None = None
+) -> str:
     return llm.chat(
-        [
-            {"role": "system", "content": SYSTEM_PROMPT.format(dont_know=DONT_KNOW)},
-            {"role": "user", "content": f"Passages:\n{context}\n\nQuestion: {question}"},
-        ],
-        temperature=0.1,
-        timeout=60.0,
-        max_tokens=260,
+        _messages(question, passages, history), temperature=0.1, timeout=60.0, max_tokens=260
     )
 
 
-def answer(question: str) -> Grounded | None:
+def passage(source: str, heading: str) -> dict | None:
+    """One passage of the corpus by its citation, for the reader who clicks
+    a source: the paragraph the model was given, verbatim."""
+    hits = [c for c in corpus() if c.source == source and c.heading == heading]
+    if not hits:
+        return None
+    return {"source": source, "heading": heading, "text": "\n\n".join(c.text for c in hits)}
+
+
+def answer(question: str, history: list[dict] | None = None) -> Grounded | None:
     """A grounded answer, or None when there is nothing safe to say.
 
     None means: no model, no relevant passages, the model declined, or the
@@ -205,11 +230,13 @@ def answer(question: str) -> Grounded | None:
     """
     if not available():
         return None
+    # A follow-up depends on what came before it, so only a first question
+    # is served from, or written to, the memo.
     key = _key(question)
-    if key in _answers:
+    if not history and key in _answers:
         return _answers[key]
-    result = _answer(question)
-    if result is not None and not result.refused:
+    result = _answer(question, history)
+    if result is not None and not result.refused and not history:
         _answers[key] = result
     return result
 
@@ -292,7 +319,7 @@ def forget_answers() -> None:
 _SENTENCE_END = re.compile(r"[.!?।](?=\s)")
 
 
-def stream(question: str):
+def stream(question: str, history: list[dict] | None = None):
     """`answer`, delivered a sentence at a time, with the same guards.
 
     Yields dict events: `sources` first, then a `delta` for each sentence
@@ -306,7 +333,7 @@ def stream(question: str):
     if not available():
         yield {"type": "done", "accepted": False, "reason": "no_model", "text": ""}
         return
-    hit = cached(question)
+    hit = None if history else cached(question)
     if hit is not None:
         yield {"type": "sources", "sources": hit.sources}
         yield {"type": "delta", "text": hit.text}
@@ -323,13 +350,7 @@ def stream(question: str):
     yield {"type": "sources", "sources": sources}
 
     known = _numbers(" ".join(c.text for c, _ in passages)) | _numbers(question)
-    context = "\n\n".join(
-        f"[{i + 1}] ({c.source} · {c.heading}) {c.text}" for i, (c, _) in enumerate(passages)
-    )
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT.format(dont_know=DONT_KNOW)},
-        {"role": "user", "content": f"Passages:\n{context}\n\nQuestion: {question}"},
-    ]
+    messages = _messages(question, passages, history)
     import time
 
     full = ""
@@ -395,11 +416,12 @@ def stream(question: str):
         yield {"type": "done", "accepted": False, "reason": "declined", "text": ""}
         return
     _outcome("accepted", question, sources=sources, text=text, seconds=time.time() - started)
-    _answers[_key(question)] = Grounded(text, sources=sources, mode="llm")
+    if not history:
+        _answers[_key(question)] = Grounded(text, sources=sources, mode="llm")
     yield {"type": "done", "accepted": True, "text": text, "sources": sources}
 
 
-def _answer(question: str) -> Grounded | None:
+def _answer(question: str, history: list[dict] | None = None) -> Grounded | None:
     import time
 
     passages = retrieve(question)
@@ -408,7 +430,7 @@ def _answer(question: str) -> Grounded | None:
         return None
     started = time.time()
     try:
-        text = _call_model(question, passages)
+        text = _call_model(question, passages, history)
     except Exception as exc:
         note = f"model unavailable ({type(exc).__name__})"
         _outcome("unavailable", question, note=note, seconds=time.time() - started)

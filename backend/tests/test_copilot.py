@@ -324,7 +324,7 @@ class TestCopilotPageConversation:
     def test_off_topic_states_the_scope(self, as_viewer, pipeline_run, monkeypatch):
         from app import knowledge
 
-        monkeypatch.setattr(knowledge, "answer", lambda q: None)
+        monkeypatch.setattr(knowledge, "answer", lambda q, history=None: None)
         body = as_viewer.post(
             "/api/copilot/query", json={"question": "who is india president"}
         ).json()

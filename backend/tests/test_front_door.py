@@ -24,6 +24,8 @@ PUBLIC = {
     # The streamed form of the same answer: the model reads the public
     # documents; a visitor's data question never reaches it (assistant._answer).
     ("GET", "/api/assistant/stream"),
+    # The passage behind a citation: the public documents, verbatim.
+    ("GET", "/api/assistant/passage"),
     ("GET", "/api/assistant/suggestions"),
     ("GET", "/api/assistant/voice"),
 }

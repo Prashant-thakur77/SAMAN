@@ -760,6 +760,13 @@ is appended to `data/eval/assistant-answers.jsonl` (`SAMAN_ANSWER_LOG`), and
 `make llm-eval` can replay the questions people actually asked with
 `python -m app.cli llm-eval --from-log`.
 
+A follow-up carries its context: the widget sends the last five turns with
+the question, the model sees them (trimmed) before the passages, and such
+answers are never memoised, since the same words later may mean something
+else. Every model answer names the passages it was given as chips; a click
+opens the paragraph verbatim from `/api/assistant/passage`, so nobody has to
+take the model's word for what the documents say.
+
 `POST /api/assistant/query` is public and scoped like every other endpoint.
 
 ### Commercial and inventory analytics

@@ -901,6 +901,7 @@ def answer(
     signed_in: bool = True,
     stream: bool = False,
     use_model: bool = True,
+    history: list[dict] | None = None,
 ) -> Reply:
     """Route one utterance. The order is navigation, knowledge, then the Copilot.
 
@@ -918,13 +919,13 @@ def answer(
     without the model at all, which is what the stream falls back to when the
     model's words fail the guards.
     """
-    reply = _answer(db, question, scope, current_path, signed_in, stream, use_model)
+    reply = _answer(db, question, scope, current_path, signed_in, stream, use_model, history)
     if signed_in:
         return reply
     return _for_a_visitor(reply)
 
 
-def _grounded(question: str, stream: bool, use_model: bool):
+def _grounded(question: str, stream: bool, use_model: bool, history: list[dict] | None = None):
     """The model's answer, a stream marker, or nothing.
 
     Returns a `Reply` of kind "stream" when the caller asked for a stream and
@@ -933,9 +934,9 @@ def _grounded(question: str, stream: bool, use_model: bool):
     """
     if not use_model:
         return None
-    if stream and knowledge.available() and knowledge.cached(question) is None:
+    if stream and knowledge.available() and (history or knowledge.cached(question) is None):
         return Reply("stream", "", mode="llm", matched={"question": question})
-    return knowledge.answer(question)
+    return knowledge.answer(question, history)
 
 
 def _for_a_visitor(reply: Reply) -> Reply:
@@ -969,6 +970,7 @@ def _answer(
     signed_in: bool,
     stream: bool = False,
     use_model: bool = True,
+    history: list[dict] | None = None,
 ) -> Reply:
     question = (question or "").strip()
     if not question:
@@ -1057,7 +1059,9 @@ def _answer(
         # quote example figures, and a visitor must not be told one of those
         # as if it were an answer about the live estate.
         grounded = (
-            None if _looks_like_data_question(text) else _grounded(question, stream, use_model)
+            None
+            if _looks_like_data_question(text)
+            else _grounded(question, stream, use_model, history)
         )
         if isinstance(grounded, Reply):
             return grounded
@@ -1078,7 +1082,7 @@ def _answer(
     # 5. Not a data question, not a screen, not a card: ask the local model,
     #    grounded in the project's own documents, if one is running.
     if not useful:
-        grounded = _grounded(question, stream, use_model)
+        grounded = _grounded(question, stream, use_model, history)
         if isinstance(grounded, Reply):
             return grounded
         if grounded and grounded.text:

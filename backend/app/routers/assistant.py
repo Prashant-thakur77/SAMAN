@@ -34,6 +34,9 @@ class Query(BaseModel):
     #: The caller can read `/assistant/stream`; answers from the model then
     #: arrive a sentence at a time instead of after the whole thing.
     stream: bool = False
+    #: The last few turns, oldest first, so a follow-up has its context. Only
+    #: the model reads them; navigation and the Copilot answer the question alone.
+    history: list[dict] = Field(default_factory=list, max_length=knowledge.HISTORY_TURNS)
 
 
 @router.get("/suggestions")
@@ -72,6 +75,7 @@ def query(
         current_path=body.path,
         signed_in=user is not None,
         stream=body.stream,
+        history=body.history,
     )
     payload = reply.as_dict()
     payload["scope"] = scope.as_dict()
@@ -83,6 +87,7 @@ def query(
 def stream(
     q: str,
     path: str | None = None,
+    h: str | None = None,
     user: Annotated[User | None, Depends(current_user_optional)] = None,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
@@ -98,10 +103,21 @@ def stream(
 
     scope = scope_for(user)
     signed_in = user is not None
+    # The last few turns ride along as compact JSON (EventSource is GET-only).
+    history: list[dict] = []
+    if h:
+        try:
+            parsed = json.loads(h)
+            if isinstance(parsed, list):
+                history = [t for t in parsed if isinstance(t, dict)][-knowledge.HISTORY_TURNS :]
+        except ValueError:
+            history = []
     # The same routing as /query decides whether this question may reach the
     # model at all: a navigation, a topic card, a Copilot question, or a
     # visitor's data-shaped question is answered here without it.
-    routed = assistant.answer(db, q, scope, current_path=path, signed_in=signed_in, stream=True)
+    routed = assistant.answer(
+        db, q, scope, current_path=path, signed_in=signed_in, stream=True, history=history
+    )
 
     def events():
         if routed.kind != "stream":
@@ -110,7 +126,7 @@ def stream(
             yield f"data: {payload}\n\n"
             return
         accepted = False
-        for event in knowledge.stream(q):
+        for event in knowledge.stream(q, history):
             if event.get("type") == "done":
                 accepted = bool(event.get("accepted"))
                 if not accepted:
@@ -215,3 +231,13 @@ def speak(body: Speak, user: Annotated[User, Depends(require_user)]) -> Response
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     return Response(content=audio, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/passage")
+def passage(source: str, heading: str) -> dict:
+    """The passage behind a citation, verbatim: the documents are public, and
+    a reader who clicks a source should see what the model was given."""
+    found = knowledge.passage(source, heading)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such passage.")
+    return found

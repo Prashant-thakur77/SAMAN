@@ -5,7 +5,10 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ApiError,
   askAssistant,
+  getPassage,
   streamAssistant,
+  type AssistantSource,
+  type AssistantTurn,
   getVoice,
   speakText,
   transcribeAudio,
@@ -258,6 +261,9 @@ export function Assistant() {
   const [initial] = useState(loadState)
   const [open, setOpen] = useState(initial.open)
   const [turns, setTurns] = useState<Turn[]>(initial.turns)
+  // The conversation as of the last render, readable inside the ask callback.
+  const turnsRef = useRef<Turn[]>(initial.turns)
+  turnsRef.current = turns
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [listening, setListening] = useState(false)
@@ -498,9 +504,15 @@ export function Assistant() {
       setDraft('')
       setBusy(true)
       const userId = ++counter.current
+      // The last few turns go with the question so a follow-up has its
+      // context; only the model reads them.
+      const history: AssistantTurn[] = turnsRef.current
+        .filter((t) => !t.error && t.text)
+        .slice(-5)
+        .map((t) => ({ role: t.role, text: t.text }))
       setTurns((prev) => [...prev, { id: userId, role: 'user', text: question, heard }])
       try {
-        let reply = await askAssistant(question, location.pathname, STREAMING)
+        let reply = await askAssistant(question, location.pathname, STREAMING, history)
         if (reply.kind === 'stream') {
           // The model's answer arrives a checked sentence at a time; the card
           // fills as it does. If a later sentence fails the guard the whole
@@ -508,13 +520,18 @@ export function Assistant() {
           // said.
           const id = ++counter.current
           setTurns((prev) => [...prev, { id, role: 'assistant', text: '', streaming: true }])
-          const { done } = streamAssistant(question, location.pathname, (event) => {
-            if (event.type === 'delta') {
-              setTurns((prev) =>
-                prev.map((t) => (t.id === id ? { ...t, text: t.text + event.text } : t)),
-              )
-            }
-          })
+          const { done } = streamAssistant(
+            question,
+            location.pathname,
+            (event) => {
+              if (event.type === 'delta') {
+                setTurns((prev) =>
+                  prev.map((t) => (t.id === id ? { ...t, text: t.text + event.text } : t)),
+                )
+              }
+            },
+            history,
+          )
           const final = await done
           if (final.accepted) {
             reply = {
@@ -1021,6 +1038,9 @@ export function Assistant() {
                     {turn.reply?.kind === 'navigate' && turn.reply.action && (
                       <p className="micro-label mt-2">Opened {turn.reply.action.to}</p>
                     )}
+                    {turn.role === 'assistant' && turn.reply?.mode === 'llm' && (
+                      <Sources sources={(turn.reply.matched?.sources as AssistantSource[] | undefined) ?? []} />
+                    )}
                     {turn.reply?.citations && turn.reply.citations.length > 0 && (
                       <ul className="mt-2 flex max-w-full flex-wrap gap-1.5">
                         {turn.reply.citations.slice(0, 4).map((cite, index) => (
@@ -1127,5 +1147,59 @@ export function Assistant() {
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+
+/**
+ * Where a model answer came from: the passages it was given, each a chip
+ * that opens the paragraph verbatim. The documents are public; the reader
+ * should not have to take the model's word for what they say.
+ */
+function Sources({ sources }: { sources: AssistantSource[] }) {
+  const [open, setOpen] = useState<string | null>(null)
+  const [text, setText] = useState<string | null>(null)
+  const key = (s: AssistantSource) => `${s.source} · ${s.heading}`
+  // Two passages under one heading are one source to the reader.
+  const distinct = sources.filter((s, i) => sources.findIndex((o) => key(o) === key(s)) === i)
+  if (distinct.length === 0) return null
+  const toggle = async (s: AssistantSource) => {
+    const k = key(s)
+    if (open === k) {
+      setOpen(null)
+      return
+    }
+    setOpen(k)
+    setText(null)
+    try {
+      setText((await getPassage(s.source, s.heading)).text)
+    } catch {
+      setText('The passage could not be loaded.')
+    }
+  }
+  return (
+    <div className="mt-2 space-y-2">
+      <ul className="flex max-w-full flex-wrap items-center gap-1.5">
+        <li className="micro-label">from</li>
+        {distinct.slice(0, 3).map((s) => (
+          <li key={key(s)} className="min-w-0 max-w-full">
+            <button
+              type="button"
+              onClick={() => void toggle(s)}
+              aria-expanded={open === key(s)}
+              title="Show the passage the model was given"
+              className={cn('code-chip block max-w-full truncate hover:bg-bg', open === key(s) && 'bg-bg')}
+            >
+              {s.source} · {s.heading}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {open && (
+        <blockquote className="max-h-40 overflow-y-auto border-l-2 border-hairline pl-3 text-xs text-muted">
+          {text ?? 'Loading…'}
+        </blockquote>
+      )}
+    </div>
   )
 }

@@ -49,7 +49,7 @@ and at a desk.*
 | Dashboards | improve | A steward's own-CPSE view; date scoping on the money sections | The same page must serve two readers | 2 d |
 | Onboard | improve | Excel input, long-text tables, a downloadable rejection report, progress for large files | Real extracts are .xlsx with MAKTX in one sheet and long text in another | 3 d |
 | Item / Cluster | add · **compare done**, attachments next | Side-by-side compare of any two rows; attachments (datasheet, drawing) on a golden record | Approvers ask for the datasheet first | 3 d |
-| Assistant | improve | Hindi answers when asked in Hindi; clickable citations; the last five turns as context | The people at the bin do not write English questions | 2 d |
+| Assistant | improve · **done** | Hindi answers when asked in Hindi; clickable citations; the last five turns as context | The people at the bin do not write English questions | 2 d |
 | Whole site | improve | Hindi interface toggle; loading states on every fetch; an accessibility pass with a screen reader | A government instrument is used by everyone | 4 d |
 
 **Gate:** a steward clears a page of the high band in under a minute; the

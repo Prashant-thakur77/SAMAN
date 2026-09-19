@@ -1776,8 +1776,22 @@ export type AssistantReply = {
   mode: string
   matched?: Record<string, unknown> | null
 }
-export const askAssistant = (question: string, path?: string, stream = false) =>
-  api.post<AssistantReply>('/assistant/query', { question, path, stream })
+export type AssistantTurn = { role: 'user' | 'assistant'; text: string }
+
+export const askAssistant = (
+  question: string,
+  path?: string,
+  stream = false,
+  history: AssistantTurn[] = [],
+) => api.post<AssistantReply>('/assistant/query', { question, path, stream, history })
+
+export type AssistantSource = { source: string; heading: string; score: number }
+
+/** The passage behind a citation, verbatim. */
+export const getPassage = (source: string, heading: string) =>
+  api.get<{ source: string; heading: string; text: string }>(
+    `/assistant/passage?source=${encodeURIComponent(source)}&heading=${encodeURIComponent(heading)}`,
+  )
 
 export type StreamEvent =
   | { type: 'sources'; sources: { source: string; heading: string; score: number }[] }
@@ -1802,9 +1816,11 @@ export function streamAssistant(
   question: string,
   path: string | undefined,
   onEvent: (event: StreamEvent) => void,
+  history: AssistantTurn[] = [],
 ): { done: Promise<StreamEvent & { type: 'done' }>; cancel: () => void } {
   const params = new URLSearchParams({ q: question })
   if (path) params.set('path', path)
+  if (history.length) params.set('h', JSON.stringify(history))
   const source = new EventSource(`/api/assistant/stream?${params.toString()}`, {
     withCredentials: true,
   })

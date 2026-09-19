@@ -169,7 +169,11 @@ class TestStreaming:
         return list(knowledge.stream(question))
 
     def test_sentences_are_released_as_they_complete(self, model_streams):
-        model_streams["pieces"] = ["The Damm digit catches ", "every transposition. ", "It is one digit."]
+        model_streams["pieces"] = [
+            "The Damm digit catches ",
+            "every transposition. ",
+            "It is one digit.",
+        ]
         events = self._events()
         kinds = [e["type"] for e in events]
         assert kinds[0] == "sources" and kinds[-1] == "done"
@@ -179,7 +183,10 @@ class TestStreaming:
         assert events[-1]["text"] == "The Damm digit catches every transposition. It is one digit."
 
     def test_an_invented_figure_stops_the_stream_before_that_sentence(self, model_streams):
-        model_streams["pieces"] = ["The check digit is Damm. ", "It handles 4,000,000 rows a second."]
+        model_streams["pieces"] = [
+            "The check digit is Damm. ",
+            "It handles 4,000,000 rows a second.",
+        ]
         events = self._events()
         deltas = [e["text"] for e in events if e["type"] == "delta"]
         assert deltas == ["The check digit is Damm."]
@@ -326,7 +333,9 @@ class TestAnswerLog:
 
 
 class TestStreamIsRoutedLikeQuery:
-    def test_a_visitors_data_question_never_reaches_the_model(self, client, pipeline_run, model_streams):
+    def test_a_visitors_data_question_never_reaches_the_model(
+        self, client, pipeline_run, model_streams
+    ):
         import json
 
         model_streams["pieces"] = ["should not be used"]
@@ -338,3 +347,42 @@ class TestStreamIsRoutedLikeQuery:
         assert len(events) == 1 and events[0]["reason"] == "routed"
         assert events[0]["fallback"]["matched"] == {"topic": "sign_in"}
         assert "should not be used" not in body
+
+
+class TestFollowUps:
+    def test_the_last_turns_reach_the_model_and_skip_the_memo(self, model_up):
+        model_up["reply"] = "The Damm digit catches every adjacent transposition."
+        first = knowledge.answer("how does the check digit work")
+        assert first is not None
+        history = [
+            {"role": "user", "text": "how does the check digit work"},
+            {"role": "assistant", "text": first.text},
+        ]
+        model_up["reply"] = "Yes: Luhn misses some transpositions; Damm catches them all."
+        follow = knowledge.answer("and is that better than Luhn?", history)
+        assert follow is not None and follow.text.startswith("Yes")
+        messages = model_up["prompt"]["messages"]
+        roles = [m["role"] for m in messages]
+        assert roles == ["system", "user", "assistant", "user"]
+        assert messages[1]["content"] == "how does the check digit work"
+        # A follow-up is not memoised: the same words later may mean something else.
+        assert knowledge.cached("and is that better than Luhn?") is None
+
+    def test_history_is_trimmed(self):
+        turns = [{"role": "user", "text": "x" * 1000}] * 9
+        messages = knowledge._messages("q", [], turns)
+        assert len(messages) == 1 + knowledge.HISTORY_TURNS + 1
+        assert len(messages[1]["content"]) == knowledge.HISTORY_CHARS
+
+
+class TestPassages:
+    def test_a_citation_opens_its_passage(self, client):
+        top = knowledge.retrieve("damm check digit", k=1)[0][0]
+        body = client.get(
+            "/api/assistant/passage", params={"source": top.source, "heading": top.heading}
+        ).json()
+        assert body["source"] == top.source and top.text[:40] in body["text"]
+        assert (
+            client.get("/api/assistant/passage", params={"source": "x", "heading": "y"}).status_code
+            == 404
+        )

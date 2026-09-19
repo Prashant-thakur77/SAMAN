@@ -63,7 +63,7 @@ describe('a streamed answer', () => {
       </MemoryRouter>,
     )
     ask('what is the damm check digit')
-    await waitFor(() => expect(askAssistant).toHaveBeenCalledWith('what is the damm check digit', '/', true))
+    await waitFor(() => expect(askAssistant).toHaveBeenCalledWith('what is the damm check digit', '/', true, []))
     await waitFor(() => expect(FakeEventSource.last).not.toBeNull())
     const source = FakeEventSource.last!
     expect(source.url).toContain('/api/assistant/stream?q=what+is+the+damm+check+digit')

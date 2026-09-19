@@ -83,7 +83,7 @@ describe('the assistant', () => {
     // The current path travels with the question, so "open the workbench"
     // from the workbench can be answered rather than performed.
     // jsdom has no EventSource, so the widget asks for a plain answer.
-    expect(askAssistant).toHaveBeenCalledWith('Take me to the workbench', '/', false)
+    expect(askAssistant).toHaveBeenCalledWith('Take me to the workbench', '/', false, [])
   })
 
   it('sends a visitor to sign in first, carrying the screen they asked for', async () => {
