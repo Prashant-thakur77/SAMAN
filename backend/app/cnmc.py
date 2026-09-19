@@ -129,7 +129,7 @@ class ConflictError(RuntimeError):
     """The cluster still has an unresolved identity-critical conflict."""
 
 
-def issue_code(db, golden, user) -> dict:
+def issue_code(db, golden, user, policy: str | None = None) -> dict:
     """Allocate and record a CNMC for an approved golden record.
 
     Shared by the registrar endpoint and the demo seeder so the two cannot
@@ -189,6 +189,9 @@ def issue_code(db, golden, user) -> dict:
             "cluster_id": golden.cluster_id,
             "class_code": class_code,
             "std_description": golden.std_description,
+            # "auto" when issued under a family policy (autoissue); absent
+            # for a registrar's own click.
+            **({"policy": policy} if policy else {}),
         },
         user=user.email,
         commit=False,

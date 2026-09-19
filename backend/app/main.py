@@ -19,6 +19,7 @@ from .routers import (
     admin,
     assistant,
     auth,
+    autoissue,
     bootstrap,
     clusters,
     cnmc,
@@ -128,6 +129,7 @@ for signed_in_router in (
     substitutes.router,
     scan.router,
     reports.router,
+    autoissue.router,
 ):
     app.include_router(signed_in_router, prefix="/api", dependencies=SIGNED_IN)
 

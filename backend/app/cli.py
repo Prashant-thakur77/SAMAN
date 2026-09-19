@@ -331,6 +331,34 @@ def cmd_evaluate(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_autoissue(args: argparse.Namespace) -> int:
+    """Issue codes under the families' policies (dry run unless --apply).
+
+    What a nightly cron line runs after `pipeline`: the gates are the ones the
+    admin page states, and nothing issues for a family whose policy is off.
+    """
+    from . import autoissue
+
+    init_db()
+    with SessionLocal() as db:
+        result = autoissue.run(db, dry_run=not args.apply, limit=args.limit, family=args.family)
+    verb = "would issue" if result["dry_run"] else "issued"
+    print(f"{verb} {len(result['issued'])} code(s); {result['eligible']} eligible")
+    for row in result["issued"][:20]:
+        code = row["code"] or "(dry run)"
+        text = row["std_description"][:50]
+        print(f"  {code:20} cluster {row['cluster_id']:6} {row['family']}  {text}")
+    if len(result["issued"]) > 20:
+        print(f"  … and {len(result['issued']) - 20} more")
+    for row in result["skipped"]:
+        print(f"  skipped cluster {row['cluster_id']}: {row['reason']}")
+    if result["not_eligible"]:
+        print("held back:")
+        for reason, n in sorted(result["not_eligible"].items(), key=lambda kv: -kv[1]):
+            print(f"  {n:6}  {reason}")
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     """Write each CPSE's catalogue report as HTML and JSON, and optionally
     deliver it (SMTP when configured, the outbox otherwise). What a weekly
@@ -500,6 +528,14 @@ def main(argv: list[str] | None = None) -> int:
     report.add_argument("--to", help="recipient instead of the CPSE's contact email")
     report.add_argument("--out", help="directory for the files (default: the outbox)")
     report.set_defaults(func=cmd_report)
+
+    auto = sub.add_parser(
+        "autoissue", help="issue codes under the families' policies (dry run unless --apply)"
+    )
+    auto.add_argument("--apply", action="store_true", help="issue rather than list")
+    auto.add_argument("--family", help="one family only, e.g. BRNG")
+    auto.add_argument("--limit", type=int, default=500)
+    auto.set_defaults(func=cmd_autoissue)
 
     simulate = sub.add_parser(
         "simulate-reviews", help="label tuning-split pairs from ground truth (demo only)"

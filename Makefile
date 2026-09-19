@@ -182,6 +182,9 @@ evaluate:  ## Score the latest run on held-out truth and record it on the run (w
 report:  ## Write every CPSE's catalogue report to data/outbox (CPSE=CPCL for one; SEND=1 delivers by SMTP or into the outbox)
 	cd backend && ../$(PY) -m app.cli report $(if $(CPSE),--cpse $(CPSE),--all) $(if $(SEND),--send,)
 
+autoissue:  ## List the codes that would issue under the families' policies (APPLY=1 issues them; the nightly cron line)
+	cd backend && ../$(PY) -m app.cli autoissue $(if $(APPLY),--apply,) $(if $(FAMILY),--family $(FAMILY),)
+
 simulate-reviews:  ## Demo only: label tuning-split pairs from ground truth as simulated reviewers
 	cd backend && ../$(PY) -m app.cli simulate-reviews --n 400
 

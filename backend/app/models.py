@@ -409,6 +409,23 @@ class MigrationChange(Base):
     state: Mapped[str] = mapped_column(String(16), default="planned")  # applied|held|rolled_back
 
 
+class IssuePolicy(Base):
+    """Per-family permission for codes to issue on their own (`autoissue`).
+
+    Off until a registrar turns it on for a family and names the held-out
+    precision the family must show. The registrar who set it is the issuer
+    of record for every code that follows from it.
+    """
+
+    __tablename__ = "issue_policy"
+
+    family: Mapped[str] = mapped_column(String(8), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    min_precision: Mapped[float] = mapped_column(Float, default=0.99)
+    set_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    set_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class SmartCreateDraft(Base):
     """A new-material request saved before it is decided (§5).
 

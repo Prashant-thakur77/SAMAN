@@ -1923,3 +1923,44 @@ export async function transcribeAudio(wav: Blob, language?: string): Promise<Tra
   if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
   return body as Transcript
 }
+
+// ---- automatic code issue under a registrar's policy ----
+
+export type AutoIssueFamily = {
+  family: string
+  classes: string[]
+  enabled: boolean
+  min_precision: number
+  set_by: number | null
+  set_at: string | null
+  /** The lowest held-out precision among the family's classes; null without a snapshot. */
+  precision: number | null
+  eligible: number
+}
+
+export type AutoIssueStatus = {
+  families: AutoIssueFamily[]
+  eligible: number
+  not_eligible: Record<string, number>
+  has_snapshot: boolean
+  issued_under_policy: number
+  default_min_precision: number
+}
+
+export type AutoIssueRun = {
+  dry_run: boolean
+  eligible: number
+  issued: { cluster_id: number; family: string; code: string | null; std_description: string; members: number }[]
+  skipped: { cluster_id: number; reason: string }[]
+  not_eligible: Record<string, number>
+  note: string
+}
+
+export const getAutoIssue = () => api.get<AutoIssueStatus>('/autoissue/status')
+export const setAutoIssuePolicy = (family: string, enabled: boolean, min_precision: number) =>
+  request<{ family: string; enabled: boolean; min_precision: number }>(
+    `/autoissue/policy/${family}`,
+    { method: 'PUT', body: JSON.stringify({ enabled, min_precision }) },
+  )
+export const runAutoIssue = (dry_run: boolean, family?: string) =>
+  api.post<AutoIssueRun>('/autoissue/run', { dry_run, family })

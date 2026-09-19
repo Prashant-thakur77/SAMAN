@@ -880,6 +880,29 @@ CPSE=CPCL SEND=1` delivers one. A weekly send from cron, Monday 07:00:
 0 7 * * 1  cd /opt/saman/backend && .venv/bin/python -m app.cli report --all --send >> /var/log/saman-report.log 2>&1
 ```
 
+### Codes that issue themselves, under policy
+
+Seven thousand policy confirmations are not a registrar's afternoon. Where the
+evidence is beyond argument a code can issue without a click, under three
+gates the Administration page states in words: every stored pair inside the
+cluster carries a Tier-0 anchor and every compared attribute agrees, with
+nothing vetoed and nothing in conflict; the class's **held-out precision** on
+the latest run's snapshot is at or above the target the registrar set for the
+family (0.99 by default; no snapshot, nothing issues); and no grey-band task
+touches the cluster. A cluster with a single row has nothing to compare and is
+left to a person. The policy is per family and **off by default**; only a
+registrar can turn it on, and every code issued under it carries that
+registrar as issuer of record with `policy: "auto"` on its `cnmc.issue` event,
+because automation must name the person who chose it rather than dilute
+accountability. **Dry run** lists what would issue and why the rest is held
+back (on the synthetic estate: 818 single rows, 199 pairs without an anchor,
+8 with a grey task pending, 1 with an attribute in disagreement); `make
+autoissue APPLY=1` is the nightly line, after the pipeline:
+
+```
+30 2 * * *  cd /opt/saman/backend && .venv/bin/python -m app.cli pipeline && .venv/bin/python -m app.cli evaluate && .venv/bin/python -m app.cli autoissue --apply >> /var/log/saman-nightly.log 2>&1
+```
+
 ### Review and governance
 
 The workbench covers all three confidence bands, not only the uncertain one: an

@@ -160,8 +160,8 @@ never a feeling.
 |---|---|---|
 | Auto-retrain (P1) | done | Promotion only if not worse; audited |
 | Scheduled per-CPSE report | done | Sent to the CPSE's contact; every figure computed; assumptions attached |
-| Auto-issue codes for clusters that pass every gate (anchored, all attributes agree, held-out precision above target for that class) | next | Registrar sets the policy per family; every issue audited; nothing issued for a class below target |
-| Nightly incremental pipeline over new rows | next | Runs record their stats; the dashboard shows the run id and time |
+| Auto-issue codes for clusters that pass every gate (anchored, all attributes agree, held-out precision above target for that class) | done | Registrar sets the policy per family; every issue audited; nothing issued for a class below target |
+| Nightly incremental pipeline over new rows | cron line documented; incremental rerun next | Runs record their stats; the dashboard shows the run id and time |
 | Re-evaluate the held-out snapshot after each run | done | Already recorded on the run; the dashboard says when |
 | Retire an unused legacy code suggestion (no stock, no PO, no movement in 24 months) | next | Suggestion only; migration plan needs approval |
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { PageHeader } from '../components/PageHeader'
+import { AutoIssuePanel } from '../components/AutoIssuePanel'
 import { ReportsSection } from '../components/ReportsPanel'
 import { RetrainingPanel } from '../components/RetrainingPanel'
 import { Button } from '../components/primitives/Button'
@@ -112,6 +113,8 @@ export default function Admin() {
       )}
 
       <ReportsSection />
+
+      <AutoIssuePanel />
 
       {health && (
         <section className="space-y-4">
