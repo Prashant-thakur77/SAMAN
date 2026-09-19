@@ -409,6 +409,36 @@ class MigrationChange(Base):
     state: Mapped[str] = mapped_column(String(16), default="planned")  # applied|held|rolled_back
 
 
+class SmartCreateDraft(Base):
+    """A new-material request saved before it is decided (§5).
+
+    Most requests start from a box in hand and end at a desk: the storekeeper
+    types what the label says, sees what the check found, and leaves the
+    decision to whoever raises codes. The draft keeps the fields and the last
+    check's headline so the next person opens it where the last one stopped.
+    """
+
+    __tablename__ = "smart_create_draft"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    cpse_id: Mapped[int | None] = mapped_column(ForeignKey("cpse.id"), nullable=True)
+    description: Mapped[str] = mapped_column(Text)
+    mpn: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    gtin: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    uom: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: draft | submitted | discarded
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
+    last_check_id: Mapped[int | None] = mapped_column(
+        ForeignKey("smart_create_check.id"), nullable=True
+    )
+    top_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    candidates: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class SmartCreateCheck(Base):
     """One duplicate-prevention check at the point of creation (§5).
 

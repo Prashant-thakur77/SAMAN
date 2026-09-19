@@ -16,7 +16,7 @@ from fastapi import (
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import ocr, ocr_eval, smart_create
+from .. import audit, ocr, ocr_eval, smart_create
 from ..auth import require_roles
 from ..db import get_db
 from ..models import User
@@ -42,6 +42,7 @@ async def _read_capped(file: UploadFile) -> bytes:
         chunks.append(chunk)
     return b"".join(chunks)
 
+
 #: Anyone who can create a material can run the check. Viewers and auditors
 #: cannot, because for them it would be a way to probe another CPSE's
 #: catalogue by description.
@@ -51,8 +52,24 @@ CREATOR = ("registrar", "admin", "approver", "steward")
 class CheckIn(BaseModel):
     description: str = Field(min_length=1, max_length=1000)
     mpn: str | None = None
+    #: The barcode on the box, scanned or typed; its check digit is verified.
+    gtin: str | None = Field(default=None, max_length=32)
     uom: str | None = None
     limit: int = Field(default=smart_create.TOP_N, ge=1, le=20)
+
+
+class DraftIn(BaseModel):
+    description: str = Field(min_length=1, max_length=1000)
+    mpn: str | None = Field(default=None, max_length=64)
+    gtin: str | None = Field(default=None, max_length=32)
+    uom: str | None = Field(default=None, max_length=16)
+    note: str | None = Field(default=None, max_length=500)
+    #: The check this draft was saved from, if one ran.
+    check_id: int | None = None
+
+
+class DraftStatusIn(BaseModel):
+    status: str  # submitted | discarded
 
 
 class ReuseIn(BaseModel):
@@ -75,9 +92,117 @@ def check(
     db: Session = Depends(get_db),
 ) -> dict:
     try:
-        return smart_create.check(db, body.description, body.mpn, body.uom, user, body.limit)
+        return smart_create.check(
+            db, body.description, body.mpn, body.uom, user, body.limit, gtin=body.gtin
+        )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+# --------------------------------------------------------------------------
+# Drafts: a request saved before it is decided
+# --------------------------------------------------------------------------
+
+
+def _draft_row(draft) -> dict:
+    return {
+        "id": draft.id,
+        "created_at": draft.created_at.isoformat(),
+        "updated_at": draft.updated_at.isoformat(),
+        "description": draft.description,
+        "mpn": draft.mpn,
+        "gtin": draft.gtin,
+        "uom": draft.uom,
+        "note": draft.note,
+        "status": draft.status,
+        "last_check_id": draft.last_check_id,
+        "top_confidence": draft.top_confidence,
+        "candidates": draft.candidates,
+    }
+
+
+@router.get("/drafts")
+def list_drafts(
+    user: Annotated[User, Depends(require_roles(*CREATOR))],
+    db: Session = Depends(get_db),
+) -> dict:
+    """The caller's open drafts, newest first. A steward sees their own; an
+    approver, registrar or admin sees every open draft in the estate, since
+    theirs is the desk the requests land on."""
+    from sqlalchemy import select
+
+    from ..models import SmartCreateDraft
+
+    query = select(SmartCreateDraft).where(SmartCreateDraft.status == "draft")
+    if user.role == "steward":
+        query = query.where(SmartCreateDraft.user_id == user.id)
+    rows = db.execute(query.order_by(SmartCreateDraft.updated_at.desc()).limit(50)).scalars()
+    return {"drafts": [_draft_row(d) for d in rows]}
+
+
+@router.post("/drafts")
+def save_draft(
+    body: DraftIn,
+    user: Annotated[User, Depends(require_roles(*CREATOR))],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Save what was typed, and the headline of the last check, for later."""
+    from datetime import UTC, datetime
+
+    from ..models import SmartCreateCheck, SmartCreateDraft
+
+    check_row = db.get(SmartCreateCheck, body.check_id) if body.check_id else None
+    draft = SmartCreateDraft(
+        user_id=user.id,
+        cpse_id=user.cpse_id,
+        description=body.description.strip(),
+        mpn=(body.mpn or "").strip() or None,
+        gtin=(body.gtin or "").strip() or None,
+        uom=(body.uom or "").strip() or None,
+        note=(body.note or "").strip() or None,
+        last_check_id=check_row.id if check_row else None,
+        top_confidence=check_row.top_confidence if check_row else None,
+        candidates=check_row.candidates if check_row else None,
+        updated_at=datetime.now(UTC),
+    )
+    db.add(draft)
+    db.flush()
+    audit.record(
+        db,
+        action="smart_create.draft",
+        entity=f"draft:{draft.id}",
+        payload={"description": draft.description, "check_id": draft.last_check_id},
+        user=user.email,
+        commit=False,
+    )
+    db.commit()
+    return _draft_row(draft)
+
+
+@router.patch("/drafts/{draft_id}")
+def set_draft_status(
+    draft_id: int,
+    body: DraftStatusIn,
+    user: Annotated[User, Depends(require_roles(*CREATOR))],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Close a draft: `submitted` once the request was decided (reused or
+    created), `discarded` when it is no longer wanted."""
+    from datetime import UTC, datetime
+
+    from ..models import SmartCreateDraft
+
+    if body.status not in ("submitted", "discarded"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "submitted or discarded")
+    draft = db.get(SmartCreateDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No draft {draft_id}.")
+    if user.role == "steward" and draft.user_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "That draft belongs to someone else.")
+    draft.status = body.status
+    draft.updated_at = datetime.now(UTC)
+    db.commit()
+    return _draft_row(draft)
 
 
 @router.post("/scan")
@@ -160,8 +285,13 @@ def create(
 ) -> dict:
     try:
         return smart_create.create_anyway(
-            db, body.create_token, body.legacy_code, body.description,
-            body.uom, body.reason, user,
+            db,
+            body.create_token,
+            body.legacy_code,
+            body.description,
+            body.uom,
+            body.reason,
+            user,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

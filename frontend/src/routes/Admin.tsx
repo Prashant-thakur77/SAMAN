@@ -29,10 +29,8 @@ import {
   type SnapshotStatus,
 } from '../lib/api'
 import { cn } from '../lib/cn'
+import { parseUtc } from '../lib/time'
 import { useSession } from '../lib/session'
-
-/** The API's timestamps are UTC; the naive ones carry no zone marker. */
-const utc = (iso: string) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`)
 
 /**
  * /admin — users, sovereign mode and the health panel (spec §6.13).
@@ -345,7 +343,7 @@ export default function Admin() {
                   }
                 >
                   {user.activity?.last_sign_in
-                    ? utc(user.activity.last_sign_in).toLocaleString('en-IN', {
+                    ? parseUtc(user.activity.last_sign_in).toLocaleString('en-IN', {
                         dateStyle: 'medium',
                         timeStyle: 'short',
                       })
@@ -357,7 +355,7 @@ export default function Admin() {
                   className="tabular-nums"
                   title={
                     user.activity?.last_decision
-                      ? `Last on ${utc(user.activity.last_decision).toLocaleString('en-IN')}${user.activity.undos ? ` · ${user.activity.undos} taken back` : ''}`
+                      ? `Last on ${parseUtc(user.activity.last_decision).toLocaleString('en-IN')}${user.activity.undos ? ` · ${user.activity.undos} taken back` : ''}`
                       : undefined
                   }
                 >

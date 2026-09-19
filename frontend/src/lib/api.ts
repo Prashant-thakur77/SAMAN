@@ -1441,8 +1441,42 @@ export type SmartCreateStats = {
 export const smartCreateCheck = (body: {
   description: string
   mpn?: string
+  /** The barcode on the box; its check digit is verified server-side. */
+  gtin?: string
   uom?: string
 }) => api.post<SmartCreateResult>('/smart-create/check', body)
+
+// ---- drafts: a request saved before it is decided ----
+
+export type SmartCreateDraft = {
+  id: number
+  created_at: string
+  updated_at: string
+  description: string
+  mpn: string | null
+  gtin: string | null
+  uom: string | null
+  note: string | null
+  status: 'draft' | 'submitted' | 'discarded'
+  last_check_id: number | null
+  top_confidence: number | null
+  candidates: number | null
+}
+
+export const getDrafts = () => api.get<{ drafts: SmartCreateDraft[] }>('/smart-create/drafts')
+export const saveDraft = (body: {
+  description: string
+  mpn?: string
+  gtin?: string
+  uom?: string
+  note?: string
+  check_id?: number
+}) => api.post<SmartCreateDraft>('/smart-create/drafts', body)
+export const setDraftStatus = (id: number, status: 'submitted' | 'discarded') =>
+  request<SmartCreateDraft>(`/smart-create/drafts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
 
 export const smartCreateReuse = (check_id: number, item_id: number) =>
   api.post<{ check_id: number; outcome: string; reused_item_id: number }>(

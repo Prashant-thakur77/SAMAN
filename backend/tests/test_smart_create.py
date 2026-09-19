@@ -416,3 +416,73 @@ class TestTheProbeSharesThePipelinesFit:
         assert Embedder.load(tmp_path / "missing.joblib") is None
         (tmp_path / "broken.joblib").write_bytes(b"not a model")
         assert Embedder.load(tmp_path / "broken.joblib") is None
+
+
+class TestABarcodeInItsOwnField:
+    def test_a_scanned_gtin_anchors_the_check(self, db, pipeline_run):
+        from app.models import Item
+
+        row = db.execute(select(Item.gtin, Item.id).where(Item.gtin.isnot(None)).limit(1)).first()
+        if row is None:
+            pytest.skip("no item carries a GTIN")
+        gtin, item_id = row
+        # A description that says nothing useful; the barcode alone finds it.
+        result = smart_create.check(db, "box from the store, label unreadable", gtin=gtin)
+        assert result["probe"]["gtin"] == gtin
+        assert any(s["item_id"] == item_id for s in result["suggestions"])
+
+    def test_a_gtin_with_a_bad_check_digit_is_ignored(self, db, pipeline_run):
+        result = smart_create.check(db, "GATE VALVE 150NB", gtin="8908440682860")
+        assert result["probe"]["gtin"] is None
+
+
+class TestDrafts:
+    def test_a_steward_saves_a_draft_and_sees_only_their_own(
+        self, as_steward, client, pipeline_run
+    ):
+        checked = as_steward.post(
+            "/api/smart-create/check", json={"description": "BRG BALL 6205 ZZ SKF", "mpn": "6205ZZ"}
+        ).json()
+        saved = as_steward.post(
+            "/api/smart-create/drafts",
+            json={
+                "description": "BRG BALL 6205 ZZ SKF",
+                "mpn": "6205ZZ",
+                "uom": "NOS",
+                "note": "two boxes in bay 4",
+                "check_id": checked["check_id"],
+            },
+        )
+        assert saved.status_code == 200, saved.text
+        draft = saved.json()
+        assert draft["status"] == "draft" and draft["last_check_id"] == checked["check_id"]
+        assert draft["candidates"] is not None
+        mine = as_steward.get("/api/smart-create/drafts").json()["drafts"]
+        assert any(d["id"] == draft["id"] for d in mine)
+
+        # An approver sees every open draft: it is their desk.
+        client.post("/api/auth/login", json={"email": "approver@min.gov.in", "password": "demo"})
+        theirs = client.get("/api/smart-create/drafts").json()["drafts"]
+        assert any(d["id"] == draft["id"] for d in theirs)
+
+        # Closing it takes it off both lists.
+        closed = client.patch(
+            f"/api/smart-create/drafts/{draft['id']}", json={"status": "submitted"}
+        )
+        assert closed.status_code == 200 and closed.json()["status"] == "submitted"
+        assert all(
+            d["id"] != draft["id"] for d in client.get("/api/smart-create/drafts").json()["drafts"]
+        )
+
+    def test_a_viewer_has_no_drafts(self, as_viewer, pipeline_run):
+        assert as_viewer.get("/api/smart-create/drafts").status_code == 403
+
+    def test_a_bad_status_is_refused(self, as_steward, pipeline_run):
+        saved = as_steward.post("/api/smart-create/drafts", json={"description": "GASKET"}).json()
+        assert (
+            as_steward.patch(
+                f"/api/smart-create/drafts/{saved['id']}", json={"status": "lost"}
+            ).status_code
+            == 422
+        )
+        as_steward.patch(f"/api/smart-create/drafts/{saved['id']}", json={"status": "discarded"})

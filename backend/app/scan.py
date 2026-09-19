@@ -131,7 +131,13 @@ def _nothing(raw: str, tried: str | None, note: str) -> dict:
         "equipment": [],
         "differs_on": [],
         "note": note,
-        "next": {"action": "smart_create", "to": f"/smart-create?description={raw}"},
+        # A bare digit run of barcode length is handed over as the barcode
+        # too, so Smart-Create anchors on it rather than reading it as words.
+        "next": {
+            "action": "smart_create",
+            "to": f"/smart-create?description={raw}"
+            + (f"&gtin={raw}" if raw.isdigit() and 8 <= len(raw) <= 14 else ""),
+        },
     }
 
 

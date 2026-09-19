@@ -7,17 +7,22 @@ import { CodeChip, StatusChip } from '../components/primitives/Chip'
 import { Field, Input } from '../components/primitives/Field'
 import {
   ApiError,
+  getDrafts,
   getSmartCreateStats,
+  saveDraft,
+  setDraftStatus,
   smartCreateCheck,
   smartCreateCreate,
   smartCreateReuse,
   smartCreateScan,
   type SmartCreateApproval,
+  type SmartCreateDraft,
   type SmartCreateMatch,
   type SmartCreateResult,
   type SmartCreateStats,
 } from '../lib/api'
 import { cn } from '../lib/cn'
+import { parseUtc } from '../lib/time'
 import { useHealth } from '../lib/useHealth'
 
 const ACTION_TONE = {
@@ -42,7 +47,12 @@ const ACTION_HEADLINE = {
 export default function SmartCreate() {
   const [description, setDescription] = useState('')
   const [mpn, setMpn] = useState('')
+  const [gtin, setGtin] = useState('')
   const [uom, setUom] = useState('')
+  const [drafts, setDrafts] = useState<SmartCreateDraft[]>([])
+  const [draftNote, setDraftNote] = useState('')
+  // The draft this check was opened from, closed when the request is decided.
+  const [openDraft, setOpenDraft] = useState<number | null>(null)
   const [legacyCode, setLegacyCode] = useState('')
   const [reason, setReason] = useState('')
   const [result, setResult] = useState<SmartCreateResult | null>(null)
@@ -58,15 +68,21 @@ export default function SmartCreate() {
 
   useEffect(() => {
     void getSmartCreateStats().then(setStats).catch(() => setStats(null))
+    void getDrafts()
+      .then((r) => setDrafts(r.drafts))
+      .catch(() => setDrafts([]))
   }, [])
 
-  // Scan hands a nameplate's text over as `?description=`; check it at once,
-  // so the person who photographed the marking sees the answer, not a form.
+  // Scan hands a nameplate's text over as `?description=` (and a barcode as
+  // `?gtin=`); check it at once, so the person who photographed the marking
+  // sees the answer, not a form.
   useEffect(() => {
     const handed = params.get('description')?.trim()
+    const code = params.get('gtin')?.trim()
+    if (code) setGtin(code)
     if (!handed) return
     setDescription(handed)
-    void checkText(handed)
+    void checkText(handed, code || undefined)
     // Once, on arrival: a later edit to the field is the person's own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -97,13 +113,14 @@ export default function SmartCreate() {
       setResult(scanned)
     })
 
-  const checkText = (text: string) =>
+  const checkText = (text: string, barcode?: string) =>
     run(async () => {
       setResolved(false)
       setResult(
         await smartCreateCheck({
           description: text,
           mpn: mpn || undefined,
+          gtin: (barcode ?? gtin) || undefined,
           uom: uom || undefined,
         }),
       )
@@ -111,11 +128,67 @@ export default function SmartCreate() {
 
   const check = () => checkText(description)
 
+  const closeDraft = async (status: 'submitted' | 'discarded') => {
+    if (openDraft === null) return
+    const id = openDraft
+    setOpenDraft(null)
+    try {
+      await setDraftStatus(id, status)
+      setDrafts((prev) => prev.filter((d) => d.id !== id))
+    } catch {
+      /* the request itself succeeded; the draft can be closed from the list */
+    }
+  }
+
+  const keepDraft = () =>
+    run(async () => {
+      const saved = await saveDraft({
+        description,
+        mpn: mpn || undefined,
+        gtin: gtin || undefined,
+        uom: uom || undefined,
+        note: draftNote || undefined,
+        check_id: result?.check_id,
+      })
+      setDrafts((prev) => [saved, ...prev])
+      setOpenDraft(saved.id)
+      setDraftNote('')
+      setMessage({ tone: 'ok', text: 'Saved as a draft. It waits here for whoever raises codes.' })
+    })
+
+  const reopen = (draft: SmartCreateDraft) => {
+    setDescription(draft.description)
+    setMpn(draft.mpn ?? '')
+    setGtin(draft.gtin ?? '')
+    setUom(draft.uom ?? '')
+    setOpenDraft(draft.id)
+    setMessage(null)
+    void run(async () => {
+      setResolved(false)
+      setResult(
+        await smartCreateCheck({
+          description: draft.description,
+          mpn: draft.mpn ?? undefined,
+          gtin: draft.gtin ?? undefined,
+          uom: draft.uom ?? undefined,
+        }),
+      )
+    })
+  }
+
+  const discard = (draft: SmartCreateDraft) =>
+    run(async () => {
+      await setDraftStatus(draft.id, 'discarded')
+      setDrafts((prev) => prev.filter((d) => d.id !== draft.id))
+      if (openDraft === draft.id) setOpenDraft(null)
+    })
+
   const reuse = (match: SmartCreateMatch) =>
     run(async () => {
       if (!result) return
       await smartCreateReuse(result.check_id, match.item_id)
       setResolved(true)
+      void closeDraft('submitted')
       setMessage({
         tone: 'ok',
         text: `Reused ${match.cnmc ?? match.description}. One duplicate prevented.`,
@@ -133,6 +206,7 @@ export default function SmartCreate() {
         reason: reason || undefined,
       })
       setResolved(true)
+      void closeDraft('submitted')
       setMessage({ tone: 'ok', text: `${created.legacy_code} created. ${created.note}` })
     })
 
@@ -174,7 +248,7 @@ export default function SmartCreate() {
       )}
 
       <section className="space-y-4 card p-6">
-        <div className="grid gap-4 md:grid-cols-[1fr_180px_120px]">
+        <div className="grid gap-4 md:grid-cols-[1fr_160px_160px_100px]">
           <Field label="Material description" htmlFor="sc-description">
             <Input
               id="sc-description"
@@ -189,6 +263,15 @@ export default function SmartCreate() {
           </Field>
           <Field label="Part number" htmlFor="sc-mpn" hint="Optional, but decisive.">
             <Input id="sc-mpn" value={mpn} onChange={(e) => setMpn(e.target.value)} />
+          </Field>
+          <Field label="Barcode" htmlFor="sc-gtin" hint="The GTIN on the box, scanned or typed.">
+            <Input
+              id="sc-gtin"
+              value={gtin}
+              inputMode="numeric"
+              placeholder="8908440682867"
+              onChange={(e) => setGtin(e.target.value)}
+            />
           </Field>
           <Field label="UoM" htmlFor="sc-uom">
             <Input
@@ -313,6 +396,14 @@ export default function SmartCreate() {
                     mpn <span className="text-muted">{result.probe.mpn_norm}</span>
                   </span>
                 )}
+                {result.probe.gtin && (
+                  <span>
+                    gtin <span className="text-muted">{result.probe.gtin}</span>
+                  </span>
+                )}
+                {gtin.trim() && !result.probe.gtin && (
+                  <span className="text-danger">barcode ignored: its check digit fails</span>
+                )}
                 {Object.entries(result.probe.attrs).map(([key, value]) => (
                   <span key={key}>
                     {key.replace(/_/g, ' ')} <span className="text-muted">{String(value)}</span>
@@ -346,6 +437,28 @@ export default function SmartCreate() {
             <p className="card px-4 py-3 text-sm text-muted">
               Nothing in the catalogue resembles this description closely enough to compare.
             </p>
+          )}
+
+          {!resolved && openDraft === null && (
+            <section className="space-y-3 card p-6">
+              <h2 className="micro-label">Not your decision to make?</h2>
+              <p className="max-w-prose text-sm text-muted">
+                Save what you typed and what the check found as a draft request. It waits
+                here for whoever raises codes, and opens where you stopped.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Input
+                  aria-label="Note for the approver"
+                  value={draftNote}
+                  placeholder="e.g. two boxes in bay 4, no code on the label"
+                  onChange={(e) => setDraftNote(e.target.value)}
+                  className="sm:max-w-md"
+                />
+                <Button variant="secondary" disabled={busy} onClick={() => void keepDraft()}>
+                  Save as draft
+                </Button>
+              </div>
+            </section>
           )}
 
           {!resolved && (
@@ -389,6 +502,54 @@ export default function SmartCreate() {
             </section>
           )}
         </>
+      )}
+
+      {drafts.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="micro-label">Draft requests</h2>
+            <p className="text-xs text-muted">
+              Saved from this screen and not yet decided. Open one to re-run the check where
+              it stopped.
+            </p>
+          </div>
+          <ul className="card divide-y divide-hairline">
+            {drafts.map((draft) => (
+              <li
+                key={draft.id}
+                className={cn(
+                  'flex flex-wrap items-center gap-3 px-4 py-3',
+                  openDraft === draft.id && 'bg-bg',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-sm">{draft.description}</p>
+                  <p className="text-xs text-muted">
+                    {[
+                      draft.mpn && `mpn ${draft.mpn}`,
+                      draft.gtin && `gtin ${draft.gtin}`,
+                      draft.uom,
+                      draft.candidates !== null &&
+                        `${draft.candidates} match${draft.candidates === 1 ? '' : 'es'} at last check`,
+                      draft.note,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+                <span className="font-mono text-[11px] text-muted">
+                  {parseUtc(draft.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                </span>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => reopen(draft)}>
+                  Open
+                </Button>
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => void discard(draft)}>
+                  Discard
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   )

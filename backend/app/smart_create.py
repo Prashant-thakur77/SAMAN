@@ -190,8 +190,12 @@ def reset_embedder_cache() -> None:
     _FITTED = None
 
 
-def build_probe(db: Session, description: str, mpn: str | None, uom: str | None) -> Probe:
+def build_probe(
+    db: Session, description: str, mpn: str | None, uom: str | None, gtin: str | None = None
+) -> Probe:
     """Normalize, extract and embed a description that has no row yet."""
+    from .normalize import normalize_gtin
+
     norm = normalize_row(description or "", uom)
     ex = extract(norm.norm_text)
 
@@ -203,6 +207,9 @@ def build_probe(db: Session, description: str, mpn: str | None, uom: str | None)
     # An MPN typed into its own field is better evidence than one guessed out
     # of free text, so it wins.
     mpn_norm = normalize_mpn(mpn) or normalize_mpn(ex.mpn)
+    # Likewise a barcode scanned into its own field: the check digit is
+    # verified, and a code that fails it is ignored rather than trusted.
+    gtin_norm = (normalize_gtin(gtin) if gtin else None) or ex.gtin
 
     probe = Probe(
         norm_text=norm.norm_text,
@@ -210,7 +217,7 @@ def build_probe(db: Session, description: str, mpn: str | None, uom: str | None)
         class_code=ex.class_code,
         class_confidence=ex.class_confidence,
         mpn_norm=mpn_norm,
-        gtin=ex.gtin,
+        gtin=gtin_norm,
         attrs=attrs,
         uom_base=norm.uom_base,
         pack_qty=norm.pack_qty,
@@ -352,6 +359,7 @@ def check(
     uom: str | None = None,
     user: User | None = None,
     limit: int = TOP_N,
+    gtin: str | None = None,
 ) -> dict:
     """Rank the existing items a new description would duplicate.
 
@@ -369,7 +377,7 @@ def check(
     if not (description or "").strip():
         raise ValueError("a description is required")
 
-    probe = build_probe(db, description, mpn, uom)
+    probe = build_probe(db, description, mpn, uom, gtin)
     suggestions: list[Suggestion] = []
     equivalents: list[Suggestion] = []
     ruled_out: list[Suggestion] = []

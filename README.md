@@ -974,7 +974,15 @@ Smart-Create's check with an API key (`SAMAN_API_KEYS`, sent as
 Every other part of SAMAN cleans up duplicates that already exist. Smart-Create
 is the part that stops them being born: before a buyer raises a new material
 master, the description they are typing is run through **the same matcher, the
-same veto layer and the same evidence** the pipeline uses.
+same veto layer and the same evidence** the pipeline uses. Most requests start
+from a box in hand, so the part number and the barcode have fields of their
+own: a typed part number beats one guessed from the text, and a scanned GTIN
+(check digit verified; a failing one is named and ignored) anchors the check
+even when the description says nothing useful. Scan hands a bare barcode over
+the same way. A storekeeper who cannot decide saves the request as a **draft**,
+with a note and the last check's headline; it waits on the screen for whoever
+raises codes, opens where it stopped, and closes itself when the request is
+reused or created.
 
 It answers in three parts, because a buyer needs three different answers:
 
