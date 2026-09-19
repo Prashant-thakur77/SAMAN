@@ -314,8 +314,11 @@ def health_panel(
     }
     prevention = smart_create.stats(db)
     counts["duplicates_prevented"] = prevention["prevented"]
+    from ..capabilities import runs_where
+
     return {
         "capabilities": detect().as_dict(),
+        "runs_where": runs_where(),
         "sovereign_mode": sovereign_mode(),
         "ollama_configured": bool(settings.ollama_url),
         "database": str(settings.db_file),
@@ -328,3 +331,82 @@ def health_panel(
         "smart_create": prevention,
         "audit": audit.verify(db),
     }
+
+
+# --------------------------------------------------------------------------
+# Demo snapshot (§8A): back to the state you demo from, in seconds
+# --------------------------------------------------------------------------
+
+
+@router.get("/settings/snapshot")
+def snapshot_status(
+    _user: Annotated[User, Depends(require_roles(*ADMIN_ROLES))],
+) -> dict:
+    """Whether a restore point exists, and when it was taken."""
+    from .. import snapshot
+
+    directory = snapshot.snapshot_dir()
+    files = sorted(directory.glob("*.db")) if directory.is_dir() else []
+    taken = max((f.stat().st_mtime for f in files), default=None)
+    from datetime import UTC, datetime
+
+    return {
+        "exists": bool(files),
+        "files": [f.name for f in files],
+        "bytes": sum(f.stat().st_size for f in files),
+        "taken_at": datetime.fromtimestamp(taken, UTC).isoformat() if taken else None,
+        "directory": str(directory),
+    }
+
+
+@router.post("/settings/snapshot")
+def snapshot_capture(
+    actor: Annotated[User, Depends(require_roles(*ADMIN_ROLES))],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Capture the current databases as the restore point (`make demo-snapshot`)."""
+    from .. import snapshot
+
+    result = snapshot.capture()
+    audit.record(
+        db,
+        action="demo.snapshot",
+        entity="database",
+        payload=result.as_dict(),
+        user=actor.email,
+    )
+    return result.as_dict()
+
+
+@router.post("/settings/snapshot/restore")
+def snapshot_restore(
+    actor: Annotated[User, Depends(require_roles(*ADMIN_ROLES))],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Put every database back to the snapshot (`make demo-restore`).
+
+    Admin-only and audited — on the chain *after* the restore, since the
+    restore replaces the chain the event would otherwise have joined. The
+    caller's session survives: sessions are cookies signed by the server,
+    not rows.
+    """
+    from .. import snapshot
+
+    if not snapshot.exists():
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "No snapshot to restore. Take one first (`make demo-snapshot`).",
+        )
+    db.close()
+    result = snapshot.restore()
+    from ..db import SessionLocal
+
+    with SessionLocal() as fresh:
+        audit.record(
+            fresh,
+            action="demo.restore",
+            entity="database",
+            payload=result.as_dict(),
+            user=actor.email,
+        )
+    return {**result.as_dict(), "note": "Restored. Reload any open screen."}

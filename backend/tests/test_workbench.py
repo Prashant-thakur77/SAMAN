@@ -527,3 +527,230 @@ class TestItemDetail:
 
     def test_an_unknown_item_is_404(self, as_viewer, pipeline_run):
         assert as_viewer.get("/api/items/999999").status_code == 404
+
+
+class TestQueueFilters:
+    """Queues are worked by family; the filters say what exists and keep it."""
+
+    def test_facets_list_classes_and_cpses_present_in_the_band(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/queues?band=grey").json()
+        assert body["facets"]["classes"] and body["facets"]["cpses"]
+        assert sum(f["count"] for f in body["facets"]["classes"]) == body["total"]
+
+    def test_a_class_filter_keeps_only_that_class(self, as_viewer, pipeline_run):
+        facets = as_viewer.get("/api/queues?band=grey").json()["facets"]
+        code = facets["classes"][0]["code"]
+        body = as_viewer.get(f"/api/queues?band=grey&class={code}&limit=50").json()
+        assert body["total"] == facets["classes"][0]["count"]
+        assert body["filters"]["class"] == code
+        for card in body["tasks"]:
+            assert code in {item["class_code"] for item in card["items"]}
+
+    def test_a_cpse_filter_keeps_pairs_touching_that_cpse(self, as_viewer, pipeline_run):
+        facets = as_viewer.get("/api/queues?band=grey").json()["facets"]
+        cpse = facets["cpses"][-1]
+        body = as_viewer.get(f"/api/queues?band=grey&cpse={cpse['id']}&limit=50").json()
+        assert body["total"] == cpse["count"]
+        for card in body["tasks"]:
+            assert cpse["code"] in {item["cpse"] for item in card["items"]}
+
+    def test_mine_keeps_the_callers_role(self, as_steward, pipeline_run):
+        body = as_steward.get("/api/queues?band=grey&mine=true").json()
+        assert body["filters"]["mine"] is True
+        assert body["total"] <= as_steward.get("/api/queues?band=grey").json()["total"]
+
+    def test_every_card_says_why_it_is_here(self, as_viewer, pipeline_run):
+        for band in ("high", "grey", "low"):
+            body = as_viewer.get(f"/api/queues?band={band}&limit=3").json()
+            for card in body["tasks"]:
+                assert card["why"] and card["why"].endswith((".", ")"))
+
+
+class TestBulkDecisions:
+    def test_a_page_of_the_high_band_closes_with_one_reason(self, as_steward, db, pipeline_run):
+        page = as_steward.get("/api/queues?band=high&limit=5").json()["tasks"]
+        ids = [card["task_id"] for card in page]
+        if not ids:
+            pytest.skip("no pending high-band task")
+        response = as_steward.post(
+            "/api/decisions/bulk",
+            json={"task_ids": ids, "action": "approve", "note": "policy confirmation"},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["count"] == len(ids) and body["skipped"] == []
+        db.expire_all()
+        assert all(db.get(ReviewTask, i).state == "done" for i in ids)
+        # One audit event per row, each with the shared reason.
+        events = db.execute(
+            select(AuditEvent).where(
+                AuditEvent.action == "decision.approve",
+                AuditEvent.entity.in_([f"review_task:{i}" for i in ids]),
+            )
+        ).scalars().all()
+        assert len(events) == len(ids)
+        assert all('"policy confirmation"' in e.payload_json for e in events)
+
+    def test_a_task_that_cannot_close_is_reported_not_fatal(self, as_steward, db, pipeline_run):
+        task = _pending_review_task(db)
+        if task is None:
+            pytest.skip("no pending task")
+        as_steward.post("/api/decisions", json={"task_id": task.id, "action": "reject"})
+        response = as_steward.post(
+            "/api/decisions/bulk", json={"task_ids": [task.id, 10**9], "action": "reject"}
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["count"] == 0
+        assert {row["task_id"] for row in body["skipped"]} == {task.id, 10**9}
+
+    def test_only_approve_and_reject_in_bulk(self, as_steward, pipeline_run):
+        response = as_steward.post("/api/decisions/bulk", json={"task_ids": [1], "action": "split"})
+        assert response.status_code == 422
+
+    def test_a_viewer_cannot_bulk_decide(self, as_viewer, pipeline_run):
+        response = as_viewer.post(
+            "/api/decisions/bulk", json={"task_ids": [1], "action": "approve"}
+        )
+        assert response.status_code == 403
+
+
+class TestUndo:
+    """Everyone mis-clicks. Within the window the world goes back as it was."""
+
+    def _high_task(self, db):
+        from app.models import Pair
+
+        return db.execute(
+            select(ReviewTask, Pair)
+            .join(Pair, Pair.id == ReviewTask.pair_id)
+            .where(ReviewTask.state == "pending", ReviewTask.band == "high")
+            .limit(1)
+        ).first()
+
+    def test_a_reject_is_taken_back_and_the_pair_rejoined(self, as_steward, db, pipeline_run):
+        from app.models import PairLabel
+
+        row = self._high_task(db)
+        if row is None:
+            pytest.skip("no pending high-band task")
+        task, pair = row
+        verdict_before = pair.verdict
+        cluster_before = db.execute(
+            select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_a)
+        ).scalar()
+        decided = as_steward.post(
+            "/api/decisions", json={"task_id": task.id, "action": "reject", "seconds": 12.5}
+        ).json()
+        assert decided["undo_until"]
+        db.expire_all()
+        assert (
+            db.execute(
+                select(ClusterMember.cluster_id).where(ClusterMember.item_id == pair.item_b)
+            ).scalar()
+            != cluster_before
+        ), "the reject should have split the pair"
+
+        response = as_steward.post(f"/api/decisions/{decided['decision_id']}/undo")
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["restored"]["label_withdrawn"] is True
+        db.expire_all()
+        assert db.get(ReviewTask, task.id).state == "pending"
+        assert db.get(Decision, decided["decision_id"]) is None
+        assert db.get(pair.__class__, pair.id).verdict == verdict_before
+        # Both items are back in one cluster.
+        a, b = (
+            db.execute(
+                select(ClusterMember.cluster_id).where(ClusterMember.item_id == item)
+            ).scalar()
+            for item in (pair.item_a, pair.item_b)
+        )
+        assert a == b
+        # No label remains for the model to learn from.
+        lo, hi = sorted((pair.item_a, pair.item_b))
+        assert (
+            db.execute(
+                select(func.count(PairLabel.id)).where(
+                    PairLabel.item_a == lo, PairLabel.item_b == hi, PairLabel.source == "reviewer"
+                )
+            ).scalar()
+            == 0
+        )
+        # The chain remembers both.
+        undo = db.execute(
+            select(AuditEvent).where(
+                AuditEvent.action == "decision.undo",
+                AuditEvent.entity == f"review_task:{task.id}",
+            )
+        ).scalars().first()
+        assert undo is not None and '"after_seconds"' in undo.payload_json
+
+    def test_an_approve_that_merged_is_unmerged(self, client, db, pipeline_run):
+        from app.models import Pair
+
+        client.post("/api/auth/login", json={"email": "approver@min.gov.in", "password": "demo"})
+        row = db.execute(
+            select(ReviewTask, Pair)
+            .join(Pair, Pair.id == ReviewTask.pair_id)
+            .where(ReviewTask.state == "pending", ReviewTask.band == "low")
+            .limit(1)
+        ).first()
+        if row is None:
+            pytest.skip("no pending low-band task")
+        task, pair = row
+        decided = client.post("/api/decisions", json={"task_id": task.id, "action": "approve"})
+        assert decided.status_code == 200, decided.text
+        db.expire_all()
+        merged = [
+            db.execute(
+                select(ClusterMember.cluster_id).where(ClusterMember.item_id == item)
+            ).scalar()
+            for item in (pair.item_a, pair.item_b)
+        ]
+        assert merged[0] == merged[1]
+
+        response = client.post(f"/api/decisions/{decided.json()['decision_id']}/undo")
+        assert response.status_code == 200, response.text
+        assert "unmerged_into" in response.json()["restored"]
+        db.expire_all()
+        apart = [
+            db.execute(
+                select(ClusterMember.cluster_id).where(ClusterMember.item_id == item)
+            ).scalar()
+            for item in (pair.item_a, pair.item_b)
+        ]
+        assert apart[0] != apart[1]
+        assert db.get(ReviewTask, task.id).state == "pending"
+
+    def test_only_the_author_or_an_admin_may_undo(self, client, db, pipeline_run):
+        task = _pending_review_task(db)
+        if task is None:
+            pytest.skip("no pending task")
+        client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
+        decided = client.post("/api/decisions", json={"task_id": task.id, "action": "reject"}).json()
+        client.post("/api/auth/login", json={"email": "approver@min.gov.in", "password": "demo"})
+        assert client.post(f"/api/decisions/{decided['decision_id']}/undo").status_code == 403
+
+    def test_the_window_closes(self, as_steward, db, pipeline_run, monkeypatch):
+        from datetime import UTC, datetime, timedelta
+
+        task = _pending_review_task(db)
+        if task is None:
+            pytest.skip("no pending task")
+        decided = as_steward.post("/api/decisions", json={"task_id": task.id, "action": "reject"})
+        decision = db.get(Decision, decided.json()["decision_id"])
+        decision.ts = datetime.now(UTC) - timedelta(minutes=6)
+        db.commit()
+        response = as_steward.post(f"/api/decisions/{decision.id}/undo")
+        assert response.status_code == 409
+        assert "window closed" in response.json()["detail"]
+
+    def test_undoing_twice_is_a_404(self, as_steward, db, pipeline_run):
+        task = _pending_review_task(db)
+        if task is None:
+            pytest.skip("no pending task")
+        decided = as_steward.post("/api/decisions", json={"task_id": task.id, "action": "reject"})
+        did = decided.json()["decision_id"]
+        assert as_steward.post(f"/api/decisions/{did}/undo").status_code == 200
+        assert as_steward.post(f"/api/decisions/{did}/undo").status_code == 404

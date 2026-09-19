@@ -857,6 +857,23 @@ confirmation, and Auto-low surfaces the closest matches the veto layer refused,
 the most informative refusals to spot-check. Overturning an automatic decision
 actually changes the world: rejecting a merge splits the cluster back apart.
 
+Queues are worked by family, so the Workbench filters by class, by CPSE
+(either side of the pair) and by "assigned to me", offering only the values
+the band holds. The policy bands are worked a page at a time: **Decide this
+page** closes up to fifty auto-high or auto-low tasks with one stated reason,
+and each still gets its own audit event, its own label and its own undo.
+Everyone mis-clicks, so every approve or reject can be taken back for five
+minutes (`U`, or the Undo button; `SAMAN_UNDO_WINDOW_S`): the task returns to
+the queue, the merge or split it caused is reversed, the reviewer's label is
+withdrawn so the learned model never trains on it, and the ledger keeps both
+the decision and the undo. Each card also states, in one deterministic
+sentence, *why* it is in front of the reviewer, and the Copilot answers "why
+were IOCL001320 and CPCL001294 not merged" or "why is task 3784 in the
+queue" with the same sentence and the veto's reason. The seconds a card was
+on screen are recorded with the decision and shown on the executive
+dashboard as a median and a 90th percentile, the first number a pilot is
+judged on.
+
 Every mutation appends to a hash-chained ledger whose hash covers the event's
 own sequence number, so the chain detects **reordering as well as tampering**,
 and `GET /api/audit/verify` reports the sequence number of the first break.

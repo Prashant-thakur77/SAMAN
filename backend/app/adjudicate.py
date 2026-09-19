@@ -201,7 +201,10 @@ HEADLINE = {
 def _finish(
     recommendation: str, confidence: float, reasons: list[str], _evidence: dict
 ) -> Adjudication:
-    summary = f"{HEADLINE[recommendation]}. {reasons[0]}" if reasons else HEADLINE[recommendation]
+    summary = HEADLINE[recommendation] + "."
+    if reasons:
+        first = reasons[0].strip()
+        summary += " " + first + ("" if first.endswith((".", "!", "?", ")")) else ".")
     return Adjudication(recommendation, confidence, reasons, summary)
 
 

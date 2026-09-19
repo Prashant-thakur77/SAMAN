@@ -335,7 +335,7 @@ export default function Onboard() {
               {report.samples.length > 0 && (
                 <div className="space-y-3">
                   <h2 className="micro-label">What normalization will do</h2>
-                  <Table>
+                  <Table exportAs="normalization-preview">
                     <THead>
                       <TH>Original</TH>
                       <TH>Normalized</TH>

@@ -233,7 +233,7 @@ export default function Pprl() {
 
           <section className="space-y-3">
             <h2 className="micro-label">Matched pairs</h2>
-            <Table>
+            <Table exportAs="restricted-mode-matches">
               <THead>
                 <TH>{payloads.left.cpse} reference</TH>
                 <TH>{payloads.right.cpse} reference</TH>

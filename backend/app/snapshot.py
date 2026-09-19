@@ -84,9 +84,7 @@ def capture() -> SnapshotResult:
 def restore() -> SnapshotResult:
     """Put every database back to the snapshot. Raises if there is none."""
     if not exists():
-        raise FileNotFoundError(
-            f"no snapshot in {snapshot_dir()}; run `make demo-snapshot` first"
-        )
+        raise FileNotFoundError(f"no snapshot in {snapshot_dir()}; run `make demo-snapshot` first")
 
     started = time.perf_counter()
     from .db import dispose_engine
@@ -116,6 +114,12 @@ def restore() -> SnapshotResult:
 
 def _reset_caches() -> None:
     """Drop anything derived from the database we just replaced."""
-    from . import smart_create
+    from . import cache, knowledge, learn, smart_create
 
     smart_create.reset_embedder_cache()
+    # The dashboard memo is keyed on the audit ledger, which the restore has
+    # just rewound; the learned model may have been retrained since the
+    # snapshot; the answer memo may quote figures that no longer hold.
+    cache.clear()
+    learn.forget_model()
+    knowledge.forget_answers()

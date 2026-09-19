@@ -92,6 +92,12 @@ class Settings(BaseSettings):
     saman_auto_retrain: bool = True
     saman_retrain_every: int = 25
 
+    #: How long a reviewer may take back an approve or reject from the
+    #: Workbench (`review.undo_decision`). Everyone mis-clicks; five minutes
+    #: is long enough to notice and short enough that nothing downstream has
+    #: been built on the decision.
+    saman_undo_window_s: int = 300
+
     #: Delivery of the per-CPSE report (`reports.deliver`). With no host set
     #: the report is written as an .eml into data/outbox/ (or SAMAN_OUTBOX_DIR),
     #: so an offline installation still produces the artefact.

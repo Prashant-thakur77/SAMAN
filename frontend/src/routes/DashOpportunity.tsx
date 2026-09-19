@@ -139,7 +139,7 @@ export default function DashOpportunity() {
             </div>
           </div>
 
-          <Table>
+          <Table exportAs="joint-tenders">
             <THead>
               <TH>Material</TH>
               <TH>CPSEs</TH>
@@ -175,7 +175,7 @@ export default function DashOpportunity() {
       {tab === 'variance' && (
         <section className="space-y-4">
           <p className="text-sm text-muted">{price_variance.note}</p>
-          <Table>
+          <Table exportAs="price-variance">
             <THead>
               <TH>Material</TH>
               <TH align="right">Variance</TH>
@@ -241,7 +241,7 @@ export default function DashOpportunity() {
                 No CPSE is holding idle surplus of a material another is short of.
               </p>
             ) : (
-              <Table>
+              <Table exportAs="transfer-suggestions">
                 <THead>
                   <TH>Material</TH>
                   <TH>From</TH>
@@ -284,7 +284,7 @@ export default function DashOpportunity() {
 
           <div className="space-y-3">
             <h2 className="micro-label">Slow-moving stock</h2>
-            <Table>
+            <Table exportAs="slow-moving-stock">
               <THead>
                 <TH>Material</TH>
                 <TH align="right">Qty</TH>

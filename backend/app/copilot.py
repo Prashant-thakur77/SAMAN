@@ -548,6 +548,10 @@ def answer(db: Session, question: str, scope: Scope, use_llm: bool = False) -> A
             mode="refusal",
         )
 
+    why = explain_why(db, question)
+    if why is not None:
+        return why
+
     template = match_template(question)
     if template is not None:
         class_code = class_in(question)
@@ -633,7 +637,192 @@ def answer(db: Session, question: str, scope: Scope, use_llm: bool = False) -> A
 
 
 def suggested_prompts() -> list[str]:
-    return [template.example for template in TEMPLATES]
+    return [template.example for template in TEMPLATES] + [WHY_EXAMPLE]
+
+
+# --------------------------------------------------------------------------
+# "Why?" — the reason behind one pair, already computed
+# --------------------------------------------------------------------------
+
+WHY_EXAMPLE = "why were IOCL001320 and CPCL001294 not merged"
+
+_WHY = re.compile(r"\bwhy\b|\bkyu[n]?\b|क्यों", re.IGNORECASE)
+_TASK_REF = re.compile(r"\btask\s*#?\s*(\d+)", re.IGNORECASE)
+_CODE_REF = re.compile(r"\b([A-Z]{2,8}\d{4,10})\b")
+
+
+def explain_why(db: Session, question: str) -> Answer | None:
+    """Answer "why were X and Y (not) merged" or "why is task N in the queue"
+    with the sentence the pipeline already wrote for that pair: the veto's
+    reason, the anchor, or the attribute that could not be read. Nothing is
+    computed anew and no model is consulted; this is the Workbench card's
+    `why` line, reachable by asking."""
+    if not _WHY.search(question):
+        return None
+    import json as _json
+
+    from sqlalchemy import or_, select
+
+    from .adjudicate import adjudicate
+    from .models import ClusterMember, Item, Pair, RawItem, ReviewTask
+
+    task_match = _TASK_REF.search(question)
+    codes = [c.upper() for c in _CODE_REF.findall(question.upper())]
+    pair: Pair | None = None
+    task: ReviewTask | None = None
+    labels: list[str] = []
+
+    if task_match:
+        task = db.get(ReviewTask, int(task_match.group(1)))
+        if task is None:
+            return Answer(
+                text=f"There is no review task {task_match.group(1)}.",
+                template="why",
+                note="No such task.",
+            )
+        pair = db.get(Pair, task.pair_id) if task.pair_id else None
+    elif len(codes) >= 2:
+        rows = db.execute(
+            select(RawItem.legacy_code, Item.id)
+            .join(Item, Item.raw_item_id == RawItem.id)
+            .where(RawItem.legacy_code.in_(codes[:2]))
+        ).all()
+        by_code = {code: item_id for code, item_id in rows}
+        missing = [c for c in codes[:2] if c not in by_code]
+        if missing:
+            return Answer(
+                text=f"I do not know the code{'s' if len(missing) > 1 else ''} "
+                + ", ".join(missing)
+                + ".",
+                template="why",
+                note="Unknown legacy code.",
+            )
+        a, b = by_code[codes[0]], by_code[codes[1]]
+        labels = codes[:2]
+        pair = (
+            db.execute(
+                select(Pair).where(
+                    or_(
+                        (Pair.item_a == a) & (Pair.item_b == b),
+                        (Pair.item_a == b) & (Pair.item_b == a),
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if pair is None:
+            clusters = {
+                db.execute(
+                    select(ClusterMember.cluster_id).where(ClusterMember.item_id == i)
+                ).scalar_one_or_none()
+                for i in (a, b)
+            }
+            if len(clusters) == 1 and None not in clusters:
+                text_value = (
+                    f"{labels[0]} and {labels[1]} were never scored against each other "
+                    "directly, but they sit in the same cluster: each was matched to a "
+                    "row that the other also matched."
+                )
+            else:
+                text_value = (
+                    f"{labels[0]} and {labels[1]} were never compared. Blocking did not put "
+                    "them in the same candidate bucket (no shared part number, class key, "
+                    "or text neighbourhood), so no pair was scored."
+                )
+            return Answer(text=text_value, template="why", rows=[{"pair": None}])
+        task = (
+            db.execute(
+                select(ReviewTask)
+                .where(ReviewTask.pair_id == pair.id)
+                .order_by(ReviewTask.id.desc())
+            )
+            .scalars()
+            .first()
+        )
+    else:
+        return None
+
+    if pair is None:
+        return Answer(text="That task has no pair behind it.", template="why")
+
+    evidence = _json.loads(pair.evidence_json or "{}")
+    veto = _json.loads(pair.veto_json) if pair.veto_json else None
+    tiers = _json.loads(pair.tier_scores_json or "{}")
+    verdict_words = {
+        "duplicate": "merged",
+        "auto_merge": "merged automatically",
+        "distinct": "kept apart",
+        "auto_reject": "kept apart automatically",
+        "review": "held for a person",
+        "conflict": "flagged as a specification conflict",
+    }
+    said = adjudicate(evidence, tiers, pair.confidence, pair.verdict, veto, rephrase=False)
+    if not labels:
+        labels = [f"item {pair.item_a}", f"item {pair.item_b}"]
+    parts = [
+        f"{labels[0]} and {labels[1]} were {verdict_words.get(pair.verdict, pair.verdict)} "
+        f"at confidence {pair.confidence:.2f}.",
+        said.summary,
+    ]
+    if veto and veto.get("vetoed_by"):
+        parts.append(
+            "The veto layer refused on "
+            + "; ".join(
+                f"{v['attr']}: {v.get('reason', '')}".strip() for v in veto["vetoed_by"][:3]
+            )
+            + "."
+        )
+    if task is not None:
+        if task.state == "pending":
+            parts.append(f"Review task {task.id} in the {task.band} band is still pending.")
+        else:
+            from .models import Decision
+
+            decision = (
+                db.execute(
+                    select(Decision).where(Decision.task_id == task.id).order_by(Decision.id.desc())
+                )
+                .scalars()
+                .first()
+            )
+            parts.append(
+                f"Review task {task.id} in the {task.band} band was "
+                + (
+                    f"{decision.action}d by a reviewer"
+                    + (f' ("{decision.note}")' if decision.note else "")
+                    if decision
+                    else "decided"
+                )
+                + "."
+            )
+    cluster_ids = [
+        db.execute(
+            select(ClusterMember.cluster_id).where(ClusterMember.item_id == i)
+        ).scalar_one_or_none()
+        for i in (pair.item_a, pair.item_b)
+    ]
+    return Answer(
+        text=" ".join(parts),
+        citations=[
+            {"cluster_id": cid, "label": label, "cnmc": None}
+            for cid, label in zip(cluster_ids, labels, strict=True)
+            if cid
+        ],
+        rows=[
+            {
+                "pair_id": pair.id,
+                "verdict": pair.verdict,
+                "confidence": pair.confidence,
+                "recommendation": said.recommendation,
+                "reasons": said.reasons,
+                "task_id": task.id if task else None,
+                "band": task.band if task else pair.band,
+            }
+        ],
+        template="why",
+        note="Computed from the pair's stored evidence; no model was consulted.",
+    )
 
 
 # --------------------------------------------------------------------------

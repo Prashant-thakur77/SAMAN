@@ -107,7 +107,7 @@ export default function Item() {
               </p>
             </div>
           </div>
-          <Table>
+          <Table exportAs="item-siblings">
             <THead>
               <TH>CPSE</TH>
               <TH>Plant</TH>

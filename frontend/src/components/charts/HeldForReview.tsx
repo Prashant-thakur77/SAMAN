@@ -89,8 +89,19 @@ export function HeldForReview({ data }: { data: HeldForReviewData }) {
             Decisions so far:{' '}
             <span className="font-mono tabular-nums text-ink">{formatCount(data.decisions.total)}</span>
             {actions && <> ({actions})</>}
-            {lastDecision && <>, last on {lastDecision}</>}.
+            {lastDecision && <>, last on {lastDecision}</>}
+            {data.decisions.undone ? <>; {formatCount(data.decisions.undone)} taken back within the undo window</> : null}.
           </li>
+          {data.decisions.seconds && (
+            <li>
+              Seconds per decision, as reported by the Workbench over{' '}
+              <span className="font-mono tabular-nums text-ink">{formatCount(data.decisions.seconds.n)}</span>{' '}
+              decisions: median{' '}
+              <span className="font-mono tabular-nums text-ink">{data.decisions.seconds.median}</span> s, 90th
+              percentile <span className="font-mono tabular-nums text-ink">{data.decisions.seconds.p90}</span> s.
+              A median, not a rate: one reviewer's afternoon is not a trend.
+            </li>
+          )}
           <li>
             Labels feeding the learner:{' '}
             <span className="font-mono tabular-nums text-ink">{formatCount(data.labels.reviewer)}</span> by

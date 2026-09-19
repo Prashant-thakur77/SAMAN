@@ -169,6 +169,8 @@ export type TaskCard = {
   cluster_id: number | null
   pair_id?: number
   verdict?: string
+  /** One deterministic sentence: why this card is here. */
+  why?: string
   confidence?: number
   tier_scores?: TierScores
   veto?: { vetoed_by: { attr: string; a: unknown; b: unknown; reason: string }[] } | null
@@ -200,22 +202,47 @@ export type LearnedOpinion = {
   uncertainty: number
 }
 
+export type QueueFacets = {
+  classes: { code: string; count: number }[]
+  cpses: { id: number; code: string; count: number }[]
+}
+
+export type QueueFilters = {
+  class?: string | null
+  cpse?: number | null
+  mine?: boolean
+}
+
 export type QueueResponse = {
   band: string | null
   counts: { high: number; grey: number; low: number }
   total: number
   offset: number
   order?: 'id' | 'uncertainty'
+  filters?: QueueFilters
+  facets?: QueueFacets
   model_available?: boolean
+  /** How long a reviewer may take a decision back, in seconds. */
+  undo_window_s?: number
   tasks: TaskCard[]
 }
 
 export type QueueOrder = 'id' | 'uncertainty'
 
-export const getQueue = (band?: string, offset = 0, limit = 25, order: QueueOrder = 'id') =>
-  api.get<QueueResponse>(
-    `/queues?limit=${limit}&offset=${offset}&order=${order}${band ? `&band=${band}` : ''}`,
-  )
+export const getQueue = (
+  band?: string,
+  offset = 0,
+  limit = 25,
+  order: QueueOrder = 'id',
+  filters: QueueFilters = {},
+) => {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset), order })
+  if (band) params.set('band', band)
+  if (filters.class) params.set('class', filters.class)
+  if (filters.cpse) params.set('cpse', String(filters.cpse))
+  if (filters.mine) params.set('mine', 'true')
+  return api.get<QueueResponse>(`/queues?${params.toString()}`)
+}
 
 // ---- learning from the Workbench ----
 
@@ -314,13 +341,45 @@ export const simulateLabels = (n: number) =>
   api.post<LearnStatus & { simulated: { added: number } }>('/learn/simulate', { n })
 export const CORPUS_URL = '/api/learn/corpus'
 
+export type DecisionOutcome = {
+  action: string
+  decision_id: number
+  task_id: number
+  /** ISO time until which the decision can be taken back. */
+  undo_until?: string
+  merged_into?: number | null
+  split_into?: number
+}
+
 export const postDecision = (body: {
   task_id: number
   action: 'approve' | 'reject' | 'merge' | 'split'
   note?: string
   cluster_id?: number
   item_id?: number
-}) => api.post<Record<string, unknown>>('/decisions', body)
+  /** How long the card was on screen. */
+  seconds?: number
+}) => api.post<DecisionOutcome>('/decisions', body)
+
+export type BulkOutcome = {
+  action: string
+  count: number
+  done: DecisionOutcome[]
+  skipped: { task_id: number; reason: string }[]
+}
+
+/** A page of the high or low band with one reason; one audit event per row. */
+export const postBulkDecisions = (body: {
+  task_ids: number[]
+  action: 'approve' | 'reject'
+  note?: string
+}) => api.post<BulkOutcome>('/decisions/bulk', body)
+
+export const undoDecision = (decisionId: number) =>
+  api.post<{ task_id: number; restored: Record<string, unknown> }>(
+    `/decisions/${decisionId}/undo`,
+    {},
+  )
 
 // ---- clusters (§6.6) ----
 
@@ -674,7 +733,14 @@ export type HeldForReview = {
       sample_of: number
     },
   ]
-  decisions: { by_action: Record<string, number>; total: number; last_at: string | null }
+  decisions: {
+    by_action: Record<string, number>
+    total: number
+    last_at: string | null
+    /** Seconds a card was on screen before it was decided; null until any decision reported it. */
+    seconds?: { n: number; median: number; p90: number } | null
+    undone?: number
+  }
   labels: { reviewer: number; simulated: number }
   note: string
 }
@@ -1085,8 +1151,19 @@ export const reportHtmlUrl = (code: string) => `/api/reports/cpse/${code}?format
 export const sendReport = (code: string, to: string[] | null = null) =>
   api.post<ReportSendResult>(`/reports/cpse/${code}/send`, { to })
 
+export type RunsWhereRow = {
+  engine: string
+  version: string | null
+  /** 'local' (this process), 'browser' (the user's device) or 'remote · host'. */
+  where: string
+  used_for: string
+  available: boolean
+}
+
 export type HealthPanel = {
   capabilities: Health['capabilities']
+  /** Each engine, its version and where it runs. */
+  runs_where?: RunsWhereRow[]
   sovereign_mode: boolean
   ollama_configured: boolean
   database: string
@@ -1103,6 +1180,22 @@ export type HealthPanel = {
 export const getHealthPanel = () => api.get<HealthPanel>('/settings/health')
 export const setSovereign = (enabled: boolean) =>
   api.post<{ sovereign_mode: boolean; note: string }>('/settings/sovereign', { enabled })
+
+// ---- demo snapshot (§8A) ----
+
+export type SnapshotStatus = {
+  exists: boolean
+  files: string[]
+  bytes: number
+  taken_at: string | null
+  directory: string
+}
+
+export type SnapshotResult = { files: string[]; bytes: number; seconds: number; note?: string }
+
+export const getSnapshot = () => api.get<SnapshotStatus>('/settings/snapshot')
+export const takeSnapshot = () => api.post<SnapshotResult>('/settings/snapshot', {})
+export const restoreSnapshot = () => api.post<SnapshotResult>('/settings/snapshot/restore', {})
 
 // ---- ERP migration (§2C, §6.12) ----
 

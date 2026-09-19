@@ -267,3 +267,53 @@ class TestSearchReadsHindi:
         ).json()
         assert hindi["total"] == english["total"] > 0
         assert {i["item_id"] for i in hindi["items"]} == {i["item_id"] for i in english["items"]}
+
+
+class TestDemoSnapshot:
+    """The reset button (§8A): admin-only, audited, and the state comes back."""
+
+    def test_status_says_whether_a_restore_point_exists(self, as_registrar, pipeline_run):
+        body = as_registrar.get("/api/settings/snapshot").json()
+        assert set(body) >= {"exists", "files", "taken_at", "directory"}
+
+    def test_capture_then_restore_round_trips_and_is_audited(
+        self, as_registrar, db, pipeline_run
+    ):
+        from app.models import AuditEvent, ReviewTask
+
+        pending_before = db.execute(
+            select(func.count(ReviewTask.id)).where(ReviewTask.state == "pending")
+        ).scalar()
+        taken = as_registrar.post("/api/settings/snapshot")
+        assert taken.status_code == 200 and taken.json()["files"]
+        assert as_registrar.get("/api/settings/snapshot").json()["exists"] is True
+
+        # The fixture's own connection must let go of the file first, as every
+        # request-scoped session in production already has by the time the
+        # restore runs.
+        db.close()
+        restored = as_registrar.post("/api/settings/snapshot/restore")
+        assert restored.status_code == 200, restored.text
+        assert restored.json()["seconds"] < 5
+        assert (
+            db.execute(
+                select(func.count(ReviewTask.id)).where(ReviewTask.state == "pending")
+            ).scalar()
+            == pending_before
+        )
+        last = db.execute(
+            select(AuditEvent).order_by(AuditEvent.seq.desc())
+        ).scalars().first()
+        assert last is not None and last.action == "demo.restore"
+        assert last.user == "registrar@min.gov.in"
+
+    def test_a_steward_may_not_restore(self, as_steward, pipeline_run):
+        assert as_steward.post("/api/settings/snapshot/restore").status_code == 403
+
+    def test_the_what_runs_where_table_names_each_engine(self, as_registrar, pipeline_run):
+        body = as_registrar.get("/api/settings/health").json()
+        rows = body["runs_where"]
+        engines = {row["engine"] for row in rows}
+        assert {"Python", "SQLite", "rapidfuzz", "scikit-learn", "tesseract.js"} <= engines
+        assert all(row["where"] in ("local", "browser") or row["where"].startswith("remote") for row in rows)
+        assert next(row for row in rows if row["engine"] == "Python")["version"].startswith("3.12")

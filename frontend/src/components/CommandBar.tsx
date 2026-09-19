@@ -10,9 +10,11 @@ import { UserChip } from './UserChip'
 export function CommandBar({
   onOpenPalette,
   onOpenNav,
+  onOpenHelp,
 }: {
   onOpenPalette: () => void
   onOpenNav: () => void
+  onOpenHelp?: () => void
 }) {
   const isMac =
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '')
@@ -44,6 +46,17 @@ export function CommandBar({
 
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         <DegradedChip />
+        {onOpenHelp && (
+          <button
+            type="button"
+            onClick={onOpenHelp}
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            className="hidden h-9 w-9 items-center justify-center rounded-full border border-hairline font-mono text-xs text-muted hover:text-ink sm:flex"
+          >
+            ?
+          </button>
+        )}
         <ThemeToggle />
         <UserChip />
       </div>

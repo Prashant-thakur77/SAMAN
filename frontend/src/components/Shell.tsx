@@ -6,6 +6,7 @@ import { useHealth } from '../lib/useHealth'
 import { CommandBar } from './CommandBar'
 import { Assistant } from './Assistant'
 import { CommandPalette } from './CommandPalette'
+import { ShortcutHelp } from './ShortcutHelp'
 import { RouteAnnouncer } from './RouteAnnouncer'
 import { Sidebar } from './Sidebar'
 import { Button } from './primitives/Button'
@@ -26,6 +27,7 @@ export function Shell({ children }: { children: ReactNode }) {
     }
   })
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   // Below lg the sidebar is a drawer rather than a column; this is whether it
   // is out. Closed on every navigation, because a drawer that stays open over
   // the page you just asked for is a drawer in the way.
@@ -50,6 +52,14 @@ export function Shell({ children }: { children: ReactNode }) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setPaletteOpen((o) => !o)
+      }
+      // `?` opens the shortcut help, unless the user is typing one.
+      const target = e.target as HTMLElement | null
+      const typing =
+        target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)
+      if (e.key === '?' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        setHelpOpen((o) => !o)
       }
       if (e.key === 'Escape') setNavOpen(false)
     }
@@ -89,7 +99,11 @@ export function Shell({ children }: { children: ReactNode }) {
         onClose={() => setNavOpen(false)}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <CommandBar onOpenPalette={() => setPaletteOpen(true)} onOpenNav={() => setNavOpen(true)} />
+        <CommandBar
+          onOpenPalette={() => setPaletteOpen(true)}
+          onOpenNav={() => setNavOpen(true)}
+          onOpenHelp={() => setHelpOpen(true)}
+        />
         <main
           id="main-content"
           tabIndex={-1}
@@ -122,6 +136,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </footer>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <Assistant />
     </div>
   )

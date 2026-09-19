@@ -192,7 +192,7 @@ export default function Audit() {
           }
         />
       ) : (
-        <Table>
+        <Table exportAs="audit-ledger">
           <THead>
             <TH>Seq</TH>
             <TH>When</TH>

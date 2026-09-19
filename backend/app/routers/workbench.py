@@ -7,12 +7,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from .. import audit, inventory, learn, opportunity, review, substitutes
 from ..adjudicate import adjudicate
 from ..auth import current_user_optional, require_roles, require_user
+from ..config import get_settings
 from ..db import get_db
 from ..models import (
     AuditEvent,
@@ -44,6 +45,14 @@ class DecisionIn(BaseModel):
     #: for merge/split, the cluster and item the reviewer acted on
     cluster_id: int | None = None
     item_id: int | None = None
+    #: how long the card was on screen, for the seconds-per-decision figure
+    seconds: float | None = None
+
+
+class BulkDecisionIn(BaseModel):
+    task_ids: list[int]
+    action: str  # approve | reject
+    note: str | None = None
 
 
 def _item_card(db: Session, item_id: int) -> dict:
@@ -127,12 +136,30 @@ def _task_card(db: Session, task: ReviewTask, rephrase: bool = True) -> dict:
         for entry in attributes.get("per_attr", [])
     ]
 
+    tier_scores = json.loads(pair.tier_scores_json or "{}")
+    # Tier 3 (§0.4): a recommendation with its reasons, so the reviewer starts
+    # from a position rather than from a score. It never decides. The grey
+    # band may have the model rephrase it; every band gets the deterministic
+    # sentence as `why`, the one-line answer to "why is this card here".
+    adjudication = adjudicate(
+        evidence,
+        tier_scores,
+        pair.confidence,
+        pair.verdict,
+        veto,
+        # Fifty cards times one model call is a page that never loads. The
+        # first card is the one on screen; the rest read the deterministic
+        # sentence, which says the same thing.
+        rephrase=rephrase and task.band == "grey",
+    )
+
     card.update(
         {
             "pair_id": pair.id,
             "verdict": pair.verdict,
+            "why": adjudication.summary,
             "confidence": pair.confidence,
-            "tier_scores": json.loads(pair.tier_scores_json or "{}"),
+            "tier_scores": tier_scores,
             "veto": veto,
             "refused_because": (
                 [f"{v['attr']}: {v['reason']}" for v in veto["vetoed_by"]] if veto else []
@@ -146,24 +173,47 @@ def _task_card(db: Session, task: ReviewTask, rephrase: bool = True) -> dict:
             # The learned model's opinion, beside the pipeline's. It never
             # decides; it is here so a reviewer can see when the two disagree.
             "learned": learn.score(pair, db=db),
-            # Tier 3 (§0.4): a recommendation with its reasons, so the reviewer
-            # starts from a position rather than from a score. It never decides.
-            "adjudication": adjudicate(
-                evidence,
-                json.loads(pair.tier_scores_json or "{}"),
-                pair.confidence,
-                pair.verdict,
-                veto,
-                # Fifty cards times one model call is a page that never loads.
-                # The first card is the one on screen; the rest read the
-                # deterministic sentence, which says the same thing.
-                rephrase=rephrase,
-            ).as_dict()
-            if task.band == "grey"
-            else None,
+            "adjudication": adjudication.as_dict() if task.band == "grey" else None,
         }
     )
     return card
+
+
+def _facets(db: Session, band: str | None, state: str) -> dict:
+    """What the band holds, by class and by CPSE, so the filters offer only
+    values that exist. Both sides of a pair count for the CPSE facet: a
+    steward at BHEL wants every pair that touches BHEL."""
+    A, B = aliased(Item), aliased(Item)
+    RA, RB = aliased(RawItem), aliased(RawItem)
+    query = (
+        select(A.class_code, RA.cpse_id, RB.cpse_id)
+        .select_from(ReviewTask)
+        .join(Pair, Pair.id == ReviewTask.pair_id)
+        .join(A, A.id == Pair.item_a)
+        .join(B, B.id == Pair.item_b)
+        .join(RA, RA.id == A.raw_item_id)
+        .join(RB, RB.id == B.raw_item_id)
+        .where(ReviewTask.state == state)
+    )
+    if band:
+        query = query.where(ReviewTask.band == band)
+    classes: dict[str, int] = {}
+    cpses: dict[int, int] = {}
+    for class_code, cpse_a, cpse_b in db.execute(query):
+        classes[class_code] = classes.get(class_code, 0) + 1
+        for cpse_id in {cpse_a, cpse_b}:
+            cpses[cpse_id] = cpses.get(cpse_id, 0) + 1
+    names = dict(db.execute(select(Cpse.id, Cpse.code)).all()) if cpses else {}
+    return {
+        "classes": [
+            {"code": code, "count": n}
+            for code, n in sorted(classes.items(), key=lambda kv: (-kv[1], kv[0]))
+        ],
+        "cpses": [
+            {"id": cpse_id, "code": names.get(cpse_id, str(cpse_id)), "count": n}
+            for cpse_id, n in sorted(cpses.items(), key=lambda kv: (-kv[1], kv[0]))
+        ],
+    }
 
 
 @router.get("/queues")
@@ -173,6 +223,10 @@ def queues(
     limit: int = Query(default=25, le=200),
     offset: int = 0,
     order: str = Query(default="id"),
+    klass: str | None = Query(default=None, alias="class"),
+    cpse: int | None = Query(default=None),
+    mine: bool = Query(default=False),
+    user: Annotated[User | None, Depends(current_user_optional)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
     """The three band queues with their counts, and a page of cards (§6.5).
@@ -180,6 +234,10 @@ def queues(
     `order=uncertainty` puts the pairs the learned model is least sure about
     first, so a reviewer's time teaches it the most. It needs a trained model;
     without one the queue stays in id order and says so.
+
+    Queues are worked by family: `class` keeps one class, `cpse` keeps the
+    pairs that touch one CPSE on either side, `mine` keeps the tasks assigned
+    to the caller's role. The facets say what values exist in the band.
     """
     if order not in ("id", "uncertainty"):
         raise HTTPException(
@@ -202,6 +260,26 @@ def queues(
     query = select(ReviewTask).where(ReviewTask.state == state)
     if band:
         query = query.where(ReviewTask.band == band)
+    if mine and user is not None:
+        query = query.where(ReviewTask.assignee_role == user.role)
+    if klass or cpse:
+        A, B = aliased(Item), aliased(Item)
+        RA, RB = aliased(RawItem), aliased(RawItem)
+        filtered = (
+            select(ReviewTask.id)
+            .join(Pair, Pair.id == ReviewTask.pair_id)
+            .join(A, A.id == Pair.item_a)
+            .join(B, B.id == Pair.item_b)
+        )
+        if klass:
+            filtered = filtered.where(or_(A.class_code == klass, B.class_code == klass))
+        if cpse:
+            filtered = (
+                filtered.join(RA, RA.id == A.raw_item_id)
+                .join(RB, RB.id == B.raw_item_id)
+                .where(or_(RA.cpse_id == cpse, RB.cpse_id == cpse))
+            )
+        query = query.where(ReviewTask.id.in_(filtered))
     model = learn.load_model()
     if order == "uncertainty" and model is not None:
         # Score every pending task in the band, then page the sorted list.
@@ -213,9 +291,7 @@ def queues(
             .where(query.whereclause)
         ).all()
         # The items' few fields the features read, in one query for the band.
-        facts = learn.item_facts(
-            db, {p.item_a for _, p in rows} | {p.item_b for _, p in rows}
-        )
+        facts = learn.item_facts(db, {p.item_a for _, p in rows} | {p.item_b for _, p in rows})
         for task, pair in rows:
             opinion = learn.score(pair, model, facts=facts)
             scored.append((opinion["uncertainty"] if opinion else -1.0, task.id, task))
@@ -226,12 +302,7 @@ def queues(
         tasks = (
             db.execute(query.order_by(ReviewTask.id).offset(offset).limit(limit)).scalars().all()
         )
-    total = db.execute(
-        select(func.count(ReviewTask.id)).where(
-            ReviewTask.state == state,
-            *([ReviewTask.band == band] if band else []),
-        )
-    ).scalar()
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar()
 
     return {
         "band": band,
@@ -240,7 +311,10 @@ def queues(
         "total": total,
         "offset": offset,
         "order": order,
+        "filters": {"class": klass, "cpse": cpse, "mine": mine},
+        "facets": _facets(db, band, state),
         "model_available": model is not None,
+        "undo_window_s": get_settings().saman_undo_window_s,
         "tasks": [_task_card(db, task, rephrase=i == 0) for i, task in enumerate(tasks)],
     }
 
@@ -269,7 +343,45 @@ def create_decision(
         db.commit()
         return {"task_id": task.id, "action": "split", "new_cluster_id": new_cluster}
 
-    return review.apply_decision(db, task, body.action, user, body.note)
+    return review.apply_decision(db, task, body.action, user, body.note, body.seconds)
+
+
+@router.post("/decisions/bulk")
+def create_decisions(
+    body: BulkDecisionIn,
+    user: Annotated[User, Depends(require_roles(*review.BAND_ROLES["high"]))],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Close a page of tasks with one reason (§5): the high band's policy
+    confirmations, which nobody should do one card at a time. Each task keeps
+    its own audit event, label and undo; the ones that cannot be closed are
+    reported, not fatal."""
+    if body.action not in ("approve", "reject"):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Bulk decisions are approve or reject."
+        )
+    if not body.task_ids or len(body.task_ids) > 200:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Send between 1 and 200 task ids."
+        )
+    task_ids = list(dict.fromkeys(body.task_ids))
+    return review.apply_decisions(db, task_ids, body.action, user, body.note)
+
+
+@router.post("/decisions/{decision_id}/undo")
+def undo_decision(
+    decision_id: int,
+    user: Annotated[User, Depends(require_user)],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Take a decision back within the undo window (`SAMAN_UNDO_WINDOW_S`)."""
+    decision = db.get(Decision, decision_id)
+    if decision is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"No decision {decision_id}; it may already have been undone.",
+        )
+    return review.undo_decision(db, decision, user)
 
 
 class ClusterEditIn(BaseModel):

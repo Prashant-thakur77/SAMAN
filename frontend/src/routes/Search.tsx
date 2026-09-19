@@ -173,7 +173,7 @@ export default function Search() {
         />
       ) : (
         <>
-          <Table>
+          <Table exportAs="search-results">
             <THead>
               <TH>Description</TH>
               <TH>CPSE</TH>

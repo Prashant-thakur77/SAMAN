@@ -30,6 +30,7 @@ function spies(openCluster = true): WorkbenchKeyHandlers & Record<string, unknow
     next: vi.fn(),
     previous: vi.fn(),
     openCluster: openCluster ? vi.fn() : undefined,
+    undo: vi.fn(),
   }
 }
 
@@ -46,6 +47,7 @@ describe('the workbench keyboard contract', () => {
     ['j', 'next'],
     ['k', 'previous'],
     ['m', 'openCluster'],
+    ['u', 'undo'],
   ] as const)('%s triggers %s', async (key, name) => {
     const user = userEvent.setup()
     render(<Harness handlers={handlers} />)

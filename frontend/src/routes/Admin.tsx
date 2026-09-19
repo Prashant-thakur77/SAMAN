@@ -14,15 +14,19 @@ import {
   createUser,
   getHealthPanel,
   getLearnStatus,
+  getSnapshot,
   getUsers,
   patchUser,
+  restoreSnapshot,
   setSovereign,
   simulateLabels,
+  takeSnapshot,
   trainModel,
   type AdminUser,
   type HealthPanel,
   type LearnStatus,
   type Role,
+  type SnapshotStatus,
 } from '../lib/api'
 import { cn } from '../lib/cn'
 import { useSession } from '../lib/session'
@@ -37,6 +41,8 @@ export default function Admin() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [health, setHealth] = useState<HealthPanel | null>(null)
+  const [snapshot, setSnapshot] = useState<SnapshotStatus | null>(null)
+  const [confirmRestore, setConfirmRestore] = useState(false)
   const [learn, setLearn] = useState<LearnStatus | null>(null)
   const [message, setMessage] = useState<{ tone: 'ok' | 'danger'; text: string } | null>(null)
   const [draft, setDraft] = useState({ email: '', name: '', role: 'viewer', cpse_code: '' })
@@ -45,15 +51,17 @@ export default function Admin() {
 
   const load = useCallback(async () => {
     try {
-      const [userList, panel, learned] = await Promise.all([
+      const [userList, panel, learned, snap] = await Promise.all([
         getUsers(),
         getHealthPanel(),
         getLearnStatus(),
+        getSnapshot().catch(() => null),
       ])
       setUsers(userList.users)
       setRoles(userList.roles)
       setHealth(panel)
       setLearn(learned)
+      setSnapshot(snap)
     } catch (err) {
       setMessage({
         tone: 'danger',
@@ -132,6 +140,94 @@ export default function Admin() {
             </ul>
           )}
 
+          {health.runs_where && (
+            <div className="space-y-3">
+              <div>
+                <h3 className="micro-label">What runs where</h3>
+                <p className="max-w-prose text-xs text-muted">
+                  Every engine this installation uses, its installed version, and where it
+                  runs. Nothing marked <span className="font-mono">local</span> or{' '}
+                  <span className="font-mono">browser</span> sends anything off this machine or
+                  the user's device.
+                </p>
+              </div>
+              <Table exportAs="what-runs-where">
+                <THead>
+                  <TH>Engine</TH>
+                  <TH>Version</TH>
+                  <TH>Where</TH>
+                  <TH>Used for</TH>
+                </THead>
+                <TBody>
+                  {health.runs_where.map((row) => (
+                    <TR key={row.engine} className={row.available ? '' : 'opacity-50'}>
+                      <TD className="font-medium">{row.engine}</TD>
+                      <TD mono>{row.version ?? '—'}</TD>
+                      <TD>
+                        <StatusChip tone={row.where.startsWith('remote') ? 'neutral' : 'ok'}>
+                          {row.where}
+                        </StatusChip>
+                      </TD>
+                      <TD className="text-muted">
+                        {row.used_for}
+                        {!row.available && ' · not installed'}
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
+          )}
+
+          <div className="space-y-3 card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="micro-label">Demo restore point</h3>
+                <p className="max-w-prose text-xs text-muted">
+                  {snapshot?.exists
+                    ? `Taken ${snapshot.taken_at ? new Date(snapshot.taken_at).toLocaleString('en-IN') : ''} · ${(snapshot.bytes / 1_048_576).toFixed(1)} MB · ${snapshot.files.join(', ')}`
+                    : 'No restore point yet. Take one before a demo; restoring puts both databases back in about a second.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void run(takeSnapshot, 'Snapshot taken. This is now the restore point.')}
+                >
+                  Take snapshot
+                </Button>
+                {snapshot?.exists && !confirmRestore && (
+                  <Button size="sm" variant="danger" disabled={busy} onClick={() => setConfirmRestore(true)}>
+                    Restore…
+                  </Button>
+                )}
+                {snapshot?.exists && confirmRestore && (
+                  <>
+                    <span className="text-xs text-danger">
+                      Every decision since the snapshot is discarded. Sure?
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busy}
+                      onClick={() => {
+                        setConfirmRestore(false)
+                        void run(restoreSnapshot, 'Restored from the snapshot. Reload any open screen.')
+                      }}
+                    >
+                      Yes, restore
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmRestore(false)}>
+                      Keep
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-4 card p-5">
             <div className="max-w-prose space-y-1">
               <p className="micro-label">Sovereign mode</p>
@@ -195,7 +291,7 @@ export default function Admin() {
           <p className="max-w-prose text-sm text-muted">
             {health.visibility_policy.summary}
           </p>
-          <Table>
+          <Table exportAs="visibility-policy">
             <THead>
               <TH>Role</TH>
               <TH>Sees</TH>
@@ -219,7 +315,7 @@ export default function Admin() {
 
       <section className="space-y-4">
         <h2 className="micro-label">Users</h2>
-        <Table>
+        <Table exportAs="users">
           <THead>
             <TH>Name</TH>
             <TH>Email</TH>

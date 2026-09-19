@@ -1,18 +1,46 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 
 import { cn } from '../../lib/cn'
+import { downloadCsv, tableToCsv } from '../../lib/csv'
 import { listItemVariants, listVariants } from '../../lib/motion'
 
 /**
  * Dense data table — 40px rows, hairline dividers only (spec §1.3), rows
  * staggered in at 20ms (spec §1.5).
+ *
+ * `exportAs` names a CSV file and adds a small download control above the
+ * table: the rows as rendered, nothing more, so a steward can take what the
+ * screen showed into a spreadsheet without asking anyone.
  */
 
-export function Table({ children, className }: { children: ReactNode; className?: string }) {
+export function Table({
+  children,
+  className,
+  exportAs,
+}: {
+  children: ReactNode
+  className?: string
+  exportAs?: string
+}) {
+  const ref = useRef<HTMLTableElement>(null)
   return (
-    <div className={cn('card w-full overflow-x-auto', className)}>
-      <table className="w-full border-collapse text-sm">{children}</table>
+    <div className={cn('relative', exportAs && 'pt-6')}>
+      {exportAs && (
+        <button
+          type="button"
+          className="no-print absolute right-0 top-0 font-mono text-[11px] text-muted underline-offset-2 hover:text-ink hover:underline"
+          title="Download these rows, as shown, as a CSV file"
+          onClick={() => ref.current && downloadCsv(exportAs, tableToCsv(ref.current))}
+        >
+          CSV ↓
+        </button>
+      )}
+      <div className={cn('card w-full overflow-x-auto', className)}>
+        <table ref={ref} className="w-full border-collapse text-sm">
+          {children}
+        </table>
+      </div>
     </div>
   )
 }

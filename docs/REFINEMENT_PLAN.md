@@ -1,4 +1,4 @@
-# SAMAN refinement plan
+co# SAMAN refinement plan
 
 Four stages, each ending at a gate that must be true before the next begins.
 Every item is tagged **improve** (what exists), **add** (what is missing) or
@@ -37,9 +37,9 @@ and at a desk.*
 
 | Screen | Tag | Item | Why | Effort |
 |---|---|---|---|---|
-| Workbench | add | Bulk confirm for the high band: select a page, one reason, one audit event per row | 7,381 policy confirmations one card at a time is not a steward's afternoon | 2 d |
-| Workbench | add | Seconds per decision recorded on the card; shown on the dashboard | The first number a pilot is judged on | 2 d |
-| Workbench | improve | Filters (class, CPSE, band, assigned to me); undo within five minutes | Queues are worked by family, and everyone mis-clicks | 2 d |
+| Workbench | add · **done** | Bulk confirm for the high band: select a page, one reason, one audit event per row | 7,381 policy confirmations one card at a time is not a steward's afternoon | 2 d |
+| Workbench | add · **done** | Seconds per decision recorded on the card; shown on the dashboard | The first number a pilot is judged on | 2 d |
+| Workbench | improve · **done** | Filters (class, CPSE, band, assigned to me); undo within five minutes | Queues are worked by family, and everyone mis-clicks | 2 d |
 | Search | improve | Sort by relevance, recent searches, "did you mean" from the abbreviation table | Half of real queries are misspelt abbreviations | 2 d |
 | Scan | add | Installable app (PWA) with the OCR engine cached; works with no signal, syncs later | Stores have no signal; the phone must still answer | 3 d |
 | Scan | add | Stock-count mode (scan, count, next); bin binding ("this bin holds this code") | The storekeeper's real daily job | 3 d |
@@ -178,14 +178,14 @@ never a feeling.
 
 | Item | Status | Effort |
 |---|---|---|
-| Export any table (search results, queue, dashboard section) as CSV | next | 1 d |
+| Export any table (search results, queue, dashboard section) as CSV | done | 1 d |
 | A printable specification sheet from a golden record, for a GeM bid | next | 1 d |
-| "Why?" on every card and Copilot answer: the refusal or merge reason as one sentence, already computed | next | 1 d |
-| Keyboard shortcut help (`?`) on every screen | next | ½ d |
-| A "what runs where" panel on the health page listing each engine, its version and whether it is local or remote | next | ½ d |
+| "Why?" on every card and Copilot answer: the refusal or merge reason as one sentence, already computed | done | 1 d |
+| Keyboard shortcut help (`?`) on every screen | done | ½ d |
+| A "what runs where" panel on the health page listing each engine, its version and whether it is local or remote | done | ½ d |
 | Session activity per user on Admin (last sign-in, decisions, reports sent) | next | 1 d |
 | Provenance tooltip on every dashboard figure: computed at, from how many rows, memo version | next | 1 d |
-| Demo reset button for admins (restore the snapshot in under five seconds; exists as `make demo-restore`) | next | ½ d |
+| Demo reset button for admins (restore the snapshot in under five seconds; exists as `make demo-restore`) | done | ½ d |
 
 ## What to improve in what already exists, regardless of stage
 

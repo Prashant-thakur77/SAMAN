@@ -259,7 +259,7 @@ export default function Migration() {
             description="Run a dry run, then apply the safe changes. Every applied row is journaled with its before-image so the batch can be reversed."
           />
         ) : (
-          <Table>
+          <Table exportAs="migration-plan">
             <THead>
               <TH>Batch</TH>
               <TH>When</TH>
@@ -326,7 +326,7 @@ export default function Migration() {
               </Button>
             </div>
           </div>
-          <Table>
+          <Table exportAs="migration-blockers">
             <THead>
               <TH>Material</TH>
               <TH>State</TH>
@@ -437,7 +437,7 @@ function PlanTable({ plan }: { plan: MigrationPlan }) {
 
   return (
     <div {...scrollProps}>
-      <Table>
+      <Table exportAs="migration-runs">
         <THead>
           <TH>Material</TH>
           <TH>Action</TH>

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 
 /**
  * The workbench keyboard contract (spec §6.5): `A` approve, `R` reject,
- * `J`/`K` next and previous, `M` open the cluster.
+ * `J`/`K` next and previous, `M` open the cluster, `U` undo the last decision.
  *
  * Extracted from the route so the contract is stated in one place and can be
  * tested without mounting a screen's worth of API calls. A reviewer working a
@@ -16,6 +16,8 @@ export type WorkbenchKeyHandlers = {
   previous: () => void
   /** Absent when the card has no cluster to open. */
   openCluster?: () => void
+  /** Absent when there is nothing to take back. */
+  undo?: () => void
 }
 
 /** Elements whose own keystrokes must never be stolen. */
@@ -37,6 +39,7 @@ export function useWorkbenchKeys(handlers: WorkbenchKeyHandlers, enabled = true)
         j: handlers.next,
         k: handlers.previous,
         m: handlers.openCluster,
+        u: handlers.undo,
       }[event.key.toLowerCase()]
 
       if (!action) return

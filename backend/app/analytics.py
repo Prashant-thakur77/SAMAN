@@ -33,6 +33,7 @@ from .blocking import PASSES
 from .match import T_HIGH, T_LOW
 from .metrics import TARGETS
 from .models import (
+    AuditEvent,
     Cluster,
     ClusterMember,
     Cnmc,
@@ -661,6 +662,11 @@ def held_for_review(
             "by_action": {action: n for action, n, _ in decisions},
             "total": sum(n for _, n, _ in decisions),
             "last_at": last_at.isoformat() if last_at else None,
+            "seconds": _seconds_per_decision(db),
+            "undone": db.execute(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "decision.undo")
+            ).scalar()
+            or 0,
         },
         "labels": {
             "reviewer": labels.get("reviewer", 0),
@@ -676,6 +682,32 @@ def held_for_review(
             f"refusals (at most {LOW_BAND_SAMPLE:,} of them). Simulated labels are named "
             "as such."
         ),
+    }
+
+
+def _seconds_per_decision(db: Session) -> dict | None:
+    """How long a card was on screen before it was decided: the first number a
+    pilot is judged on. Reported by the client on each decision and kept on
+    the audit event; only decisions that reported it count. Median and the
+    90th percentile, never a mean — one reviewer's tea break is not a trend."""
+    seconds: list[float] = []
+    rows = db.execute(
+        select(AuditEvent.payload_json).where(
+            AuditEvent.action.in_(("decision.approve", "decision.reject"))
+        )
+    ).scalars()
+    for raw in rows:
+        value = json.loads(raw).get("seconds")
+        if isinstance(value, int | float) and 0 < value < 3600:
+            seconds.append(float(value))
+    if not seconds:
+        return None
+    seconds.sort()
+    n = len(seconds)
+    return {
+        "n": n,
+        "median": round(seconds[n // 2], 1),
+        "p90": round(seconds[min(n - 1, int(n * 0.9))], 1),
     }
 
 

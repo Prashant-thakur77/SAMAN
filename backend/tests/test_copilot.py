@@ -5,6 +5,7 @@ a number, and the copilot is not a way around row-level visibility.
 """
 
 import pytest
+from sqlalchemy import select
 
 from app import copilot
 from app.visibility import Scope
@@ -260,7 +261,7 @@ class TestCopilotEndpoint:
 
     def test_suggestions_describe_what_can_be_asked(self, as_viewer, pipeline_run):
         body = as_viewer.get("/api/copilot/suggestions").json()
-        assert len(body["prompts"]) == len(copilot.TEMPLATES)
+        assert len(body["prompts"]) == len(copilot.TEMPLATES) + 1  # + the "why" example
         assert body["mode"] in {"ollama", "deterministic"}
 
     def test_an_empty_question_is_handled(self, as_viewer, pipeline_run):
@@ -335,3 +336,63 @@ class TestCopilotPageConversation:
             "/api/copilot/query", json={"question": "count duplicates by cpse"}
         ).json()
         assert body["sql"] and body["template"] == "duplicates_by_cpse"
+
+
+class TestWhy:
+    """The reason behind one pair, already computed, reachable by asking."""
+
+    def _pair_codes(self, db, verdict):
+        from app.models import Item, Pair, RawItem
+
+        pair = db.execute(select(Pair).where(Pair.verdict == verdict).limit(1)).scalar_one_or_none()
+        if pair is None:
+            pytest.skip(f"no {verdict} pair")
+        codes = [
+            db.execute(
+                select(RawItem.legacy_code).join(Item, Item.raw_item_id == RawItem.id).where(Item.id == i)
+            ).scalar_one()
+            for i in (pair.item_a, pair.item_b)
+        ]
+        return pair, codes
+
+    def test_a_refused_pair_explains_the_veto(self, db, pipeline_run):
+        pair, (a, b) = self._pair_codes(db, "distinct")
+        reply = copilot.answer(db, f"why were {a} and {b} not merged?", REGISTRAR)
+        assert reply.template == "why"
+        assert a in reply.text and b in reply.text
+        assert "kept apart" in reply.text
+        assert reply.rows[0]["pair_id"] == pair.id
+        assert "no model" in (reply.note or "")
+
+    def test_a_task_number_works_too(self, db, pipeline_run):
+        from app.models import ReviewTask
+
+        task = db.execute(select(ReviewTask).where(ReviewTask.band == "grey").limit(1)).scalar_one()
+        reply = copilot.answer(db, f"why is task {task.id} in the queue", REGISTRAR)
+        assert reply.template == "why"
+        assert f"Review task {task.id}" in reply.text
+
+    def test_two_uncompared_codes_say_so(self, db, pipeline_run):
+        from app.models import Item, RawItem
+
+        # Two rows from different classes were never in one blocking bucket.
+        rows = db.execute(
+            select(RawItem.legacy_code, Item.class_code)
+            .join(Item, Item.raw_item_id == RawItem.id)
+            .limit(400)
+        ).all()
+        by_class = {}
+        for code, klass in rows:
+            by_class.setdefault(klass, code)
+        a, b = list(by_class.values())[:2]
+        reply = copilot.answer(db, f"why are {a} and {b} not the same", REGISTRAR)
+        assert reply.template == "why"
+        assert "never compared" in reply.text or "same cluster" in reply.text
+
+    def test_an_unknown_code_is_named(self, db, pipeline_run):
+        reply = copilot.answer(db, "why were ZZZZ999999 and YYYY888888 not merged", REGISTRAR)
+        assert reply.template == "why" and "ZZZZ999999" in reply.text
+
+    def test_why_without_a_pair_falls_through(self, db, pipeline_run):
+        reply = copilot.answer(db, "why are approvals pending", REGISTRAR)
+        assert reply.template == "pending_approvals"
