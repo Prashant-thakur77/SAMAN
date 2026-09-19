@@ -193,3 +193,34 @@ class TestEquipmentTag:
 
     def test_a_materials_own_keys_have_their_say_before_a_tag(self, pipeline_run, db):
         assert scan.METHODS[-1] == "equipment_tag"
+
+
+class TestWrongItemReport:
+    def test_a_report_lands_on_the_chain_and_changes_nothing(self, as_steward, db, pipeline_run):
+        from sqlalchemy import func, select
+
+        from app.models import AuditEvent, ClusterMember
+
+        members_before = db.execute(select(func.count(ClusterMember.id))).scalar()
+        response = as_steward.post(
+            "/api/scan/report",
+            json={
+                "code": "CPCL001294",
+                "matched_by": "legacy_code",
+                "cluster_id": 1892,
+                "note": "the shelf holds a vented helmet, the screen shows a plain one",
+            },
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["recorded"] is True and body["seq"] > 0
+        event = db.get(
+            AuditEvent,
+            db.execute(select(AuditEvent.id).where(AuditEvent.seq == body["seq"])).scalar(),
+        )
+        assert event.action == "scan.wrong_item" and event.user == "steward@cpcl.in"
+        assert "vented helmet" in event.payload_json
+        assert db.execute(select(func.count(ClusterMember.id))).scalar() == members_before
+
+    def test_a_visitor_cannot_report(self, client, pipeline_run):
+        assert client.post("/api/scan/report", json={"code": "X"}).status_code == 401

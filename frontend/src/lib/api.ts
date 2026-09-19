@@ -1606,6 +1606,16 @@ export type ScanResult = {
 export const scanLookup = (code: string) =>
   api.get<ScanResult>('/scan/lookup?code=' + encodeURIComponent(code))
 
+/** "Wrong item?": the scan resolved, but the part in hand is not the one on screen. */
+export const reportWrongItem = (body: {
+  code: string
+  matched_by?: string | null
+  cluster_id?: number | null
+  item_id?: number | null
+  cnmc?: string | null
+  note?: string
+}) => api.post<{ recorded: boolean; seq: number; note: string }>('/scan/report', body)
+
 // ---- PPRL restricted mode (§5, M10) ----
 
 export type PprlEncoding = { ref: string; bloom: string }

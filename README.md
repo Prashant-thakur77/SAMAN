@@ -1265,6 +1265,14 @@ who each screen is for and what a deployment would still need, and in
 [`docs/REFINEMENT_PLAN.md`](docs/REFINEMENT_PLAN.md), four stages with gates,
 items and effort against every capability in the problem statement.
 
+On the shelf floor the screen keeps a list of the last scans on that device,
+turns the phone's torch on where the browser allows it (Chrome on Android;
+iOS shows no button), and carries a **Wrong item?** link under every result:
+the scan resolved, but the part in hand is not the one on screen. The report
+goes on the ledger as `scan.wrong_item` with the code, what it resolved to and
+the person's words; nothing in the record changes, because a mistake at the
+shelf is a fact for a steward to act on, not a merge or a split.
+
 ---
 
 ## Problem-statement traceability

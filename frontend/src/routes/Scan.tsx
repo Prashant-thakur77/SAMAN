@@ -8,6 +8,7 @@ import { EmptyState } from '../components/primitives/EmptyState'
 import { Input } from '../components/primitives/Field'
 import {
   ApiError,
+  reportWrongItem,
   scanLookup,
   smartCreateScan,
   type ScanEquipment,
@@ -29,12 +30,46 @@ import { useSession } from '../lib/session'
  * them. The server resolves; it does not guess. Several materials sharing a
  * part number are put to the person to choose by the attribute that differs.
  */
+/** The last scans on this device: what was scanned, when, and what it was. */
+type ScanRecord = { code: string; at: number; found: boolean; label: string | null }
+const HISTORY_KEY = 'saman.scan.history'
+const HISTORY_MAX = 12
+
+function readHistory(): ScanRecord[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    const list = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(list) ? (list as ScanRecord[]).filter((r) => r && typeof r.code === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function pushHistory(record: ScanRecord): ScanRecord[] {
+  const next = [record, ...readHistory().filter((r) => r.code !== record.code)].slice(0, HISTORY_MAX)
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+  } catch {
+    /* a phone in private mode still scans */
+  }
+  return next
+}
+
+function labelFor(result: ScanResult): string | null {
+  const m = result.materials[0]
+  if (result.equipment.length > 0) return `equipment · ${result.equipment.length} site${result.equipment.length === 1 ? '' : 's'}`
+  if (!m) return null
+  if (result.materials.length > 1) return `${result.materials.length} materials share this code`
+  return m.cnmc ?? m.std_description ?? m.members[0]?.description ?? null
+}
+
 export default function Scan() {
   const [code, setCode] = useState('')
   const [result, setResult] = useState<ScanResult | null>(null)
   const [chosen, setChosen] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [history, setHistory] = useState<ScanRecord[]>(() => readHistory())
   const field = useRef<HTMLInputElement>(null)
 
   const lookup = useCallback(async (raw: string) => {
@@ -44,7 +79,16 @@ export default function Scan() {
     setError(null)
     setChosen(null)
     try {
-      setResult(await scanLookup(query))
+      const found = await scanLookup(query)
+      setResult(found)
+      setHistory(
+        pushHistory({
+          code: query,
+          at: Date.now(),
+          found: found.materials.length > 0 || found.equipment.length > 0,
+          label: labelFor(found),
+        }),
+      )
     } catch (err) {
       setResult(null)
       setError(err instanceof ApiError ? err.message : 'The lookup did not work.')
@@ -144,13 +188,139 @@ export default function Scan() {
       )}
 
       {result && (
-        <ScanOutcome
-          result={result}
-          chosen={chosen}
-          onChoose={setChosen}
-          onScanAgain={scanAgain}
-          onLookup={decoded}
-        />
+        <>
+          <ScanOutcome
+            result={result}
+            chosen={chosen}
+            onChoose={setChosen}
+            onScanAgain={scanAgain}
+            onLookup={decoded}
+          />
+          {(result.materials.length > 0 || result.equipment.length > 0) && (
+            <WrongItem result={result} chosen={chosen} />
+          )}
+        </>
+      )}
+
+      {!result && history.length > 0 && (
+        <section className="space-y-2" aria-label="Recent scans">
+          <div className="flex items-center justify-between">
+            <h2 className="micro-label">Recent scans on this device</h2>
+            <button
+              type="button"
+              className="text-xs text-muted underline-offset-2 hover:underline"
+              onClick={() => {
+                try {
+                  localStorage.removeItem(HISTORY_KEY)
+                } catch {
+                  /* nothing to clear */
+                }
+                setHistory([])
+              }}
+            >
+              clear
+            </button>
+          </div>
+          <ul className="card divide-y divide-hairline">
+            {history.map((entry) => (
+              <li key={entry.code}>
+                <button
+                  type="button"
+                  onClick={() => decoded(entry.code)}
+                  className="flex h-12 w-full items-center gap-3 px-4 text-left hover:bg-bg"
+                >
+                  <span className="font-mono text-sm">{entry.code}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted">
+                    {entry.found ? (entry.label ?? 'found') : 'nothing carried that code'}
+                  </span>
+                  <span className="shrink-0 font-mono text-[11px] text-muted">
+                    {new Date(entry.at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  )
+}
+
+/** The scan resolved, but the part in hand is not the one on screen. */
+function WrongItem({ result, chosen }: { result: ScanResult; chosen: number | null }) {
+  const [open, setOpen] = useState(false)
+  const [note, setNote] = useState('')
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [message, setMessage] = useState<string | null>(null)
+  const material = result.materials[chosen ?? 0]
+
+  // A new lookup is a new question; the last report does not carry over.
+  useEffect(() => {
+    setOpen(false)
+    setNote('')
+    setState('idle')
+    setMessage(null)
+  }, [result])
+
+  async function send() {
+    setState('sending')
+    try {
+      const reply = await reportWrongItem({
+        code: result.query,
+        matched_by: result.matched_by,
+        cluster_id: material?.cluster_id ?? null,
+        item_id: material?.members[0]?.item_id ?? null,
+        cnmc: material?.cnmc ?? null,
+        note: note.trim() || undefined,
+      })
+      setState('sent')
+      setMessage(reply.note)
+    } catch (err) {
+      setState('failed')
+      setMessage(err instanceof ApiError ? err.message : 'The report could not be sent.')
+    }
+  }
+
+  if (state === 'sent') {
+    return (
+      <p role="status" className="text-sm text-muted">
+        Reported. {message}
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-2">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="h-11 text-sm text-muted underline underline-offset-4 hover:text-ink"
+        >
+          Wrong item? The part in hand is not this one
+        </button>
+      ) : (
+        <div className="card space-y-3 p-4">
+          <p className="text-sm">
+            Tell the steward what you are holding instead. The record is not changed by this;
+            the report goes on the ledger with the code and what it resolved to.
+          </p>
+          <Input
+            aria-label="What is in hand"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. the bin holds the 30 mm bore, the label says 25 mm"
+            className="h-11"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="primary" className="h-11" disabled={state === 'sending'} onClick={() => void send()}>
+              {state === 'sending' ? 'Sending…' : 'Report'}
+            </Button>
+            <Button variant="ghost" className="h-11" onClick={() => setOpen(false)}>
+              Never mind
+            </Button>
+            {state === 'failed' && <span className="text-sm text-danger">{message}</span>}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -721,11 +891,31 @@ function CameraScanner({
   onDecoded: (text: string) => void
 }) {
   const [state, setState] = useState<CameraState>('off')
+  // Dim stores: the back camera's light, where the browser lets a page turn
+  // it on (Chrome on Android does; iOS Safari does not, and shows no button).
+  const [torch, setTorch] = useState<'unknown' | 'off' | 'on' | 'none'>('unknown')
   const video = useRef<HTMLVideoElement>(null)
   const controls = useRef<{ stop: () => void } | null>(null)
   const supported =
     typeof navigator !== 'undefined' &&
     typeof navigator.mediaDevices?.getUserMedia === 'function'
+
+  const videoTrack = () => {
+    const stream = video.current?.srcObject as MediaStream | null | undefined
+    return stream && typeof stream.getVideoTracks === 'function' ? stream.getVideoTracks()[0] : undefined
+  }
+
+  const toggleTorch = async () => {
+    const track = videoTrack()
+    if (!track) return
+    const next = torch !== 'on'
+    try {
+      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })
+      setTorch(next ? 'on' : 'off')
+    } catch {
+      setTorch('none')
+    }
+  }
 
   const stop = useCallback(() => {
     controls.current?.stop()
@@ -762,6 +952,10 @@ function CameraScanner({
         }
         controls.current = c
         setState('on')
+        // Ask the track, once it is live, whether it has a light at all.
+        const track = videoTrack()
+        const caps = track && typeof track.getCapabilities === 'function' ? track.getCapabilities() : undefined
+        setTorch(caps && (caps as MediaTrackCapabilities & { torch?: boolean }).torch ? 'off' : 'none')
       } catch (err) {
         if (cancelled) return
         const name = err instanceof Error ? err.name : ''
@@ -829,6 +1023,16 @@ function CameraScanner({
             >
               Cancel
             </Button>
+            {state === 'on' && (torch === 'off' || torch === 'on') && (
+              <Button
+                variant={torch === 'on' ? 'primary' : 'secondary'}
+                className="h-11"
+                aria-pressed={torch === 'on'}
+                onClick={() => void toggleTorch()}
+              >
+                {torch === 'on' ? 'Torch on' : 'Torch'}
+              </Button>
+            )}
             <span className="text-sm text-muted">
               {state === 'starting' ? 'Starting the camera…' : 'Hold the code inside the frame.'}
             </span>

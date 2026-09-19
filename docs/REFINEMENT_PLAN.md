@@ -43,7 +43,7 @@ and at a desk.*
 | Search | improve · **done** | Sort by relevance, recent searches, "did you mean" from the abbreviation table | Half of real queries are misspelt abbreviations | 2 d |
 | Scan | add | Installable app (PWA) with the OCR engine cached; works with no signal, syncs later | Stores have no signal; the phone must still answer | 3 d |
 | Scan | add | Stock-count mode (scan, count, next); bin binding ("this bin holds this code") | The storekeeper's real daily job | 3 d |
-| Scan | improve | Torch toggle, scan history, a "wrong item?" report | Dim stores; mistakes need a path back | 1 d |
+| Scan | improve · **done** | Torch toggle, scan history, a "wrong item?" report | Dim stores; mistakes need a path back | 1 d |
 | Smart-Create | add | Barcode and part-number fields feeding the check; save a probe as a draft request | Most new-code requests start from a box in hand | 2 d |
 | Dashboards | add | Drill-down: every bar and tile opens the rows behind it; CSV and PDF export | An executive's next question is always "which ones" | 3 d |
 | Dashboards | improve | A steward's own-CPSE view; date scoping on the money sections | The same page must serve two readers | 2 d |
