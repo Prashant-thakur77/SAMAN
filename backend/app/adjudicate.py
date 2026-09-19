@@ -209,12 +209,29 @@ _PROMPT = """You are helping a materials reviewer at an Indian public-sector com
 
 Rewrite the assessment below as one plain sentence for the reviewer. Do not add
 any fact, number or attribute that is not already in the reasons. Do not change
-the recommendation. Do not add a greeting or a preamble.
+the recommendation. Do not add a greeting or a preamble. Answer with the
+sentence only.
 
+Example
+Recommendation: Refuse: an identity attribute differs.
+Reasons:
+- bore_mm: 25 mm vs 30 mm (identity-critical)
+- text similarity 0.91
+One sentence: The descriptions read alike, but the bore is 25 mm on one and 30 mm on
+the other, so these are different parts and should not be merged.
+
+Example
+Recommendation: Merge: anchored and consistent.
+Reasons:
+- same manufacturer part number 62052Z
+- every compared attribute agrees
+One sentence: Both rows carry part number 62052Z and every compared attribute agrees,
+so they are the same material.
+
+Now this one
 Recommendation: {headline}
 Reasons:
 {reasons}
-
 One sentence:"""
 
 
@@ -241,22 +258,27 @@ def _maybe_rephrase(result: Adjudication, _evidence: dict) -> None:
     try:
         candidate = _generate(prompt)
     except Exception as exc:
+        llm.record("adjudicate", "unavailable")
         result.prose_note = f"model unavailable ({type(exc).__name__})"
         return
 
     if not candidate:
+        llm.record("adjudicate", "empty")
         result.prose_note = "the model returned nothing"
         return
     invented = _numbers_in(candidate) - _numbers_in(" ".join(result.reasons))
     if invented:
+        llm.record("adjudicate", "invented_figure")
         result.prose_note = (
             f"the model introduced figures that were not in the evidence: "
             f"{sorted(invented)[:3]}"
         )
         return
     if len(candidate) > 400:
+        llm.record("adjudicate", "too_long")
         result.prose_note = "the model's answer was too long to be a rephrasing"
         return
 
+    llm.record("adjudicate", "accepted")
     result.summary = candidate
     result.prose_by = llm.provider()

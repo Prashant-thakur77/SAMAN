@@ -100,6 +100,41 @@ def forget() -> None:
     _remote_reachable.cache_clear()
 
 
+# --------------------------------------------------------------------------
+# What the model's wording is worth: counted, never assumed
+# --------------------------------------------------------------------------
+
+#: outcome counts per caller ("assistant", "copilot", "adjudicate"): how
+#: often the model's sentence passed the caller's guard, and why it did not.
+_outcomes: dict[str, dict[str, int]] = {}
+
+
+def record(caller: str, outcome: str) -> None:
+    bucket = _outcomes.setdefault(caller, {})
+    bucket[outcome] = bucket.get(outcome, 0) + 1
+
+
+def stats() -> dict:
+    """Acceptance per caller since the process started. `accepted` over the
+    total is the one number that says whether a smaller or larger model is
+    earning its place; the rest says why answers were thrown away."""
+    out = {}
+    for caller, counts in _outcomes.items():
+        total = sum(counts.values())
+        out[caller] = {
+            "total": total,
+            "accepted": counts.get("accepted", 0),
+            "acceptance": round(counts.get("accepted", 0) / total, 3) if total else None,
+            "by_outcome": dict(sorted(counts.items())),
+        }
+    kind = provider()
+    return {"provider": kind, "model": model_name() if kind != NONE else None, "callers": out}
+
+
+def reset_stats() -> None:
+    _outcomes.clear()
+
+
 def generate(
     prompt: str, *, temperature: float = 0.1, timeout: float = 20.0, max_tokens: int = 300
 ) -> str:
@@ -132,18 +167,7 @@ def chat(
 ) -> str:
     settings = get_settings()
     if settings.saman_llm_url:
-        response = httpx.post(
-            f"{settings.saman_llm_url.rstrip('/')}/chat/completions",
-            headers=_auth(settings.saman_llm_key or ""),
-            json={
-                "model": settings.saman_llm_model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "stream": False,
-            },
-            timeout=timeout,
-        )
+        response = _post_remote(settings, messages, temperature, max_tokens, timeout)
         response.raise_for_status()
         choices = response.json().get("choices") or []
         return ((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
@@ -159,3 +183,33 @@ def chat(
     )
     response.raise_for_status()
     return (response.json().get("message", {}).get("content") or "").strip()
+
+
+#: A free tier meters requests and tokens per minute. One wait, bounded, on a
+#: 429 is the difference between a demo that stutters and one that stops.
+RETRY_AFTER_CAP = 20.0
+
+
+def _post_remote(
+    settings, messages: list[dict], temperature: float, max_tokens: int, timeout: float
+):
+    import time
+
+    body = {
+        "model": settings.saman_llm_model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": False,
+    }
+    url = f"{settings.saman_llm_url.rstrip('/')}/chat/completions"
+    headers = _auth(settings.saman_llm_key or "")
+    response = httpx.post(url, headers=headers, json=body, timeout=timeout)
+    if response.status_code == 429:
+        try:
+            wait = float(response.headers.get("retry-after", "2"))
+        except ValueError:
+            wait = 2.0
+        time.sleep(min(max(wait, 0.5), RETRY_AFTER_CAP))
+        response = httpx.post(url, headers=headers, json=body, timeout=timeout)
+    return response

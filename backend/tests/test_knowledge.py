@@ -62,9 +62,12 @@ def model_up(monkeypatch):
         return _FakeResponse({"message": {"content": state["reply"]}})
 
     monkeypatch.setattr(httpx, "post", fake_post)
+    # Answers are memoised per question and model; each test starts clean.
+    knowledge.forget_answers()
     yield state
     config.get_settings.cache_clear()
     llm.forget()
+    knowledge.forget_answers()
 
 
 class TestGrounding:
@@ -138,3 +141,13 @@ class TestAssistantIntegration:
             assert reply.mode != "llm"
         finally:
             config.get_settings.cache_clear()
+
+
+class TestTheFigureGuardReadsSentences:
+    def test_a_trailing_full_stop_is_not_a_different_number(self):
+        # "F1" is a name, but the guard counts its digit too, on both sides alike.
+        assert knowledge._numbers("the score was 0.9775.") == {"0.9775"}
+        assert knowledge._numbers("1,823 pairs, 0.11 recall.") == {"1823", "0.11"}
+
+    def test_an_invented_figure_is_still_caught(self):
+        assert knowledge._numbers("recall 0.96") - knowledge._numbers("recall 0.960") == {"0.96"}

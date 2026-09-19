@@ -44,6 +44,8 @@ def suggestions() -> dict:
             "name": llm.model_name() if knowledge.available() else None,
             "remote": llm.provider() == llm.REMOTE,
             "grounded_on": [label for label, _ in knowledge.SOURCES],
+            # How often the model's words survived the guards in this process.
+            "stats": llm.stats(),
         },
     }
 

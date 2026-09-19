@@ -1,0 +1,39 @@
+# Questions the assistant should answer from the project's own documents, and
+# the words a correct answer must contain. Run with `python -m app.cli llm-eval`.
+#
+# This is how a model earns or loses its place: acceptance (the guards let the
+# answer through), correctness (the expected words are present), and latency,
+# measured the same way for the 3B local model, a 7B, or the remote one. The
+# expected words are facts from the README and KNOWN_GAPS, never opinions.
+- question: what check digit does the CNMC use, and why not Luhn?
+  expect: [damm]
+- question: how does SAMAN keep two different manufacturers' bearings apart?
+  expect: [equivalen]
+- question: why was the first-three-token blocking key replaced?
+  expect: ["0.11"]
+- question: how does splink compare with rapidfuzz on this data?
+  expect: [rapidfuzz]
+- question: what does the veto layer refuse on?
+  expect: [identity]
+- question: which language model runs locally and is it fine-tuned?
+  expect: [qwen]
+- question: what stops the model inventing a number?
+  expect: [figure, number]
+- question: how are prices of other CPSEs shown to a steward?
+  expect: [band]
+- question: what is restricted mode and what does it exchange?
+  expect: [bloom]
+- question: what happens to an open purchase order during migration?
+  expect: [held, hold]
+- question: how is the learned pairwise model trained and what does it decide?
+  expect: [never]
+- question: what does the scan screen resolve a code against?
+  expect: [part number, gtin]
+- question: SAMAN ka CNMC kaise banta hai?
+  expect: [cccc, family, check]
+- question: वीटो लेयर क्या करती है?
+  expect: [bore, attribute, identity]
+- question: what is not built yet with SAP?
+  expect: [live, sandbox, no sap]
+- question: what did the tier-1 engine measurement show about memory?
+  expect: [gb]

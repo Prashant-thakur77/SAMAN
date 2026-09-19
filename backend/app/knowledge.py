@@ -23,12 +23,16 @@ from pathlib import Path
 
 from . import llm
 from .config import REPO_ROOT
+from .normalize import apply_hindi_terms, expand_abbreviations, transliterate_devanagari
 
 #: Documents worth reading, in the order a reader would.
 SOURCES: tuple[tuple[str, Path], ...] = (
     ("README", REPO_ROOT / "README.md"),
     ("Known gaps", REPO_ROOT / "KNOWN_GAPS.md"),
     ("Build spec", REPO_ROOT / "SAMAN_CLAUDE_CODE_SPEC.md"),
+    ("SAP integration", REPO_ROOT / "docs" / "sap-integration.md"),
+    ("Roadmap", REPO_ROOT / "docs" / "ROADMAP.md"),
+    ("Refinement plan", REPO_ROOT / "docs" / "REFINEMENT_PLAN.md"),
 )
 #: Top hits handed to the model, each with its following paragraph. Small,
 #: so a 3B model stays on the point.
@@ -56,6 +60,8 @@ Answer the user's question using ONLY the passages provided. Rules:
 - SAMAN is the platform; the CNMC is the code it issues. Do not confuse them.
 - You cannot run queries or see live data. For questions about the data
   (counts, prices, which CPSE, stock), say the Copilot answers those.
+- Answer in the language the question was asked in: English, Hindi in
+  Devanagari, or Hinglish. Keep technical terms (CNMC, SAP, veto) as they are.
 """
 
 
@@ -139,7 +145,11 @@ def retrieve(question: str, k: int = TOP_K) -> list[tuple[Chunk, float]]:
     neighbour keeps the fact and its figure in the same context.
     """
     vectorizer, matrix = _index()
-    scores = (matrix @ vectorizer.transform([question]).T).toarray().ravel()
+    # The passages are English; a question may be Hindi, Hinglish or house
+    # abbreviations. Read it the way a description is read before searching,
+    # so "वाल्व" finds the valve passages and "BRG" the bearing ones.
+    readable = expand_abbreviations(transliterate_devanagari(apply_hindi_terms(question)))
+    scores = (matrix @ vectorizer.transform([f"{question} {readable}"]).T).toarray().ravel()
     order = [int(i) for i in scores.argsort()[::-1][:k] if scores[i] > 0.02]
     docs = corpus()
     picked: list[tuple[Chunk, float]] = []
@@ -163,7 +173,10 @@ def retrieve(question: str, k: int = TOP_K) -> list[tuple[Chunk, float]]:
 
 
 def _numbers(text: str) -> set[str]:
-    return set(re.findall(r"\d[\d,.]*", text))
+    """Every figure in the text, with thousands separators and a sentence's
+    trailing full stop removed, so "0.9775." at the end of the model's sentence
+    is the "0.9775" in the passage and not an invented number."""
+    return {m.replace(",", "").rstrip(".") for m in re.findall(r"\d[\d,.]*", text)}
 
 
 def _call_model(question: str, passages: list[tuple[Chunk, float]]) -> str:
@@ -186,29 +199,57 @@ def answer(question: str) -> Grounded | None:
 
     None means: no model, no relevant passages, the model declined, or the
     model's answer failed the checks. The caller falls back to its own words.
+    Answers are memoised per question and model for the life of the process:
+    the same question asked twice in a demo costs one model call, and a local
+    3B model's seven seconds happen once.
     """
     if not available():
         return None
+    key = (" ".join(question.lower().split()), llm.provider(), llm.model_name())
+    if key in _answers:
+        return _answers[key]
+    result = _answer(question)
+    if result is not None and not result.refused:
+        _answers[key] = result
+    return result
+
+
+_answers: dict[tuple[str, str, str], Grounded] = {}
+
+
+def forget_answers() -> None:
+    _answers.clear()
+
+
+def _answer(question: str) -> Grounded | None:
     passages = retrieve(question)
     if not passages:
+        llm.record("assistant", "no_passages")
         return None
     try:
         text = _call_model(question, passages)
     except Exception as exc:
+        llm.record("assistant", "unavailable")
         return Grounded(
-            "", mode="llm", note=f"local model unavailable ({type(exc).__name__})", refused=True
+            "", mode="llm", note=f"model unavailable ({type(exc).__name__})", refused=True
         )
 
-    if not text or DONT_KNOW.lower() in text.lower() or len(text) > MAX_ANSWER_CHARS:
+    if not text or DONT_KNOW.lower() in text.lower():
+        llm.record("assistant", "declined")
+        return None
+    if len(text) > MAX_ANSWER_CHARS:
+        llm.record("assistant", "too_long")
         return None
     context_text = " ".join(c.text for c, _ in passages)
     invented = _numbers(text) - _numbers(context_text) - _numbers(question)
     if invented:
+        llm.record("assistant", "invented_figure")
         return Grounded(
             "",
             note=f"the model introduced figures not in the documents: {sorted(invented)[:3]}",
             refused=True,
         )
+    llm.record("assistant", "accepted")
     sources = [
         {"source": c.source, "heading": c.heading, "score": round(s, 3)} for c, s in passages[:3]
     ]

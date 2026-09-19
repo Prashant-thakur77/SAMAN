@@ -684,14 +684,19 @@ def compose_with_llm(question: str, draft: str, rows: list[dict]) -> tuple[str, 
         candidate = llm.generate(prompt, temperature=0.2, timeout=20.0, max_tokens=300)
     except Exception as exc:
         # A local model being down must never cost the user their answer.
+        llm.record("copilot", "unavailable")
         return draft, f"model unavailable ({type(exc).__name__})"
 
     if not candidate:
+        llm.record("copilot", "empty")
         return draft, "the model returned nothing"
 
     invented = _numbers_in(candidate) - _numbers_in(draft)
     if invented:
+        llm.record("copilot", "invented_figure")
         return draft, f"the model introduced figures that were not computed: {sorted(invented)[:3]}"
     if len(candidate) > 600:
+        llm.record("copilot", "too_long")
         return draft, "the model's answer was too long to be a rephrasing"
+    llm.record("copilot", "accepted")
     return candidate, None
