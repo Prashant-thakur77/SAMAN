@@ -16,6 +16,7 @@ from .auth import require_user
 from .config import get_settings
 from .db import SessionLocal, init_db
 from .routers import (
+    abbreviations,
     admin,
     assistant,
     auth,
@@ -130,6 +131,7 @@ for signed_in_router in (
     scan.router,
     reports.router,
     autoissue.router,
+    abbreviations.router,
 ):
     app.include_router(signed_in_router, prefix="/api", dependencies=SIGNED_IN)
 

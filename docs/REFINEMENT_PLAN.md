@@ -66,12 +66,12 @@ descriptions, and let the system grow past eight classes.*
 | Data | add | A public corpus from GeM and CPPP tender documents (item descriptions only), a few thousand rows, run through the pipeline with measured precision | The one answer to "your data is synthetic" that a slide cannot give | 3 d |
 | Data | fix | Fifty real nameplate photographs in bad light; OCR score on them; repair rules tuned | 0.967 is on drawn plates and says so | 2 d |
 | Classes | add | Class-template drafting: from a class's rows, propose attributes, units, tolerances and roles for an expert to approve in a form | Eight classes do not cover a refinery; this is the step to fifty | 1 wk |
-| Classes | add | Steward-editable abbreviation dictionary per CPSE, versioned, audited | Every house style has words the taxonomy does not know | 3 d |
-| Matching | improve | Per-class thresholds swept on the tuning split; incremental reruns that touch only new rows and their neighbours | Bearings and chemicals do not share one T_HIGH; 200 new rows should not cost a 19-minute rerun | 1 wk |
+| Classes | add · **done** | Steward-editable abbreviation dictionary per CPSE, versioned, audited | Every house style has words the taxonomy does not know | 3 d |
+| Matching | improve · **incremental reruns done**; per-class sweep next | Per-class thresholds swept on the tuning split; incremental reruns that touch only new rows and their neighbours | Bearings and chemicals do not share one T_HIGH; 200 new rows should not cost a 19-minute rerun | 1 wk |
 | Matching | add | The language model as equivalence *proposer*, the spec's lowest-trust source: suggestions only, into the review queue, never a merge | Named in the spec; adds recall where rules stop | 3 d |
 | Matching | improve | Bundle MiniLM weights for an offline Tier 2 install option; measure against TF-IDF on the real corpus | Meaning similarity may win on real text; today it is unmeasured there | 2 d |
-| Learning | improve | Retrain on real reviewer labels only once they exceed the simulated ones; show the model's precision by class on the admin page | The learned model must be judged on people's decisions, not the generator's | 2 d |
-| Procurement | add | Vendor alias table and normalised vendor overlap; price-anomaly flags with the assumption shown | Overlap matches exact strings today | 3 d |
+| Learning | improve · **done** | Retrain on real reviewer labels only once they exceed the simulated ones; show the model's precision by class on the admin page | The learned model must be judged on people's decisions, not the generator's | 2 d |
+| Procurement | add · **alias table and normalised overlap done**; price-anomaly flags next | Vendor alias table and normalised vendor overlap; price-anomaly flags with the assumption shown | Overlap matches exact strings today | 3 d |
 | Languages | add | Hindi attribute words inside extraction; Odia and Tamil term tables | Plants write in their own language | 2 d |
 
 **Gate:** precision above 0.95 on the public corpus for two families,

@@ -1034,6 +1034,16 @@ twelve, twenty-four or thirty-six months of purchases, with the window and
 its line count stated; stock is a position, not a flow, and does not move
 with it.
 
+The built-in abbreviation table (198 rules) is ours; every CPSE's extracts
+carry words that are theirs. **House abbreviations** are taught from the
+Administration page (or `POST /api/abbreviations`): a token and what it reads
+as, for one CPSE or, if the registrar says so, for every catalogue. They are
+consulted before the built-in table, audited on the chain with what they
+replaced, retired rather than deleted, and a preview shows what a word changes
+before anyone commits to it. A steward teaches words for their own CPSE only.
+A new word applies to rows normalised after it was added; an incremental
+pipeline run applies it to the rest.
+
 ---
 
 ### Migrating the ERP, reversibly

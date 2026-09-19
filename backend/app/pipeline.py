@@ -117,8 +117,10 @@ def build_items(
     Resumable by construction: it only processes raw rows with no item yet, so a
     crashed run restarts where it stopped rather than from zero (spec §8A).
     """
+    from . import abbreviations
+
     stmt = (
-        select(RawItem.id, RawItem.description, RawItem.uom)
+        select(RawItem.id, RawItem.description, RawItem.uom, RawItem.cpse_id)
         .outerjoin(Item, Item.raw_item_id == RawItem.id)
         .where(Item.id.is_(None))
     )
@@ -128,9 +130,11 @@ def build_items(
     rows = db.execute(stmt).all()
     created = 0
     buffer: list[dict] = []
+    # The house dictionary per CPSE: theirs on top of the global rows.
+    house = {cpse_id: abbreviations.for_cpse(db, cpse_id) for cpse_id in {r[3] for r in rows}}
 
-    for raw_id, description, uom in rows:
-        norm = normalize_row(description or "", uom)
+    for raw_id, description, uom, cpse_id in rows:
+        norm = normalize_row(description or "", uom, house.get(cpse_id) or None)
         ex = extract(norm.norm_text)
 
         attrs = dict(ex.attrs)

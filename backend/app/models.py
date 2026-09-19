@@ -409,6 +409,28 @@ class MigrationChange(Base):
     state: Mapped[str] = mapped_column(String(16), default="planned")  # applied|held|rolled_back
 
 
+class Abbreviation(Base):
+    """A house abbreviation a steward taught the platform (§2D).
+
+    Every CPSE's extracts carry words the built-in table does not know:
+    "GSKT" is common, "SPWD" is one plant's. A row here expands a whole token
+    the way the built-in table does, for one CPSE (`cpse_id`) or for every
+    catalogue (`cpse_id` null), and is consulted before the built-in table.
+    Retired rows stay, inactive, so the chain and the history read whole.
+    """
+
+    __tablename__ = "abbreviation"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(32), index=True)
+    expansion: Mapped[str] = mapped_column(String(128))
+    cpse_id: Mapped[int | None] = mapped_column(ForeignKey("cpse.id"), nullable=True, index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    added_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
 class GoldenAttachment(Base):
     """A datasheet, drawing or photograph attached to a golden record (§6.6).
 

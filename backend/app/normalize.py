@@ -199,11 +199,13 @@ _MULTISPACE = re.compile(r"\s+")
 _NON_ALNUM = re.compile(r"[^A-Z0-9]")
 
 
-def expand_abbreviations(text: str) -> str:
+def expand_abbreviations(text: str, extra: dict[str, str] | None = None) -> str:
     """Expand known abbreviations on whole tokens only.
 
     Token-wise is the point: a substring rule would turn "SS316" into
-    "STAINLESS STEEL316".
+    "STAINLESS STEEL316". `extra` is a house dictionary (a CPSE's own
+    abbreviations, kept in the database) consulted before the built-in table,
+    so a steward's word for a thing wins over ours.
     """
     out: list[str] = []
     for token in text.split():
@@ -211,7 +213,10 @@ def expand_abbreviations(text: str) -> str:
         # "NOS." -> "NOS", but never strip the dot from "1.5"
         if key.endswith(".") and not key[:-1].replace(".", "").isdigit():
             key = key.rstrip(".")
-        out.append(ABBREVIATIONS.get(key, token))
+        if extra and key in extra:
+            out.append(extra[key])
+        else:
+            out.append(ABBREVIATIONS.get(key, token))
     return " ".join(out)
 
 
@@ -283,8 +288,11 @@ class NormalizedRow:
     pack_qty: float
 
 
-def normalize_row(description: str, uom: str | None = None) -> NormalizedRow:
-    """Normalize one catalogue row end to end."""
+def normalize_row(
+    description: str, uom: str | None = None, abbreviations: dict[str, str] | None = None
+) -> NormalizedRow:
+    """Normalize one catalogue row end to end. `abbreviations` is the house
+    dictionary for the row's CPSE (see `app.abbreviations`)."""
     lang = detect_lang(description or "")
 
     s = unicodedata.normalize("NFKC", description or "")
@@ -301,7 +309,7 @@ def normalize_row(description: str, uom: str | None = None) -> NormalizedRow:
     s = _SEPARATORS.sub(" ", s)
     s = _DANGLING_DASH.sub(" ", s)
     s = _MULTISPACE.sub(" ", s).strip()
-    s = expand_abbreviations(s)
+    s = expand_abbreviations(s, abbreviations)
     norm = _MULTISPACE.sub(" ", s).strip()
 
     return NormalizedRow(

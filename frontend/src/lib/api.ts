@@ -2089,3 +2089,30 @@ export const voidAttachment = (id: number, reason?: string) =>
     `/clusters/attachments/${id}${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`,
     { method: 'DELETE' },
   )
+
+// ---- the house abbreviation dictionary ----
+
+export type HouseWord = {
+  id: number
+  token: string
+  expansion: string
+  cpse: string | null
+  note: string | null
+  added_by: string
+  added_at: string
+  overrides_built_in: string | null
+}
+
+export type HouseWords = { built_in: number; house: HouseWord[]; note: string }
+
+export const getAbbreviations = (cpse?: string) =>
+  api.get<HouseWords>(`/abbreviations${cpse ? `?cpse=${encodeURIComponent(cpse)}` : ''}`)
+export const addAbbreviation = (body: { token: string; expansion: string; cpse_code?: string; note?: string }) =>
+  api.post<HouseWords & { added: number }>('/abbreviations', body)
+export const retireAbbreviation = (id: number) =>
+  request<{ retired: number }>(`/abbreviations/${id}`, { method: 'DELETE' })
+export const previewAbbreviations = (description: string, cpse_code?: string) =>
+  api.post<{ description: string; built_in_only: string; with_house_words: string; changed: boolean }>(
+    '/abbreviations/preview',
+    { description, cpse_code },
+  )
