@@ -7,8 +7,20 @@
 		reverse_proxy backend:8000
 	}
 
+	# Hashed assets may be cached for good, and a missing one is a 404: the
+	# app shell must never be served in an asset's place, or a browser holding
+	# yesterday's shell runs HTML as JavaScript and shows a white page.
+	handle /assets/* {
+		root * /srv/www
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
 	handle {
 		root * /srv/www
+		# The shell is always revalidated, so a redeploy is picked up on the
+		# next load rather than after a heuristic cache expiry.
+		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}

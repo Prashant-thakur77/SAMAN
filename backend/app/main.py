@@ -197,6 +197,11 @@ def _frontend_file(path: str) -> Path | None:
     candidate = (FRONTEND_DIR / path).resolve() if path else FRONTEND_DIR / "index.html"
     if candidate.is_relative_to(FRONTEND_DIR) and candidate.is_file():
         return candidate
+    # A hashed asset that no longer exists is a 404, never the shell: a browser
+    # holding yesterday's shell would otherwise run HTML as JavaScript and show
+    # a white page instead of reloading.
+    if path.startswith("assets/") or path.startswith("ocr/"):
+        return None
     index = FRONTEND_DIR / "index.html"
     return index if index.is_file() else None
 

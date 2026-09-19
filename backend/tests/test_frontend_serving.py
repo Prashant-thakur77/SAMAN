@@ -46,6 +46,12 @@ class TestServingTheFrontend:
         r = client.get("/api/no-such-endpoint")
         assert r.status_code == 404 and "<title>" not in r.text
 
+    def test_a_missing_asset_is_a_404_never_the_shell(self, client, frontend):
+        """A browser holding yesterday's shell asks for yesterday's bundle; the
+        answer must be a 404 it can recover from, not HTML it would execute."""
+        r = client.get("/assets/app-oldhash.js")
+        assert r.status_code == 404 and "<title>" not in r.text
+
     def test_the_api_still_answers(self, client, frontend):
         assert client.get("/api/health").status_code == 200
 
