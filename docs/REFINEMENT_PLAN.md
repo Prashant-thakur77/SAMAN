@@ -159,7 +159,7 @@ never a feeling.
 | Item | Status | The gate |
 |---|---|---|
 | Auto-retrain (P1) | done | Promotion only if not worse; audited |
-| Scheduled per-CPSE report | doing | Sent to the CPSE's contact; every figure computed; assumptions attached |
+| Scheduled per-CPSE report | done | Sent to the CPSE's contact; every figure computed; assumptions attached |
 | Auto-issue codes for clusters that pass every gate (anchored, all attributes agree, held-out precision above target for that class) | next | Registrar sets the policy per family; every issue audited; nothing issued for a class below target |
 | Nightly incremental pipeline over new rows | next | Runs record their stats; the dashboard shows the run id and time |
 | Re-evaluate the held-out snapshot after each run | done | Already recorded on the run; the dashboard says when |
@@ -169,9 +169,9 @@ never a feeling.
 
 | Item | Status | Why |
 |---|---|---|
-| One document per CPSE, computed from the database: catalogue size and coded share; duplicates inside their own catalogue with examples; duplicates shared with each other CPSE; pending reviews by band and decisions made; their quality scorecard row and the weakest rate; stock, dead stock, transfers where they are source or destination with only their side priced; joint tenders they are part of and the saving attributable to them at the stated capture; Smart-Create prevention by their users; a list of concrete next actions with the count behind each | doing | A steward should not have to open six screens to know what SAMAN found in their catalogue |
-| Delivery by e-mail when SMTP is configured; otherwise an `.eml` written to an outbox, so an offline installation and the demo still produce the artefact; every send on the audit chain | doing | Offline first, and a file a judge can open |
-| Preview and Send from the Admin page for any CPSE; a steward's own report from the Home page; a CLI and a weekly cron line | doing | On demand and on schedule |
+| One document per CPSE, computed from the database: catalogue size and coded share; duplicates inside their own catalogue with examples; duplicates shared with each other CPSE; pending reviews by band and decisions made; their quality scorecard row and the weakest rate; stock, dead stock, transfers where they are source or destination with only their side priced; joint tenders they are part of and the saving attributable to them at the stated capture; Smart-Create prevention by their users; a list of concrete next actions with the count behind each | done | A steward should not have to open six screens to know what SAMAN found in their catalogue |
+| Delivery by e-mail when SMTP is configured; otherwise an `.eml` written to an outbox, so an offline installation and the demo still produce the artefact; every send on the audit chain | done | Offline first, and a file a judge can open |
+| Preview and Send from the Admin page for any CPSE; a steward's own report from the Home page; a CLI and a weekly cron line | done | On demand and on schedule |
 | A ministry roll-up: the same report across CPSEs with per-CPSE attribution redacted to bands | next | The reader above the CPSE |
 
 ## Small add-ons judges ask about
