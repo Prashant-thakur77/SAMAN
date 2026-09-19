@@ -1405,7 +1405,15 @@ def seed_database(db: Session, profile: str = "demo", reset: bool = True) -> dic
 
     # --- organisations and users ---
     styles = CPSE_PROFILES[: conf["cpses"]]
-    db.execute(insert(Cpse), [{"code": s.code, "name": s.name} for s in styles])
+    # The address the catalogue report goes to: a placeholder domain, plainly
+    # not a real mailbox, until an administrator sets the real one.
+    db.execute(
+        insert(Cpse),
+        [
+            {"code": s.code, "name": s.name, "contact_email": f"materials@{s.code.lower()}.example"}
+            for s in styles
+        ],
+    )
     db.commit()
     cpse_ids = {c.code: c.id for c in db.execute(select(Cpse)).scalars()}
 

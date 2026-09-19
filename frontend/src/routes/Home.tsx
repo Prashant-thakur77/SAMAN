@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
+import { ReportCard } from '../components/ReportsPanel'
 import { CountUp, formatRupees } from '../components/charts/CountUp'
 import { Button } from '../components/primitives/Button'
 import { StatusChip } from '../components/primitives/Chip'
@@ -82,6 +83,10 @@ export default function Home() {
                 <Button variant="primary">Open the workbench</Button>
               </Link>
             </div>
+          )}
+
+          {user?.cpse_code && can('steward', 'approver', 'engineer') && (
+            <ReportCard cpse={user.cpse_code} />
           )}
 
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3">

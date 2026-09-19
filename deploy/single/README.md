@@ -58,3 +58,9 @@ rather the login page did not offer the accounts and print the shared password.
 language model through a free OpenAI-compatible API (Groq, Gemini); the health
 page then says the model is remote. Without them the assistant answers from
 the documents in template mode and says so.
+
+A free host has no mail relay, so the per-CPSE catalogue report's Send button
+writes an `.eml` into the container's `data/outbox/` (gone at the next
+restart) and says so in its reply. Set `SAMAN_SMTP_HOST`, `SAMAN_SMTP_USER`,
+`SAMAN_SMTP_PASSWORD` and `SAMAN_SMTP_FROM` to a relay you have and the same
+button mails it.

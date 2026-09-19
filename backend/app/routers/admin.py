@@ -158,17 +158,67 @@ def update_user(
 class CpseIn(BaseModel):
     code: str
     name: str
+    contact_email: str | None = None
+
+
+class CpsePatch(BaseModel):
+    name: str | None = None
+    contact_email: str | None = None
+
+
+def _clean_email(value: str | None) -> str | None:
+    """A plausible address or None; an empty string clears it."""
+    email = (value or "").strip().lower()
+    if not email:
+        return None
+    if "@" not in email or email.startswith("@") or email.endswith("@") or " " in email:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, f"{email!r} is not an email address."
+        )
+    return email
 
 
 @router.get("/cpses")
 def list_cpses(db: Session = Depends(get_db)) -> dict:
     rows = db.execute(
-        select(Cpse.code, Cpse.name, func.count(RawItem.id))
+        select(Cpse.code, Cpse.name, Cpse.contact_email, func.count(RawItem.id))
         .outerjoin(RawItem, RawItem.cpse_id == Cpse.id)
-        .group_by(Cpse.code, Cpse.name)
+        .group_by(Cpse.id)
         .order_by(Cpse.code)
     ).all()
-    return {"cpses": [{"code": c, "name": n, "items": i} for c, n, i in rows]}
+    return {
+        "cpses": [{"code": c, "name": n, "contact_email": e, "items": i} for c, n, e, i in rows]
+    }
+
+
+@router.patch("/cpses/{code}")
+def update_cpse(
+    code: str,
+    body: CpsePatch,
+    actor: Annotated[User, Depends(require_roles(*ADMIN_ROLES))],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Rename a CPSE or set the address its catalogue report is sent to."""
+    cpse = db.execute(select(Cpse).where(Cpse.code == code.upper())).scalar_one_or_none()
+    if cpse is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown CPSE {code!r}.")
+    before = {"name": cpse.name, "contact_email": cpse.contact_email}
+    if body.name is not None and body.name.strip():
+        cpse.name = body.name.strip()
+    if "contact_email" in body.model_fields_set:
+        cpse.contact_email = _clean_email(body.contact_email)
+    after = {"name": cpse.name, "contact_email": cpse.contact_email}
+    if after != before:
+        audit.record(
+            db,
+            action="cpse.update",
+            entity=f"cpse:{cpse.code}",
+            payload={"before": before, "after": after},
+            user=actor.email,
+            commit=False,
+        )
+    db.commit()
+    return {"code": cpse.code, "name": cpse.name, "contact_email": cpse.contact_email}
 
 
 @router.post("/cpses")
@@ -187,19 +237,21 @@ def create_cpse(
     if db.execute(select(Cpse).where(Cpse.code == code)).scalar_one_or_none():
         raise HTTPException(status.HTTP_409_CONFLICT, f"{code} is already registered.")
 
-    cpse = Cpse(code=code, name=body.name.strip() or code)
+    cpse = Cpse(
+        code=code, name=body.name.strip() or code, contact_email=_clean_email(body.contact_email)
+    )
     db.add(cpse)
     db.flush()
     audit.record(
         db,
         action="cpse.create",
         entity=f"cpse:{code}",
-        payload={"code": code, "name": cpse.name},
+        payload={"code": code, "name": cpse.name, "contact_email": cpse.contact_email},
         user=actor.email,
         commit=False,
     )
     db.commit()
-    return {"code": cpse.code, "name": cpse.name, "items": 0}
+    return {"code": cpse.code, "name": cpse.name, "contact_email": cpse.contact_email, "items": 0}
 
 
 @router.post("/settings/sovereign")

@@ -76,6 +76,14 @@ def init_db() -> None:
             with engine.begin() as conn:
                 conn.execute(text("DROP TABLE pair_label"))
     Base.metadata.create_all(bind=engine)
+    # `cpse.contact_email` arrived with the per-CPSE report; a database from
+    # before it gains the column in place, empty, and loses nothing.
+    inspector = inspect(engine)
+    if "cpse" in inspector.get_table_names():
+        columns = {c["name"] for c in inspector.get_columns("cpse")}
+        if "contact_email" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cpse ADD COLUMN contact_email VARCHAR(128)"))
 
 
 def reset_db() -> None:

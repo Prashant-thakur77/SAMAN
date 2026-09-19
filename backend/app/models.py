@@ -47,6 +47,9 @@ class Cpse(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(16), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(128))
+    #: Where the CPSE's catalogue report goes (`reports.deliver`). Optional:
+    #: a CPSE without one can still be previewed and sent to an address typed in.
+    contact_email: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     raw_items: Mapped[list[RawItem]] = relationship(back_populates="cpse")
 
