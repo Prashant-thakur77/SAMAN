@@ -125,10 +125,10 @@ compose`. No cloud service is required for anything.
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, **SQLite** (`data/app.db`, WAL) | ~30 tables, 22 routers under `/api`; pytest (≈1,270 tests), ruff |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2.0, **SQLite** (`data/app.db`, WAL) | ~35 tables, 24 routers under `/api`; pytest (≈1,300 tests), ruff |
 | Matching | rapidfuzz (Tier 1 fallback), **splink** (Fellegi–Sunter over DuckDB, Tier 1 primary when installed), scikit-learn TF-IDF char 3–5-grams + SVD(192) (Tier 2; sentence-transformers optional), pint (unit-aware comparison) | every optional engine degrades to a working fallback and `/api/health` says which is live |
 | Language model (optional) | local **Ollama** (`qwen2.5:3b` default, 7B preferred when present) or a remote OpenAI-compatible endpoint (`SAMAN_LLM_URL/KEY/MODEL`); otherwise a deterministic adjudicator | only rephrases evidence or answers from the project's documents; every figure it emits is checked against its sources; "sovereign mode" switches it off entirely |
-| Frontend | React 18, Vite 6, TypeScript, Tailwind (monochrome design tokens, two semantic tones), framer-motion, Recharts + hand-drawn SVG charts; no component library | vitest (135 tests); visual checks with Playwright (headless Chromium) |
+| Frontend | React 18, Vite 6, TypeScript, Tailwind (monochrome design tokens, two semantic tones), framer-motion, Recharts + hand-drawn SVG charts; no component library | vitest (137 tests); visual checks with Playwright (headless Chromium) |
 | On-device | tesseract.js (OCR in the browser), zxing (barcode/QR), Web Speech fallback | the phone's image never uploads |
 | Server-side optional | rapidocr (nameplate OCR), faster-whisper (speech in), piper (speech out) | `make deps-ocr / deps-stt / deps-tts` |
 | Deployment | `deploy/single/Dockerfile` (one image: uvicorn serves API + built UI + demo DB; `render.yaml` Blueprint), `deploy/` compose stack with Caddy (+ optional local Ollama profile), ngrok/cloudflared tunnels for laptop demos | Render free plan: 512 MB, 0.1 CPU; dashboards are memoised and warmed at start for it |
@@ -302,7 +302,7 @@ L1–L17 / P1–P6, automation, reports, small add-ons, each marked done/next),
 
 ## 9. Where it stands (September 2026)
 
-**Done and verified end to end** (backend ≈1,270 tests, frontend 135, all
+**Done and verified end to end** (backend ≈1,300 tests, frontend 137, all
 green; live on Render): everything in §2–§7 above. Recent work, in order:
 front door and security review; scan and labels; embedder persistence for the
 free host; learning loop with champion/challenger; per-CPSE reports;
@@ -314,15 +314,18 @@ description; scan history, torch, wrong-item report; Smart-Create barcode and
 drafts; dashboard drill-down, own-CPSE fold, purchase window; compare any two
 rows; assistant follow-ups and clickable sources; `.xlsx` onboarding with
 long-text join; auto-issue policy; ministry roll-up; dormant-code retirement
-suggestion.
+suggestion; `make e2e` (the five demo moves in a real browser); stock-count
+mode and bin binding on Scan; the Scan screen installable and working offline
+(counts queue on the device); attachments on golden records; incremental
+pipeline runs that keep every decision; vendors grouped by company and a
+Vendors tab; the interface in Hindi at a click; house abbreviations taught per
+CPSE; an install guide (`docs/INSTALL.md`).
 
-**Next, from the plan:** a stock-count mode and bin binding on Scan plus an
-installable offline PWA; incremental pipeline reruns; attachments on golden
-records; a Hindi interface toggle, loading states and an accessibility pass
-across the site; browser tests for the five demo moves; local 3B/7B rows for
-the model harness (`make llm-eval` with Ollama running); an install guide with
-hardware notes per model size; signed bundles between CPSE nodes; a vendor
-alias table; realised-savings tracking once post-consolidation POs exist.
+**Next, from the plan:** local 3B/7B rows for the model harness (`make
+llm-eval` with Ollama running); per-class threshold sweeps; price-anomaly
+flags; class-template drafting for new families; a public GeM/CPPP corpus to
+measure on real text; signed bundles between CPSE nodes; realised-savings
+tracking once post-consolidation POs exist; a screen-reader walkthrough.
 
 **Known limits worth saying out loud:** all data is synthetic (with full
 ground truth, which is what makes the metrics honest); no live SAP has been
