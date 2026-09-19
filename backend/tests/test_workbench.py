@@ -582,12 +582,16 @@ class TestBulkDecisions:
         db.expire_all()
         assert all(db.get(ReviewTask, i).state == "done" for i in ids)
         # One audit event per row, each with the shared reason.
-        events = db.execute(
-            select(AuditEvent).where(
-                AuditEvent.action == "decision.approve",
-                AuditEvent.entity.in_([f"review_task:{i}" for i in ids]),
+        events = (
+            db.execute(
+                select(AuditEvent).where(
+                    AuditEvent.action == "decision.approve",
+                    AuditEvent.entity.in_([f"review_task:{i}" for i in ids]),
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(events) == len(ids)
         assert all('"policy confirmation"' in e.payload_json for e in events)
 
@@ -678,12 +682,16 @@ class TestUndo:
             == 0
         )
         # The chain remembers both.
-        undo = db.execute(
-            select(AuditEvent).where(
-                AuditEvent.action == "decision.undo",
-                AuditEvent.entity == f"review_task:{task.id}",
+        undo = (
+            db.execute(
+                select(AuditEvent).where(
+                    AuditEvent.action == "decision.undo",
+                    AuditEvent.entity == f"review_task:{task.id}",
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         assert undo is not None and '"after_seconds"' in undo.payload_json
 
     def test_an_approve_that_merged_is_unmerged(self, client, db, pipeline_run):
@@ -728,7 +736,9 @@ class TestUndo:
         if task is None:
             pytest.skip("no pending task")
         client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
-        decided = client.post("/api/decisions", json={"task_id": task.id, "action": "reject"}).json()
+        decided = client.post(
+            "/api/decisions", json={"task_id": task.id, "action": "reject"}
+        ).json()
         client.post("/api/auth/login", json={"email": "approver@min.gov.in", "password": "demo"})
         assert client.post(f"/api/decisions/{decided['decision_id']}/undo").status_code == 403
 
@@ -754,3 +764,32 @@ class TestUndo:
         did = decided.json()["decision_id"]
         assert as_steward.post(f"/api/decisions/{did}/undo").status_code == 200
         assert as_steward.post(f"/api/decisions/{did}/undo").status_code == 404
+
+
+class TestCompareAnyTwoRows:
+    def test_two_rows_are_scored_like_the_pipeline_scores_them(self, as_viewer, db, pipeline_run):
+        from app.models import Pair
+
+        pair = db.execute(select(Pair).where(Pair.verdict == "distinct").limit(1)).scalar_one()
+        body = as_viewer.get(f"/api/compare?a={pair.item_a}&b={pair.item_b}").json()
+        assert body["verdict"] == pair.verdict
+        assert body["pipeline"] == {
+            "paired": True,
+            "verdict": pair.verdict,
+            "pair_id": pair.id,
+            "same_cluster": False,
+        }
+        assert body["why"] and body["attribute_diff"] and body["tier_scores"]
+        assert [i["item_id"] for i in body["items"]] == [pair.item_a, pair.item_b]
+
+    def test_rows_the_pipeline_never_paired_still_compare(self, as_viewer, db, pipeline_run):
+        from app.models import Item
+
+        ids = db.execute(select(Item.id).order_by(Item.id).limit(2)).scalars().all()
+        body = as_viewer.get(f"/api/compare?a={ids[0]}&b={ids[1]}").json()
+        assert body["verdict"] in ("duplicate", "distinct", "conflict", "review")
+        assert "Nothing was stored" in body["note"]
+
+    def test_the_same_row_twice_is_refused(self, as_viewer, pipeline_run):
+        assert as_viewer.get("/api/compare?a=1&b=1").status_code == 422
+        assert as_viewer.get("/api/compare?a=1&b=999999999").status_code == 404

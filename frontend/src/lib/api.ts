@@ -360,6 +360,27 @@ export const simulateLabels = (n: number) =>
   api.post<LearnStatus & { simulated: { added: number } }>('/learn/simulate', { n })
 export const CORPUS_URL = '/api/learn/corpus'
 
+/** Any two rows, scored now by the pipeline's matcher; nothing stored. */
+export type Comparison = {
+  items: [ItemCard, ItemCard]
+  verdict: string
+  band: 'high' | 'grey' | 'low'
+  confidence: number
+  tier_scores: TierScores
+  veto: TaskCard['veto']
+  refused_because: string[]
+  equivalence: TaskCard['equivalence']
+  attribute_diff: AttrDiff[]
+  agreement: number | null
+  why: string
+  adjudication: NonNullable<TaskCard['adjudication']>
+  pipeline: { paired: boolean; verdict: string | null; pair_id: number | null; same_cluster: boolean }
+  note: string
+}
+
+export const compareItems = (a: number, b: number) =>
+  api.get<Comparison>(`/compare?a=${a}&b=${b}`)
+
 export type DecisionOutcome = {
   action: string
   decision_id: number

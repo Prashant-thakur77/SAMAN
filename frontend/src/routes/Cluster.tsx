@@ -28,6 +28,8 @@ export default function Cluster() {
   const [detail, setDetail] = useState<ClusterDetail | null>(null)
   const [draft, setDraft] = useState('')
   const [mergeSource, setMergeSource] = useState('')
+  // Two members ticked for a side-by-side comparison; the newest two win.
+  const [picked, setPicked] = useState<number[]>([])
   const [message, setMessage] = useState<{ tone: 'ok' | 'danger'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const { user, can } = useSession()
@@ -219,6 +221,22 @@ export default function Cluster() {
             </p>
           )}
         </div>
+        {detail.member_count > 1 && (
+          <p className="text-xs text-muted">
+            Tick two members to see them side by side, scored by the matcher.
+            {picked.length === 2 && (
+              <>
+                {' '}
+                <Link
+                  to={`/compare?a=${picked[0]}&b=${picked[1]}`}
+                  className="font-medium text-ink underline underline-offset-4"
+                >
+                  Compare {picked[0]} and {picked[1]} →
+                </Link>
+              </>
+            )}
+          </p>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           {detail.members.map((member) => {
             const delta = detail.standardization_delta.find(
@@ -226,6 +244,22 @@ export default function Cluster() {
             )
             return (
               <div key={member.item_id} className="space-y-2">
+                {detail.member_count > 1 && (
+                  <label className="flex items-center gap-2 px-1 text-xs text-muted">
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(member.item_id)}
+                      onChange={(e) =>
+                        setPicked((prev) =>
+                          e.target.checked
+                            ? [...prev.filter((id) => id !== member.item_id), member.item_id].slice(-2)
+                            : prev.filter((id) => id !== member.item_id),
+                        )
+                      }
+                    />
+                    compare
+                  </label>
+                )}
                 <ItemPanel item={member} />
                 {delta && !delta.unchanged && (
                   <p className="px-1 text-xs text-muted">

@@ -665,3 +665,116 @@ def get_item(
         },
         "visibility": scope.as_dict(),
     }
+
+
+@router.get("/compare")
+def compare_items(
+    a: int,
+    b: int,
+    _user: Annotated[User, Depends(require_user)],
+    db: Session = Depends(get_db),
+) -> dict:
+    """Any two rows, side by side, scored by the same matcher the pipeline
+    uses (§6.5). Nothing is stored and nothing is decided: an approver who
+    asks "are these the same?" about two rows the pipeline never paired gets
+    the tier strip, the attribute diff, the veto and the one-line why, and
+    then makes up their own mind on the cluster page."""
+    if a == b:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick two different rows.")
+    from ..embed import unpack
+    from ..match import MatchCandidate, match_pair
+
+    def candidate(item_id: int) -> MatchCandidate:
+        row = db.execute(
+            select(
+                Item.id,
+                Item.class_code,
+                Item.class_confidence,
+                Item.norm_text,
+                Item.norm_hash,
+                Item.mpn_norm,
+                Item.gtin,
+                Item.attrs_json,
+                Item.embed_vector,
+            ).where(Item.id == item_id)
+        ).first()
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"No item {item_id}.")
+        return MatchCandidate(
+            id=row[0],
+            class_code=row[1],
+            class_confidence=row[2] or 0.0,
+            norm_text=row[3] or "",
+            norm_hash=row[4] or "",
+            mpn_norm=row[5],
+            gtin=row[6],
+            attrs=json.loads(row[7] or "{}"),
+            vector=unpack(row[8]) if row[8] else None,
+        )
+
+    result = match_pair(candidate(a), candidate(b))
+    attributes = result.evidence.get("attributes", {})
+    said = adjudicate(
+        result.evidence,
+        result.tier_scores,
+        result.confidence,
+        result.verdict,
+        result.veto,
+        rephrase=False,
+    )
+    # The pipeline's own verdict on this pair, if it ever scored it.
+    stored = (
+        db.execute(
+            select(Pair).where(
+                ((Pair.item_a == a) & (Pair.item_b == b))
+                | ((Pair.item_a == b) & (Pair.item_b == a))
+            )
+        )
+        .scalars()
+        .first()
+    )
+    same_cluster = (
+        len(
+            {
+                db.execute(
+                    select(ClusterMember.cluster_id).where(ClusterMember.item_id == i)
+                ).scalar_one_or_none()
+                for i in (a, b)
+            }
+        )
+        == 1
+    )
+    return {
+        "items": [_item_card(db, a), _item_card(db, b)],
+        "verdict": result.verdict,
+        "band": result.band,
+        "confidence": result.confidence,
+        "tier_scores": result.tier_scores,
+        "veto": result.veto,
+        "refused_because": (
+            [f"{v['attr']}: {v['reason']}" for v in result.veto["vetoed_by"]] if result.veto else []
+        ),
+        "equivalence": result.equivalence,
+        "attribute_diff": [
+            {
+                "attr": e["attr"],
+                "role": e["role"],
+                "a": e["a"],
+                "b": e["b"],
+                "result": e["result"],
+                "detail": e["detail"],
+                "agrees": e["result"] in ("match", "in_band"),
+            }
+            for e in attributes.get("per_attr", [])
+        ],
+        "agreement": attributes.get("agreement"),
+        "why": said.summary,
+        "adjudication": said.as_dict(),
+        "pipeline": {
+            "paired": stored is not None,
+            "verdict": stored.verdict if stored else None,
+            "pair_id": stored.id if stored else None,
+            "same_cluster": same_cluster,
+        },
+        "note": "Scored now, by the same matcher as the pipeline. Nothing was stored or decided.",
+    }

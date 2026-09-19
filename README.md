@@ -889,6 +889,14 @@ on screen are recorded with the decision and shown on the executive
 dashboard as a median and a 90th percentile, the first number a pilot is
 judged on.
 
+Approvers ask about pairs the pipeline never chose: two rows in one cluster
+that look wrong together, two in different clusters that look the same.
+**Compare** (`/compare?a=&b=`, reached by ticking two members on a cluster
+page or from an item's duplicates) scores any two rows now, with the same
+matcher, and shows the same tier strip, attribute diff, veto and one-line why,
+together with what the pipeline itself said about the pair, if it ever scored
+it. Nothing is stored or decided there.
+
 Every mutation appends to a hash-chained ledger whose hash covers the event's
 own sequence number, so the chain detects **reordering as well as tampering**,
 and `GET /api/audit/verify` reports the sequence number of the first break.

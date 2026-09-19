@@ -235,7 +235,15 @@ export default function Item() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {detail.duplicates.map((item) => (
-              <ItemPanel key={item.item_id} item={item} />
+              <div key={item.item_id} className="space-y-1">
+                <ItemPanel item={item} />
+                <Link
+                  to={`/compare?a=${detail.item_id}&b=${item.item_id}`}
+                  className="inline-block px-1 text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+                >
+                  Compare side by side →
+                </Link>
+              </div>
             ))}
           </div>
         )}

@@ -10,6 +10,7 @@ import { Shell } from './components/Shell'
 import Admin from './routes/Admin'
 import Audit from './routes/Audit'
 import Cluster from './routes/Cluster'
+import Compare from './routes/Compare'
 import Copilot from './routes/Copilot'
 // Recharts is ~200 kB and only two screens need it, so the dashboards are
 // split out of the initial bundle (spec §9: keep the bundle lean).
@@ -40,6 +41,7 @@ const SHELL_ROUTES = [
   { path: '/workbench', element: <Workbench /> },
   { path: '/substitutes', element: <Substitutes /> },
   { path: '/clusters/:id', element: <Cluster /> },
+  { path: '/compare', element: <Compare /> },
   { path: '/dashboard/executive', element: <DashExecutive /> },
   { path: '/dashboard/opportunity', element: <DashOpportunity /> },
   { path: '/copilot', element: <Copilot /> },
