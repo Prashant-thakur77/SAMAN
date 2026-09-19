@@ -1012,7 +1012,10 @@ def _answer(
     #    the database is not opened for a visitor who has not signed in. The
     #    documents still are (step 5), since they are public.
     if not signed_in:
-        grounded = knowledge.answer(question)
+        # A data-shaped question never reaches the model either: the documents
+        # quote example figures, and a visitor must not be told one of those
+        # as if it were an answer about the live estate.
+        grounded = None if _looks_like_data_question(text) else knowledge.answer(question)
         if grounded and grounded.text:
             return Reply("answer", grounded.text, mode="llm", matched={"sources": grounded.sources})
         return Reply(

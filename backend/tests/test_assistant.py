@@ -184,14 +184,18 @@ class TestAVisitorBeforeSignIn:
         body = client.post("/api/assistant/query", json={"question": "open the front page"}).json()
         assert body["action"] is None or not body["action"]["to"].startswith("/login")
 
-    def test_a_data_question_is_not_asked_of_the_database(self, client, pipeline_run, monkeypatch):
+    def test_a_data_question_is_not_asked_of_the_database_nor_the_model(
+        self, client, pipeline_run, monkeypatch
+    ):
         from app import assistant, copilot
 
         def never(*_a, **_k):
-            raise AssertionError("the Copilot must not run for a visitor")
+            raise AssertionError(
+                "neither the Copilot nor the model may run for a visitor's data question"
+            )
 
         monkeypatch.setattr(copilot, "answer", never)
-        monkeypatch.setattr(assistant.knowledge, "answer", lambda _q: None)
+        monkeypatch.setattr(assistant.knowledge, "answer", never)
         body = client.post(
             "/api/assistant/query", json={"question": "how many duplicates were found?"}
         ).json()
