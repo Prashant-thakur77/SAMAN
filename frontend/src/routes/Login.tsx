@@ -2,6 +2,7 @@ import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
+import { Assistant } from '../components/Assistant'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { Field, Input } from '../components/primitives/Field'
@@ -255,6 +256,10 @@ export default function Login() {
           SIH 2026 · SIH26099 · Ministry of Petroleum &amp; Natural Gas
         </p>
       </footer>
+
+      {/* The assistant meets people here too. Ask it to open a screen and it
+          says to sign in first; once signed in, it takes you there. */}
+      <Assistant />
     </div>
   )
 }

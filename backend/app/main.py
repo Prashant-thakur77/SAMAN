@@ -92,15 +92,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# The front door. Three routers answer without a session: the health page,
-# sign-in itself, and the empty-database bootstrap (which refuses once anyone
-# exists). Everything else is behind a session, whatever the individual
+# The front door. Four routers answer without a session: the health page,
+# sign-in itself, the empty-database bootstrap (which refuses once anyone
+# exists) and the assistant, which answers a visitor differently. Everything
+# else is behind a session, whatever the individual
 # endpoint says: the roles an endpoint names decide *which* signed-in user may
 # call it, never whether a stranger may. A catalogue is a CPSE's commercial
 # record, and even the aggregate dashboards are a ministry's, not the public's.
 app.include_router(health.router, prefix="/api")
 app.include_router(bootstrap.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+# The assistant meets visitors on the front page: its query and suggestions
+# answer without a session (and answer differently, see assistant.answer);
+# its speech endpoints carry their own session dependency.
+app.include_router(assistant.router, prefix="/api")
 
 SIGNED_IN = [Depends(require_user)]
 for signed_in_router in (
@@ -118,7 +123,6 @@ for signed_in_router in (
     migration.router,
     smart_create.router,
     pprl.router,
-    assistant.router,
     learn.router,
     substitutes.router,
     scan.router,

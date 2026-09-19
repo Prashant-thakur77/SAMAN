@@ -167,3 +167,48 @@ class TestEndpoint:
     def test_overlong_input_is_rejected(self, as_viewer):
         response = as_viewer.post("/api/assistant/query", json={"question": "x" * 501})
         assert response.status_code == 422
+
+
+class TestAVisitorBeforeSignIn:
+    """The assistant stands on the front page and the sign-in page. It explains
+    the system to anyone; a request to go inside is answered with the sign-in
+    page, carrying the destination; the database is never opened."""
+
+    def test_a_request_to_go_inside_is_answered_with_sign_in_first(self, client, pipeline_run):
+        body = client.post("/api/assistant/query", json={"question": "open the workbench"}).json()
+        assert body["signed_in"] is False
+        assert body["action"]["to"] == "/login" and body["action"]["then"] == "/workbench"
+        assert "Sign in" in body["action"]["label"] and "Sign in" in body["answer"]
+
+    def test_the_front_page_is_still_open_to_a_visitor(self, client, pipeline_run):
+        body = client.post("/api/assistant/query", json={"question": "open the front page"}).json()
+        assert body["action"] is None or not body["action"]["to"].startswith("/login")
+
+    def test_a_data_question_is_not_asked_of_the_database(self, client, pipeline_run, monkeypatch):
+        from app import assistant, copilot
+
+        def never(*_a, **_k):
+            raise AssertionError("the Copilot must not run for a visitor")
+
+        monkeypatch.setattr(copilot, "answer", never)
+        monkeypatch.setattr(assistant.knowledge, "answer", lambda _q: None)
+        body = client.post(
+            "/api/assistant/query", json={"question": "how many duplicates were found?"}
+        ).json()
+        assert body["rows"] == [] and body["sql"] is None
+        assert body["action"]["to"] == "/login" and body["action"]["then"] == "/copilot"
+        assert "Sign in" in body["answer"]
+
+    def test_the_system_is_explained_to_anyone(self, client, pipeline_run):
+        body = client.post("/api/assistant/query", json={"question": "what is a CNMC?"}).json()
+        assert body["kind"] == "answer" and "CNMC" in body["answer"]
+
+    def test_once_signed_in_the_same_request_opens_the_screen(self, as_viewer, pipeline_run):
+        body = as_viewer.post(
+            "/api/assistant/query", json={"question": "open the workbench"}
+        ).json()
+        assert body["signed_in"] is True and body["action"]["to"] == "/workbench"
+        assert "then" not in body["action"]
+
+    def test_speech_stays_behind_a_session(self, client, pipeline_run):
+        assert client.post("/api/assistant/speak", json={"text": "hi"}).status_code == 401

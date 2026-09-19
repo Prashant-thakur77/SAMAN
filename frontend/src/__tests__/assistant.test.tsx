@@ -20,7 +20,13 @@ const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true }
 
 function WhereAmI() {
   const location = useLocation()
-  return <p data-testid="where">{location.pathname + location.search}</p>
+  const from = (location.state as { from?: string } | null)?.from
+  return (
+    <p data-testid="where">
+      {location.pathname + location.search}
+      {from ? ` (then ${from})` : ''}
+    </p>
+  )
 }
 
 function renderAssistant(start = '/') {
@@ -77,6 +83,26 @@ describe('the assistant', () => {
     // The current path travels with the question, so "open the workbench"
     // from the workbench can be answered rather than performed.
     expect(askAssistant).toHaveBeenCalledWith('Take me to the workbench', '/')
+  })
+
+  it('sends a visitor to sign in first, carrying the screen they asked for', async () => {
+    // Before sign-in the API answers a request to go inside with the sign-in
+    // page and the destination; the widget hands both to the router, and the
+    // sign-in page returns there afterwards.
+    askAssistant.mockResolvedValue({
+      kind: 'navigate',
+      answer: 'Workbench is inside the application. Sign in first and I will open it for you.',
+      action: { type: 'navigate', to: '/login', then: '/workbench', label: 'Sign in to open Workbench' },
+      citations: [],
+      suggestions: [],
+      mode: 'deterministic',
+    })
+    renderAssistant('/welcome')
+    open()
+    fireEvent.click(screen.getByRole('button', { name: /take me to the workbench/i }))
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('/login (then /workbench)'),
+    )
   })
 
   it('offers the screen for an explanatory answer instead of jumping', async () => {

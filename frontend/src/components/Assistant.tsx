@@ -8,6 +8,7 @@ import {
   getVoice,
   speakText,
   transcribeAudio,
+  type AssistantAction,
   type AssistantReply,
 } from '../lib/api'
 import { cn } from '../lib/cn'
@@ -285,6 +286,10 @@ export function Assistant() {
   const launcherRef = useRef<HTMLButtonElement>(null)
   const counter = useRef(initial.turns.reduce((max, t) => Math.max(max, t.id), 0))
   const navigate = useNavigate()
+  // A visitor's action carries the screen to open after sign-in; the
+  // sign-in page reads it from the router state and returns there.
+  const go = (action: AssistantAction) =>
+    action.then ? navigate(action.to, { state: { from: action.then } }) : navigate(action.to)
   const location = useLocation()
   const reduce = useReducedMotion() ?? false
 
@@ -502,7 +507,7 @@ export function Assistant() {
         // A navigation answer is performed, not described. The card stays so
         // the person can see what happened and come back.
         if (reply.kind === 'navigate' && reply.action?.type === 'navigate') {
-          navigate(reply.action.to)
+          go(reply.action)
         }
       } catch (err) {
         pushError(
@@ -930,7 +935,7 @@ export function Assistant() {
                       <button
                         type="button"
                         onClick={() => {
-                          navigate(turn.reply!.action!.to)
+                          go(turn.reply!.action!)
                           setOpen(false)
                         }}
                         className="mt-2 inline-flex items-center gap-1 border-b border-ink text-xs font-medium"

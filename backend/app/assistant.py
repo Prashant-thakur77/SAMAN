@@ -872,8 +872,63 @@ def _looks_like_data_question(text: str) -> bool:
     )
 
 
-def answer(db: Session, question: str, scope: Scope, current_path: str | None = None) -> Reply:
-    """Route one utterance. The order is navigation, knowledge, then the Copilot."""
+#: Where a visitor may be taken without a session: the front page and sign-in.
+PUBLIC_PATHS = ("/welcome", "/login")
+
+SIGN_IN_FOR_DATA = (
+    "That is a question about the material data, which needs a signed-in session. "
+    "Sign in and ask me again; I will hand it to the Copilot."
+)
+
+
+def answer(
+    db: Session,
+    question: str,
+    scope: Scope,
+    current_path: str | None = None,
+    signed_in: bool = True,
+) -> Reply:
+    """Route one utterance. The order is navigation, knowledge, then the Copilot.
+
+    A visitor who has not signed in gets the same assistant on the front page
+    and the sign-in page, with two differences: a request to go somewhere
+    inside the application is answered with the sign-in page first, carrying
+    the destination so sign-in lands there; and a question about the data is
+    not asked of the database at all. Explanations of the system, which are
+    the public documents, are answered for anyone.
+    """
+    reply = _answer(db, question, scope, current_path, signed_in)
+    if signed_in:
+        return reply
+    return _for_a_visitor(reply)
+
+
+def _for_a_visitor(reply: Reply) -> Reply:
+    """A signed-out visitor's version of a reply."""
+    action = reply.action
+    if action and action.get("type") == "navigate":
+        to = str(action.get("to") or "")
+        inside = not any(to == p or to.startswith(p + "#") for p in PUBLIC_PATHS)
+        if inside:
+            label = action.get("label") or "Open"
+            screen = label[5:] if label.startswith("Open ") else label
+            reply.action = {
+                "type": "navigate",
+                "to": "/login",
+                "then": to,
+                "label": f"Sign in to open {screen}",
+            }
+            if reply.kind == "navigate":
+                reply.answer = (
+                    f"{screen} is inside the application. Sign in first and I will open it "
+                    "for you."
+                )
+    return reply
+
+
+def _answer(
+    db: Session, question: str, scope: Scope, current_path: str | None, signed_in: bool
+) -> Reply:
     question = (question or "").strip()
     if not question:
         return Reply(
@@ -953,7 +1008,19 @@ def answer(db: Session, question: str, scope: Scope, current_path: str | None = 
         action = _navigate(topic.link, topic.link_label) if topic.link else None
         return Reply("answer", topic.answer, action=action, matched={"topic": topic.key})
 
-    # 4. Everything else is a question about the data: the Copilot's job.
+    # 4. Everything else is a question about the data: the Copilot's job, and
+    #    the database is not opened for a visitor who has not signed in. The
+    #    documents still are (step 5), since they are public.
+    if not signed_in:
+        grounded = knowledge.answer(question)
+        if grounded and grounded.text:
+            return Reply("answer", grounded.text, mode="llm", matched={"sources": grounded.sources})
+        return Reply(
+            "answer",
+            SIGN_IN_FOR_DATA,
+            action={"type": "navigate", "to": "/login", "then": "/copilot", "label": "Sign in"},
+            matched={"topic": "sign_in"},
+        )
     result = copilot.answer(db, question, scope)
     if result.refused:
         return Reply("refusal", result.text, mode="refusal")

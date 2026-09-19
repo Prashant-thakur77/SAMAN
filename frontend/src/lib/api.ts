@@ -1424,7 +1424,13 @@ export const loadDemoData = () =>
   api.post<{ started: boolean; profile: string; note: string }>('/bootstrap/demo-data', {})
 
 // ---- the floating assistant ----
-export type AssistantAction = { type: 'navigate'; to: string; label: string }
+export type AssistantAction = {
+  type: 'navigate'
+  to: string
+  label: string
+  /** For a visitor: the screen to open once they have signed in. */
+  then?: string
+}
 export type AssistantCitation = {
   item_id?: number
   cluster_id?: number

@@ -1,4 +1,11 @@
-"""POST /api/assistant/query — the floating site assistant."""
+"""POST /api/assistant/query — the floating site assistant.
+
+The assistant is the one part of the application a visitor meets before
+signing in: it stands on the front page and the sign-in page, explains the
+system from its documents, and answers a request to go inside with the
+sign-in page first. The database is never opened for a visitor (see
+`assistant.answer`), and the speech engines stay behind a session.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .. import assistant, knowledge, llm, stt, tts
-from ..auth import current_user_optional
+from ..auth import current_user_optional, require_user
 from ..capabilities import detect
 from ..db import get_db
 from ..models import User
@@ -53,9 +60,12 @@ def query(
     restricted one; the Copilot path applies it exactly as /api/copilot does.
     """
     scope = scope_for(user)
-    reply = assistant.answer(db, body.question, scope, current_path=body.path)
+    reply = assistant.answer(
+        db, body.question, scope, current_path=body.path, signed_in=user is not None
+    )
     payload = reply.as_dict()
     payload["scope"] = scope.as_dict()
+    payload["signed_in"] = user is not None
     return payload
 
 
@@ -104,6 +114,7 @@ def voice() -> dict:
 
 @router.post("/transcribe")
 async def transcribe(
+    user: Annotated[User, Depends(require_user)],
     audio: UploadFile = File(...),
     language: str | None = Form(default=None),
 ) -> dict:
@@ -125,7 +136,7 @@ class Speak(BaseModel):
 
 
 @router.post("/speak")
-def speak(body: Speak) -> Response:
+def speak(body: Speak, user: Annotated[User, Depends(require_user)]) -> Response:
     """One reply, as PCM WAV, synthesised locally. 503 when the engine is absent."""
     if not tts.available():
         raise HTTPException(

@@ -8,7 +8,6 @@ import { PeacockFeather } from '../components/art/PeacockFeather'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Button } from '../components/primitives/Button'
 import { cn } from '../lib/cn'
-import { useSession } from '../lib/session'
 import { EASE, listItemVariants, listVariants } from '../lib/motion'
 
 /**
@@ -615,7 +614,6 @@ function Eyebrow({ children }: { children: ReactNode }) {
 
 export default function Landing() {
   const reduce = useReducedMotion() ?? false
-  const { user } = useSession()
   const [active, setActive] = useState<string>('')
 
   // The section nearest the top of the viewport owns the nav indicator, so it
@@ -1051,10 +1049,10 @@ export default function Landing() {
       </footer>
 
       {/* Inside `.landing`, so the widget takes the warm palette here and the
-          monochrome one everywhere else. Only once signed in: the assistant
-          walks people into the application, and the front page is the one
-          screen a stranger may stand on. */}
-      {user && <Assistant />}
+          monochrome one everywhere else. For a visitor too: the API answers a
+          visitor with the documents and, for anything inside, with sign-in
+          first, carrying the destination. */}
+      <Assistant />
     </div>
   )
 }

@@ -18,6 +18,11 @@ PUBLIC = {
     ("GET", "/api/auth/login-mode"),
     ("GET", "/api/bootstrap/status"),  # "is this database empty?"
     ("POST", "/api/bootstrap/demo-data"),  # refuses once anyone exists
+    # The assistant on the front page: explains the system, never opens the
+    # database for a visitor, sends them to sign in for anything inside.
+    ("POST", "/api/assistant/query"),
+    ("GET", "/api/assistant/suggestions"),
+    ("GET", "/api/assistant/voice"),
 }
 
 

@@ -158,9 +158,11 @@ is included behind a session dependency, and a test walks every registered
 route to prove a stranger gets 401 everywhere that is not on its short public
 list. Roles then decide which signed-in person may call what. On the client
 the same rule sends a visitor from any inner screen to sign in and back again
-afterwards; the front page is the one screen a stranger stands on, and it
-carries no assistant for them, because the assistant walks people into the
-application. While the shared demo login is on, the seeded accounts are fixed
+afterwards. The front page and the sign-in page are the two screens a
+stranger stands on, and the assistant stands there with them: it explains the
+system from its documents to anyone, answers a request to go inside with the
+sign-in page first, carrying the destination so sign-in lands there, and never
+opens the database for a visitor. While the shared demo login is on, the seeded accounts are fixed
 (their roles cannot be changed and they cannot be disabled), so one visitor to
 a public link cannot end everyone else's demo; accounts created on the admin
 page remain editable. Every response carries `X-Frame-Options`,
