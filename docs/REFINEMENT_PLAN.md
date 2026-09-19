@@ -163,7 +163,7 @@ never a feeling.
 | Auto-issue codes for clusters that pass every gate (anchored, all attributes agree, held-out precision above target for that class) | done | Registrar sets the policy per family; every issue audited; nothing issued for a class below target |
 | Nightly incremental pipeline over new rows | cron line documented; incremental rerun next | Runs record their stats; the dashboard shows the run id and time |
 | Re-evaluate the held-out snapshot after each run | done | Already recorded on the run; the dashboard says when |
-| Retire an unused legacy code suggestion (no stock, no PO, no movement in 24 months) | next | Suggestion only; migration plan needs approval |
+| Retire an unused legacy code suggestion (no stock, no PO, no movement in 24 months) | done | Suggestion only; migration plan needs approval |
 
 ## Reports to each CPSE
 

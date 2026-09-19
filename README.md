@@ -880,6 +880,14 @@ CPSE=CPCL SEND=1` delivers one. A weekly send from cron, Monday 07:00:
 0 7 * * 1  cd /opt/saman/backend && .venv/bin/python -m app.cli report --all --send >> /var/log/saman-report.log 2>&1
 ```
 
+The report also lists **dormant codes to retire**: the CPSE's own codes that
+name a material another row also names, with no stock on hand and no purchase
+or movement in twenty-four months, each with the name it would survive under.
+A suggestion with its evidence, never an action: retiring a code is the
+Migration screen's job, planned and reversible. On the synthetic estate every
+duplicated code still carries stock, so the section says so rather than
+inventing a candidate.
+
 The reader above the CPSEs gets the **ministry roll-up**
 (`/api/reports/rollup?format=html`, linked from the Administration page):
 every CPSE on one page, built from the same per-CPSE reports each company

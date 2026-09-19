@@ -431,3 +431,19 @@ class TestMinistryRollup:
         assert "quarter" in html.text
         client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
         assert client.get("/api/reports/rollup").status_code == 403
+
+
+class TestDormantCodes:
+    def test_the_report_suggests_dormant_duplicate_codes_with_evidence(self, as_steward, pipeline_run):
+        body = as_steward.get("/api/reports/cpse/CPCL").json()
+        retire = body["retirement"]
+        assert retire["rule_months"] == 24
+        assert retire["count"] <= retire["considered"]
+        for row in retire["examples"]:
+            assert row["legacy_code"] and row["other_names"] >= 1
+            assert set(row) >= {"survives_as", "last_purchase", "last_movement"}
+        assert "never a deletion" in retire["note"]
+        if retire["count"]:
+            assert any(a["key"] == "retire_dormant" for a in body["actions"])
+        html = as_steward.get("/api/reports/cpse/CPCL?format=html").text
+        assert "Dormant codes to retire" in html

@@ -31,7 +31,7 @@ import json
 import os
 import smtplib
 from collections import Counter, defaultdict
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 from pathlib import Path
@@ -151,6 +151,7 @@ def _report(db: Session, cpse: Cpse, asked_by: str, today: date) -> dict:
     inventory_section = _inventory(db, cpse, redaction, purchases)
     procurement = _procurement(db, redaction, purchases)
     prevention = _prevention(db, cpse)
+    retirement = _retirement(db, cpse, today)
     report = {
         "cpse": {"code": code, "name": cpse.name, "contact_email": cpse.contact_email},
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -174,6 +175,7 @@ def _report(db: Session, cpse: Cpse, asked_by: str, today: date) -> dict:
         "inventory": inventory_section,
         "procurement": procurement,
         "prevention": prevention,
+        "retirement": retirement,
     }
     report["actions"] = _actions(report)
     return report
@@ -706,6 +708,84 @@ def _prevention(db: Session, cpse: Cpse) -> dict:
     }
 
 
+#: A code is suggested for retirement when it has had no life for this long.
+RETIRE_MONTHS = 24
+
+
+def _retirement(db: Session, cpse: Cpse, today: date) -> dict:
+    """Own codes that duplicate another row and show no life: no stock on
+    hand, no purchase and no movement in two years. A suggestion with the
+    evidence beside it, never an action: retiring a code is the migration
+    screen's job, with a plan and a rollback. The surviving name is the
+    cluster's CNMC where one is issued, else its golden description."""
+    since = today - timedelta(days=RETIRE_MONTHS * 31)
+    clusters: dict[int, list] = defaultdict(list)
+    for cluster_id, item_id, cpse_id, legacy, description in _member_rows(db):
+        clusters[cluster_id].append((item_id, cpse_id, legacy, description))
+    # Life signs per item: stock on hand, last movement, last purchase.
+    stock = {
+        item_id: (float(qty or 0), moved)
+        for item_id, qty, moved in db.execute(
+            select(Stock.item_id, func.sum(Stock.qty_on_hand), func.max(Stock.last_movement_date))
+            .where(Stock.cpse_id == cpse.id)
+            .group_by(Stock.item_id)
+        )
+    }
+    last_po = dict(
+        db.execute(
+            select(PurchaseHistory.item_id, func.max(PurchaseHistory.po_date))
+            .where(PurchaseHistory.cpse_id == cpse.id)
+            .group_by(PurchaseHistory.item_id)
+        ).all()
+    )
+    codes = dict(
+        db.execute(
+            select(GoldenRecord.cluster_id, Cnmc.code).join(Cnmc, Cnmc.golden_id == GoldenRecord.id)
+        ).all()
+    )
+    goldens = dict(db.execute(select(GoldenRecord.cluster_id, GoldenRecord.std_description)).all())
+    candidates: list[dict] = []
+    considered = 0
+    for cluster_id, members in clusters.items():
+        if len(members) < 2:
+            continue
+        for item_id, cpse_id, legacy, description in members:
+            if cpse_id != cpse.id:
+                continue
+            considered += 1
+            qty, moved = stock.get(item_id, (0.0, None))
+            po = last_po.get(item_id)
+            if qty > 0:
+                continue
+            if moved is not None and moved >= since:
+                continue
+            if po is not None and po >= since:
+                continue
+            candidates.append(
+                {
+                    "legacy_code": legacy,
+                    "description": description,
+                    "cluster_id": cluster_id,
+                    "survives_as": codes.get(cluster_id) or goldens.get(cluster_id),
+                    "last_movement": moved.isoformat() if moved else None,
+                    "last_purchase": po.isoformat() if po else None,
+                    "other_names": len(members) - 1,
+                }
+            )
+    candidates.sort(key=lambda c: (c["last_purchase"] or "", c["last_movement"] or ""))
+    return {
+        "rule_months": RETIRE_MONTHS,
+        "considered": considered,
+        "count": len(candidates),
+        "examples": candidates[:EXAMPLES],
+        "note": (
+            f"Your codes that name a material another row also names, with no stock on "
+            f"hand and no purchase or movement in {RETIRE_MONTHS} months. A suggestion: "
+            "retiring a code is a migration, planned and reversible, never a deletion."
+        ),
+    }
+
+
 def _actions(report: dict) -> list[dict]:
     """Concrete next steps, each with the count that produced it. A CPSE with
     nothing waiting gets an empty list, not encouragement."""
@@ -748,6 +828,17 @@ def _actions(report: dict) -> list[dict]:
                 "text": f"Retire {internal['surplus_rows']:,} of your own codes that duplicate "
                 f"another of yours across {internal['clusters']:,} materials.",
                 "count": internal["surplus_rows"],
+            }
+        )
+    retire = report.get("retirement") or {}
+    if retire.get("count"):
+        actions.append(
+            {
+                "key": "retire_dormant",
+                "text": f"Retire {retire['count']:,} dormant codes: each names a material another "
+                f"row also names, with no stock, no purchase and no movement in "
+                f"{retire['rule_months']} months. Plan it on the Migration screen.",
+                "count": retire["count"],
             }
         )
     receiver = report["inventory"]["transfers"]["as_receiver"]
@@ -991,6 +1082,45 @@ def render_html(report: dict) -> str:
     else:
         parts.append('<p class="empty">Nothing is waiting on you.</p>')
     parts.append("</section>")
+
+    retire = report.get("retirement")
+    if retire:
+        parts.append("<section><h2>Dormant codes to retire</h2>")
+        parts.append(
+            '<div class="tiles">'
+            + _tile(
+                "suggested", _n(retire["count"]), f"of {_n(retire['considered'])} duplicated codes"
+            )
+            + _tile("rule", f"{retire['rule_months']} months", "no stock, purchase or movement")
+            + "</div>"
+        )
+        parts.append(
+            _table(
+                [
+                    ("Code", "code"),
+                    ("Description", "desc"),
+                    ("Survives as", "code"),
+                    ("Last purchase", "desc"),
+                    ("Last movement", "desc"),
+                ],
+                [
+                    [
+                        c["legacy_code"],
+                        c["description"],
+                        c["survives_as"] or "—",
+                        c["last_purchase"] or "never",
+                        c["last_movement"] or "never",
+                    ]
+                    for c in retire["examples"]
+                ],
+                empty=(
+                    "No dormant duplicate code: every one of yours has stock, a purchase "
+                    "or a movement."
+                ),
+            )
+        )
+        parts.append(f'<p class="note">{_e(retire["note"])}</p>')
+        parts.append("</section>")
 
     parts.append("<section><h2>Your catalogue</h2>")
     in_cluster_share = _pct(cat["in_cluster"] / cat["rows"]) if cat["rows"] else None
