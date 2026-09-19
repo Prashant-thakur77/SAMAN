@@ -221,6 +221,11 @@ tracked honestly in [`KNOWN_GAPS.md`](KNOWN_GAPS.md).
 
 ---
 
+`make e2e` drives the **five demo moves** (search, workbench approve-and-undo,
+Smart-Create, both dashboards, audit and admin) through the built UI in a
+real browser and fails on the first thing a judge would have seen break; it
+reads what the screen says, not the API. Run it before every demo.
+
 ## The screens
 
 Every route, monochrome, in dark and light. `make screenshots` regenerates all

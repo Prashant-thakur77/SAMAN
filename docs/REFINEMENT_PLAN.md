@@ -191,9 +191,8 @@ never a feeling.
 
 - **Reruns.** The pipeline re-embeds and re-matches everything; make it
   incremental so an upload of 200 rows costs seconds.
-- **Frontend test depth.** 117 tests cover the state machines; add browser
-  tests for the five demo moves so a regression is caught before a judge
-  sees it.
+- **Frontend test depth.** 135 unit tests cover the state machines; `make e2e`
+  drives the five demo moves in a real browser (done).
 - **The learned model's story.** Show its confusion matrix on real labels and
   hide it while labels are simulated.
 - **Explanations.** Every refusal already carries its reason; surface it as

@@ -162,9 +162,8 @@ def main() -> int:
                 print(f"  ok   {name:20} {time.perf_counter() - started:5.1f}s  {note}")
             except Exception as exc:  # report every move, then fail
                 failures += 1
-                print(
-                    f"  FAIL {name:20} {time.perf_counter() - started:5.1f}s  {type(exc).__name__}: {str(exc)[:160]}"
-                )
+                took = time.perf_counter() - started
+                print(f"  FAIL {name:20} {took:5.1f}s  {type(exc).__name__}: {str(exc)[:160]}")
             if args.shots:
                 Path(args.shots).mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(Path(args.shots) / f"{name[0]}.png"))
