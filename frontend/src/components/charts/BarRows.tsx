@@ -1,5 +1,6 @@
 import { useReducedMotion } from 'framer-motion'
 import { useId } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { useMeasured } from './ChartParts'
 import { RAMP, type Shade } from './ramp'
@@ -40,6 +41,8 @@ export type BarRow = {
   title: string
   /** A 1.5 px ink line with 6 px end ticks across a range of the value axis. */
   whisker?: { from: number; to: number }
+  /** Where the row opens: the rows behind the bar. The whole band is the target. */
+  href?: string
 }
 
 /** A solid hairline across the plot after a row, with a short label above it. */
@@ -119,6 +122,7 @@ export function BarRows({
   ariaLabel: string
   fallbackWidth?: number
 }) {
+  const navigate = useNavigate()
   const reduce = useReducedMotion() ?? false
   const clipId = useId()
   const { ref, width } = useMeasured<HTMLDivElement>(fallbackWidth)
@@ -269,8 +273,12 @@ export function BarRows({
           // Inline, a single label line centres on the bar; two lines start at the top.
           const firstLineY = stacked || lines.length > 1 ? top + LINE / 2 : top + rowH / 2
           return (
-            <g key={row.key} className="chart-row">
-              <title>{row.title}</title>
+            <g
+              key={row.key}
+              className={row.href ? 'chart-row cursor-pointer' : 'chart-row'}
+              onClick={row.href ? () => navigate(row.href!) : undefined}
+            >
+              <title>{row.href ? `${row.title} — open the rows` : row.title}</title>
               {/* the hit target is the whole row band, not the thin mark */}
               <rect
                 x={0}

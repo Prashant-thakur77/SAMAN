@@ -919,6 +919,14 @@ itself, extracted no grade at all, which dropped identity coverage below the
 merge threshold. One class-scoped pattern took that class from 0.847 to 0.931
 recall and the whole corpus from 0.933 to 0.939, with precision unmoved.
 
+An executive's next question is always "which ones", so every figure opens
+its rows: a KPI tile links to the catalogue, the coded rows or the Workbench
+band behind it; a CPSE's progress bar, a family's bar and a class × CPSE cell
+open the search already filtered to them; the veto chart opens the refusals.
+Every table exports as CSV as shown, the page prints to PDF, and a line under
+the header says when the figures were computed, from how many rows and at
+which audit sequence.
+
 ---
 
 ### Migrating the ERP, reversibly

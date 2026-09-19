@@ -45,7 +45,7 @@ and at a desk.*
 | Scan | add | Stock-count mode (scan, count, next); bin binding ("this bin holds this code") | The storekeeper's real daily job | 3 d |
 | Scan | improve · **done** | Torch toggle, scan history, a "wrong item?" report | Dim stores; mistakes need a path back | 1 d |
 | Smart-Create | add · **done** | Barcode and part-number fields feeding the check; save a probe as a draft request | Most new-code requests start from a box in hand | 2 d |
-| Dashboards | add | Drill-down: every bar and tile opens the rows behind it; CSV and PDF export | An executive's next question is always "which ones" | 3 d |
+| Dashboards | add · **done** (CSV on every table, PDF via print) | Drill-down: every bar and tile opens the rows behind it; CSV and PDF export | An executive's next question is always "which ones" | 3 d |
 | Dashboards | improve | A steward's own-CPSE view; date scoping on the money sections | The same page must serve two readers | 2 d |
 | Onboard | improve | Excel input, long-text tables, a downloadable rejection report, progress for large files | Real extracts are .xlsx with MAKTX in one sheet and long text in another | 3 d |
 | Item / Cluster | add | Side-by-side compare of any two rows; attachments (datasheet, drawing) on a golden record | Approvers ask for the datasheet first | 3 d |

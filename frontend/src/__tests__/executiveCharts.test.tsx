@@ -6,8 +6,13 @@
  * and the by-family chart sorted by coded share with the share labelled.
  */
 
-import { render, screen, within } from '@testing-library/react'
+import { render as renderBare, screen, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
+
+// Chart rows open the rows behind them, so the charts live inside a router.
+const render = (ui: ReactElement) => renderBare(<MemoryRouter>{ui}</MemoryRouter>)
 
 import { EvaluationTable } from '../components/charts/EvaluationTable'
 import { HarmonisationByClass } from '../components/charts/HarmonisationByClass'
@@ -330,7 +335,7 @@ describe('What kept look-alikes apart', () => {
   it('states its coverage from the payload: stored pairs, or the whole run', () => {
     const { rerender } = render(<VetoAttributes data={veto} />)
     expect(screen.getByText(/Counted over the 3,310 conflicts and the 4,623 most plausible refusals/)).toBeInTheDocument()
-    rerender(<VetoAttributes data={{ ...veto, source: 'run' }} />)
+    rerender(<MemoryRouter><VetoAttributes data={{ ...veto, source: 'run' }} /></MemoryRouter>)
     expect(screen.getByText(/Counted over every pair the veto refused in the last run/)).toBeInTheDocument()
   })
 })

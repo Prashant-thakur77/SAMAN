@@ -80,9 +80,19 @@ export default function DashOpportunity() {
         title="Opportunity"
         description="Aggregation candidates, price variance per base unit, and stock that could move instead of being bought."
         actions={
-          !data.visibility.sees_attributed_prices ? (
-            <StatusChip tone="neutral">Prices anonymised for your role</StatusChip>
-          ) : undefined
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="no-print font-mono text-[11px] text-muted underline-offset-2 hover:text-ink hover:underline"
+              title="Print the page, or save it as a PDF from the print dialog"
+            >
+              Print / PDF
+            </button>
+            {!data.visibility.sees_attributed_prices && (
+              <StatusChip tone="neutral">Prices anonymised for your role</StatusChip>
+            )}
+          </div>
         }
       />
       <ProvenanceLine provenance={data.provenance} />

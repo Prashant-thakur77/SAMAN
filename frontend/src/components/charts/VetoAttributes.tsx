@@ -31,6 +31,8 @@ export function VetoAttributes({ data }: { data: VetoAttributesData }) {
     title: `${a.label} · ${ROLE_LABEL[a.role].toLowerCase()} · ${formatCount(a.pairs)} pairs${
       a.example ? ` · e.g. ${a.example.reason}` : ''
     }`,
+    // The refusals themselves are on the Workbench's auto-low tab.
+    href: '/workbench?band=low',
   }))
   if (data.other.pairs > 0) {
     rows.push({

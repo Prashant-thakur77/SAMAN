@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import { useMemo } from 'react'
 
 import type { ByClass } from '../../lib/api'
@@ -52,6 +54,7 @@ export function HarmonisationByClass({
       segments: byClass.parts.map((p, i) => ({ key: p.key, value: values[p.key], shade: shadeOf(i) })),
       tip: row.rows ? formatPercent(row.coded_share, row.coded_share < 0.1 ? 1 : 0) : undefined,
       title: `${row.class_code} · ${formatCount(row.rows)} rows — ${readout}`,
+      href: `/search?class=${encodeURIComponent(row.class_code)}`,
     }
   })
 
@@ -86,7 +89,11 @@ export function HarmonisationByClass({
           <TBody>
             {rows.map((row) => (
               <TR key={row.class_code}>
-                <TD mono>{row.class_code}</TD>
+                <TD mono>
+                  <Link to={`/search?class=${encodeURIComponent(row.class_code)}`} className="underline-offset-2 hover:underline">
+                    {row.class_code}
+                  </Link>
+                </TD>
                 <TD mono className="text-muted">
                   {row.family ?? '—'}
                 </TD>

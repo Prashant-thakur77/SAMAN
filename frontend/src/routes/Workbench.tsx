@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
 import { AttributeDiff } from '../components/workbench/AttributeDiff'
@@ -68,7 +68,12 @@ const SELECT =
   'h-8 rounded-full border border-hairline bg-surface px-3 text-xs text-ink focus:outline-none'
 
 export default function Workbench() {
-  const [band, setBand] = useState<Band>('grey')
+  const [params] = useSearchParams()
+  // A dashboard figure opens the band behind it: /workbench?band=high.
+  const handed = params.get('band')
+  const [band, setBand] = useState<Band>(
+    handed === 'high' || handed === 'low' || handed === 'grey' ? handed : 'grey',
+  )
   const [queue, setQueue] = useState<QueueResponse | null>(null)
   const [cursor, setCursor] = useState(0)
   const [exiting, setExiting] = useState<Action | null>(null)

@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 import { EvaluationTable } from '../components/charts/EvaluationTable'
@@ -21,6 +22,17 @@ import { StatusChip } from '../components/primitives/Chip'
 import { ApiError, getExecutive, type ExecutiveDashboard, type QualityRate, type QualityScorecard} from '../lib/api'
 import { cn } from '../lib/cn'
 import { listItemVariants, listVariants } from '../lib/motion'
+
+/** Where each tile's rows are: an executive's next question is always "which ones". */
+const KPI_TARGET: Record<string, { to: string; label: string }> = {
+  items: { to: '/search', label: 'Open the catalogue' },
+  clusters: { to: '/search?cnmc=no', label: 'Materials not yet coded' },
+  duplicates: { to: '/workbench?band=high', label: 'The merges awaiting confirmation' },
+  cnmcs: { to: '/search?cnmc=yes', label: 'The coded rows' },
+  automation: { to: '/workbench', label: 'What was left to people' },
+  savings: { to: '/dashboard/opportunity', label: 'The ladder behind the figure' },
+  prevented: { to: '/smart-create', label: 'Smart-Create' },
+}
 
 /**
  * /dashboard/executive — spec §6.7.
@@ -78,7 +90,19 @@ export default function DashExecutive() {
         section="Analytics"
         title="Executive dashboard"
         description="Harmonization progress across CPSEs. Every figure is computed from the database and reconciles with /api/metrics."
-        actions={<StatusChip tone="neutral">{data.visibility.role}</StatusChip>}
+        actions={
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="no-print font-mono text-[11px] text-muted underline-offset-2 hover:text-ink hover:underline"
+              title="Print the page, or save it as a PDF from the print dialog"
+            >
+              Print / PDF
+            </button>
+            <StatusChip tone="neutral">{data.visibility.role}</StatusChip>
+          </div>
+        }
       />
       <ProvenanceLine provenance={data.provenance} />
 
@@ -95,19 +119,30 @@ export default function DashExecutive() {
             animate="animate"
             className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3"
           >
-            {data.kpis.map((kpi) => (
-              <motion.div
-                key={kpi.key}
-                variants={listItemVariants(reduce)}
-                className="space-y-2 bg-surface p-5"
-              >
-                <dt className="micro-label">{kpi.label}</dt>
-                <dd className="font-mono text-xl text-ink" title={provenanceTitle(data.provenance)}>
-                  <CountUp value={kpi.value} format={kpi.format} />
-                </dd>
-                {kpi.note && <p className="text-xs text-muted">{kpi.note}</p>}
-              </motion.div>
-            ))}
+            {data.kpis.map((kpi) => {
+              const target = KPI_TARGET[kpi.key]
+              return (
+                <motion.div
+                  key={kpi.key}
+                  variants={listItemVariants(reduce)}
+                  className="space-y-2 bg-surface p-5"
+                >
+                  <dt className="micro-label">{kpi.label}</dt>
+                  <dd className="font-mono text-xl text-ink" title={provenanceTitle(data.provenance)}>
+                    <CountUp value={kpi.value} format={kpi.format} />
+                  </dd>
+                  {kpi.note && <p className="text-xs text-muted">{kpi.note}</p>}
+                  {target && (
+                    <Link
+                      to={target.to}
+                      className="inline-block text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+                    >
+                      {target.label} →
+                    </Link>
+                  )}
+                </motion.div>
+              )
+            })}
             {/* The grid paints its gaps with the hairline colour, so a row that
                 does not divide evenly leaves grey blocks that read as a
                 rendering fault rather than as empty space. Seven KPIs in three
@@ -122,7 +157,13 @@ export default function DashExecutive() {
             <div className="space-y-3">
               {data.per_cpse.map((row) => (
                 <div key={row.cpse} className="grid grid-cols-[5rem_1fr_9rem] items-center gap-4">
-                  <span className="font-mono text-sm">{row.cpse}</span>
+                  <Link
+                    to={`/search?cpse=${encodeURIComponent(row.cpse)}`}
+                    className="font-mono text-sm underline-offset-2 hover:underline"
+                    title={`Open ${row.cpse}'s rows`}
+                  >
+                    {row.cpse}
+                  </Link>
                   <div className="h-2 w-full bg-hairline" aria-hidden>
                     <div
                       className="h-full bg-ink transition-[width] duration-500 ease-saman"
@@ -171,16 +212,17 @@ export default function DashExecutive() {
                         const intensity = cell?.intensity ?? 0
                         return (
                           <td key={cpse} className="p-0.5">
-                            <div
-                              title={`${klass} · ${cpse} · ${cell?.count ?? 0} rows`}
+                            <Link
+                              to={`/search?cpse=${encodeURIComponent(cpse)}&class=${encodeURIComponent(klass)}`}
+                              title={`${klass} · ${cpse} · ${cell?.count ?? 0} rows — open them`}
                               className={cn(
-                                'flex h-8 min-w-[4rem] items-center justify-center border border-hairline font-mono',
+                                'flex h-8 min-w-[4rem] items-center justify-center border border-hairline font-mono hover:outline hover:outline-1 hover:outline-ink',
                                 intensity > 0.55 ? 'text-bg' : 'text-ink',
                               )}
                               style={{ background: `rgb(var(--ink) / ${intensity.toFixed(3)})` }}
                             >
                               {cell?.count ?? 0}
-                            </div>
+                            </Link>
                           </td>
                         )
                       })}
