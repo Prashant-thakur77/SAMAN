@@ -454,6 +454,21 @@ def cmd_tune(_args: argparse.Namespace) -> int:
             f"{row['f1']:>8.4f} {row['clusters']:>9,}{mark}"
         )
     print(f"\nRecommended T_HIGH = {result['recommended_T_HIGH']}")
+    if result.get("per_class"):
+        print("\nPer class, on the tuning split: the global cut beside the class's own best")
+        print(
+            f"{'class':28} {'items':>6} {'at global':>22} {'own best':>22} "
+            f"{'T':>5} {'F1 gain':>8}"
+        )
+        for row in result["per_class"]:
+            g, o = row["at_global"], row["own_best"]
+            flag = "" if row["enough_items"] else "  (too few items)"
+            print(
+                f"{row['class_code']:28} {row['tuning_items']:>6} "
+                f"{'P ' + format(g['precision'], '.3f') + ' R ' + format(g['recall'], '.3f'):>22} "
+                f"{'P ' + format(o['precision'], '.3f') + ' R ' + format(o['recall'], '.3f'):>22} "
+                f"{o['threshold']:>5} {row['f1_gain']:>+8.4f}{flag}"
+            )
     print(result["note"])
     return 0
 

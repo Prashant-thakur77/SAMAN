@@ -89,15 +89,36 @@ def _load(db: Session):
     return items, truth, tuning_items, edges
 
 
+#: A class needs this many tuning-split items before its own sweep means
+#: anything; below it the per-class row is reported but not recommended.
+CLASS_MIN_ITEMS = 40
+
+
 def sweep(db: Session) -> tuple[list[SweepRow], float]:
     """Evaluate every candidate threshold on the tuning split."""
+    rows, _by_class, chosen = _sweep(db)
+    return rows, chosen
+
+
+def _sweep(db: Session) -> tuple[list[SweepRow], dict[str, list[SweepRow]], float]:
+    """The sweep, overall and per class, from one pass over the thresholds.
+
+    Per class means: the same clustering at each threshold, scored over the
+    tuning items of that class alone. Bearings and chemicals do not share one
+    best cut, and this is how much a per-class cut would buy, measured before
+    anyone builds it.
+    """
     items, truth, tuning_items, edges = _load(db)
     attrs_by_id = {i: v["attrs"] for i, v in items.items()}
     class_by_id = {i: v["class_code"] for i, v in items.items()}
     mpn_by_id = {i: v["mpn"] for i, v in items.items()}
     all_ids = list(items)
+    tuning_by_class: dict[str, set[int]] = {}
+    for item in tuning_items:
+        tuning_by_class.setdefault(class_by_id.get(item, "unclassified"), set()).add(item)
 
     rows: list[SweepRow] = []
+    by_class: dict[str, list[SweepRow]] = {c: [] for c in tuning_by_class}
     for threshold in SWEEP:
         accepted = [(a, b) for a, b, c in edges if c >= threshold]
         degree: Counter[int] = Counter()
@@ -115,24 +136,56 @@ def sweep(db: Session) -> tuple[list[SweepRow], float]:
                     predicted[item] = cluster_id
 
         result: Pairwise = pairwise(predicted, truth, tuning_items)
-        rows.append(
-            SweepRow(threshold, result.precision, result.recall, result.f1, cluster_id)
-        )
+        rows.append(SweepRow(threshold, result.precision, result.recall, result.f1, cluster_id))
+        for class_code, subset in tuning_by_class.items():
+            r = pairwise(predicted, truth, subset)
+            clusters = len({predicted[i] for i in subset if i in predicted})
+            by_class[class_code].append(SweepRow(threshold, r.precision, r.recall, r.f1, clusters))
 
     eligible = [r for r in rows if r.precision >= PRECISION_FLOOR]
     best = max(eligible or rows, key=lambda r: (r.f1, r.recall))
-    return rows, best.threshold
+    return rows, by_class, best.threshold
+
+
+def _best(rows: list[SweepRow]) -> SweepRow:
+    eligible = [r for r in rows if r.precision >= PRECISION_FLOOR]
+    return max(eligible or rows, key=lambda r: (r.f1, r.recall))
 
 
 def report(db: Session) -> dict:
-    rows, chosen = sweep(db)
+    rows, by_class, chosen = _sweep(db)
+    items, _truth, tuning_items, _edges = _load(db)
+    counts: Counter[str] = Counter(items[i]["class_code"] for i in tuning_items if i in items)
+    at_global = {r.threshold: r for r in rows}
+    per_class = []
+    for class_code, class_rows in sorted(by_class.items()):
+        own = _best(class_rows)
+        at_chosen = next((r for r in class_rows if r.threshold == chosen), None)
+        enough = counts.get(class_code, 0) >= CLASS_MIN_ITEMS
+        per_class.append(
+            {
+                "class_code": class_code,
+                "tuning_items": counts.get(class_code, 0),
+                "enough_items": enough,
+                "at_global": at_chosen.as_dict() if at_chosen else None,
+                "own_best": own.as_dict(),
+                "f1_gain": round(own.f1 - at_chosen.f1, 4) if at_chosen else None,
+                "recall_gain": round(own.recall - at_chosen.recall, 4) if at_chosen else None,
+            }
+        )
     return {
         "split": TUNING,
         "precision_floor": PRECISION_FLOOR,
         "sweep": [r.as_dict() for r in rows],
         "recommended_T_HIGH": chosen,
+        "global_at_recommended": at_global[chosen].as_dict(),
+        "per_class": per_class,
+        "class_min_items": CLASS_MIN_ITEMS,
         "note": (
             "Chosen on the tuning split only. Freeze this value in match.T_HIGH "
-            "and report held-out metrics from GET /api/metrics."
+            "and report held-out metrics from GET /api/metrics. The per-class rows say "
+            "what a class's own cut would buy over the global one, on the tuning split; "
+            "they are a measurement, not a setting: one T_HIGH stays in force until a "
+            "gain is worth a per-class rule and a registrar chooses it."
         ),
     }

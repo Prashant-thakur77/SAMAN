@@ -211,3 +211,17 @@ class TestExtractionQuality:
                 else:
                     found += 1
         assert found / (found + missing) > 0.95
+
+
+class TestPerClassSweep:
+    def test_the_sweep_says_what_a_class_cut_would_buy(self, db, pipeline_run):
+        from app.tuning import CLASS_MIN_ITEMS, report
+
+        result = report(db)
+        assert result["global_at_recommended"]["threshold"] == result["recommended_T_HIGH"]
+        rows = {r["class_code"]: r for r in result["per_class"]}
+        assert rows, "the tuning split has classes"
+        for row in rows.values():
+            assert row["own_best"]["f1"] >= (row["at_global"]["f1"] if row["at_global"] else 0)
+            assert row["enough_items"] == (row["tuning_items"] >= CLASS_MIN_ITEMS)
+        assert "a measurement, not a setting" in result["note"]

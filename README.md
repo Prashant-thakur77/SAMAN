@@ -1298,6 +1298,16 @@ and the labels it is fitted to are not a random sample of the estate. A
 registrar who changes a threshold does it deliberately, with these numbers in
 front of them and the change in the audit log.
 
+`make tune` now also sweeps **per class** on the tuning split: the same
+clustering at each threshold, scored over one class's tuning items alone, with
+the class's own best cut printed beside what the global `T_HIGH` gives it. On
+the synthetic estate the finding is narrow: bearings would gain +0.03 F1 from
+a lower cut (recall 0.897 → 0.956 at precision 1.000, because bearing
+designations are so specific that a looser cut is still safe), and every other
+class with enough items (≥ 40) gains ~0. That is a measurement, not a setting:
+one `T_HIGH` stays in force until a gain is worth a per-class rule and a
+registrar chooses it, and the table is there so the choice is made on numbers.
+
 Why this and not a fine-tuned language model: the decisions that matter are
 pairwise and attribute-driven, and two dozen weights can be audited where a 3B
 model cannot. The labelled pairs are exported as JSON lines from the admin
