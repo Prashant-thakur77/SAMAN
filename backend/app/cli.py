@@ -3,6 +3,7 @@
 python -m app.cli seed --profile demo
 python -m app.cli pipeline
 python -m app.cli evaluate
+python -m app.cli report --cpse CPCL [--send] [--out DIR]
 python -m app.cli status
 """
 
@@ -178,6 +179,8 @@ def _learn_summary(model) -> dict:
         "holdout_pairs": (model.holdout or {}).get("pairs"),
         "holdout_model_auc": (model.holdout or {}).get("model_auc"),
         "holdout_pipeline_auc": (model.holdout or {}).get("pipeline_auc"),
+        "grey_model_auc": (model.holdout or {}).get("grey_model_auc"),
+        "history": str(__import__("app.learn", fromlist=["history_path"]).history_path()),
         "saved_to": str(__import__("app.learn", fromlist=["model_path"]).model_path()),
     }
 
@@ -195,6 +198,71 @@ def cmd_learn(_args: argparse.Namespace) -> int:
             return 1
         _print_table("Learned pairwise model", _learn_summary(model))
         _print_table("Weights (standardised)", model.weights())
+        suggestions = learn.suggest_thresholds(db)
+        _print_table(
+            "Threshold suggestions (suggested, not applied)",
+            {
+                row["class_code"]: (
+                    f"T_HIGH {row['suggested_t_high']} (precision {row['suggested_precision']}, "
+                    f"F1 {row['suggested_f1']}) vs current {row['current_t_high']} "
+                    f"(precision {row['current_precision']}) on {row['labelled_pairs']} labels"
+                )
+                for row in suggestions["classes"]
+            }
+            or {"note": f"no class has {suggestions['min_labels']} labels with both answers yet"},
+        )
+    return 0
+
+
+def cmd_llm_eval(args: argparse.Namespace) -> int:
+    """Measure the configured language model on the project's own questions.
+
+    Sixteen questions with the words a correct answer must contain
+    (`app/data/llm_eval.yaml`). For each: did the guards accept the answer,
+    were the expected words present, how long did it take. The same harness
+    runs against the 3B local model, a 7B, or the remote endpoint, which is
+    how a model earns its place here rather than by reputation.
+    """
+    import yaml
+
+    from . import knowledge, llm
+    from .config import REPO_ROOT
+
+    cases = yaml.safe_load((REPO_ROOT / "backend" / "app" / "data" / "llm_eval.yaml").read_text())
+    if not llm.available():
+        print(f"no model answers ({llm.engine_label()}); nothing to measure")
+        return 1
+    print(f"model: {llm.engine_label()}\n")
+    print(f"  {'outcome':10} {'correct':8} {'seconds':>7}  question")
+    print("  " + "-" * 70)
+    accepted = correct = 0
+    total_seconds = 0.0
+    knowledge.forget_answers()
+    for case in cases:
+        started = time.time()
+        result = knowledge.answer(case["question"])
+        seconds = time.time() - started
+        total_seconds += seconds
+        if result is not None and not result.refused and result.text:
+            outcome = "accepted"
+            accepted += 1
+            text = result.text.lower()
+            ok = any(str(word).lower() in text for word in case["expect"])
+            correct += int(ok)
+        else:
+            outcome = "declined" if result is None else "refused"
+            ok = False
+        print(f"  {outcome:10} {'yes' if ok else 'no':8} {seconds:7.1f}  {case['question'][:52]}")
+        if result is not None and result.refused and result.note:
+            print(f"             {result.note[:110]}")
+        elif args.verbose and result is not None and result.text:
+            print(f"             {result.text[:160]}")
+    n = len(cases)
+    print(
+        f"\n  accepted {accepted}/{n}  correct {correct}/{n}  "
+        f"mean {total_seconds / n:.1f}s per question"
+    )
+    print("  (correct = an accepted answer that contains one of the expected words)")
     return 0
 
 
@@ -221,6 +289,71 @@ def cmd_evaluate(_args: argparse.Namespace) -> int:
         f"({round(time.time() - started, 1)}s)."
     )
     return 0
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    """Write each CPSE's catalogue report as HTML and JSON, and optionally
+    deliver it (SMTP when configured, the outbox otherwise). What a weekly
+    cron line runs; see README "A report for each CPSE"."""
+    import json
+    from pathlib import Path
+
+    from sqlalchemy import select
+
+    from . import reports
+    from .models import Cpse
+
+    if not args.cpse and not args.all:
+        print("!! name a CPSE with --cpse CODE, or pass --all")
+        return 2
+    init_db()
+    out = Path(args.out) if args.out else reports.outbox_dir()
+    out.mkdir(parents=True, exist_ok=True)
+    failures = 0
+    with SessionLocal() as db:
+        codes = (
+            [c for c in db.execute(select(Cpse.code).order_by(Cpse.code)).scalars()]
+            if args.all
+            else [args.cpse.upper()]
+        )
+        for code in codes:
+            try:
+                report = reports.cpse_report(db, code)
+            except LookupError as exc:
+                print(f"!! {exc}")
+                failures += 1
+                continue
+            html = reports.render_html(report)
+            stem = f"saman-report-{code}-{report['period']['to']}"
+            (out / f"{stem}.html").write_text(html, encoding="utf-8")
+            (out / f"{stem}.json").write_text(
+                json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+            )
+            line = f"  {code:6} {out / stem}.html  actions {len(report['actions'])}"
+            if args.send:
+                to = (
+                    [args.to]
+                    if args.to
+                    else (
+                        [report["cpse"]["contact_email"]] if report["cpse"]["contact_email"] else []
+                    )
+                )
+                if not to:
+                    line += (
+                        "  not sent: no contact email (set one under Administration or pass --to)"
+                    )
+                    failures += 1
+                else:
+                    try:
+                        result = reports.deliver(report, html, to, db=db, user="cli")
+                    except OSError as exc:
+                        line += f"  not sent: {exc}"
+                        failures += 1
+                    else:
+                        where = result["path"] if result["mode"] == "outbox" else result["host"]
+                        line += f"  sent ({result['mode']}) -> {', '.join(to)} via {where}"
+            print(line)
+    return 1 if failures else 0
 
 
 def cmd_simulate_reviews(args: argparse.Namespace) -> int:
@@ -303,6 +436,24 @@ def main(argv: list[str] | None = None) -> int:
         "evaluate", help="score the latest run on held-out truth and record it on the run"
     )
     evaluate.set_defaults(func=cmd_evaluate)
+
+    llm_eval = sub.add_parser(
+        "llm-eval", help="measure the configured language model on the project's own questions"
+    )
+    llm_eval.add_argument("--verbose", action="store_true", help="print each answer")
+    llm_eval.set_defaults(func=cmd_llm_eval)
+
+    report = sub.add_parser(
+        "report", help="write a CPSE's catalogue report (HTML + JSON) and optionally send it"
+    )
+    report.add_argument("--cpse", help="CPSE code, e.g. CPCL")
+    report.add_argument("--all", action="store_true", help="every registered CPSE")
+    report.add_argument(
+        "--send", action="store_true", help="deliver by SMTP when configured, else to the outbox"
+    )
+    report.add_argument("--to", help="recipient instead of the CPSE's contact email")
+    report.add_argument("--out", help="directory for the files (default: the outbox)")
+    report.set_defaults(func=cmd_report)
 
     simulate = sub.add_parser(
         "simulate-reviews", help="label tuning-split pairs from ground truth (demo only)"

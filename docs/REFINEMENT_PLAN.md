@@ -110,6 +110,83 @@ read back; the registry holding two CPSE nodes' codes with no conflict.
 
 **Gate:** a second ministry adopts the code without changing the software.
 
+## The models: making them stronger, measured
+
+Two models do the work that people notice: the learned pairwise model that
+orders the review queue, and the language model that words sentences and
+answers questions from the documents. Neither may decide a match; that rule
+does not change. "Stronger" here means a number that moved on a fixed test,
+never a feeling.
+
+### The language model
+
+**Status key:** `done` shipped in this round · `doing` in progress today ·
+`next` planned, in order.
+
+| # | Item | Status | Why |
+|---|---|---|---|
+| L1 | A measured harness: `make llm-eval` runs sixteen questions from the documents (English, Hinglish, Hindi) and reports acceptance, correctness against expected words, and seconds, for whatever model is configured | done | Without it "better" is an opinion. Baseline, remote Qwen 27B on Groq: accepted 14/16, correct 12/16. Local 3B and 7B: run the harness with Ollama on and record the numbers here |
+| L2 | Wider corpus: the SAP integration guide, the roadmap and this plan join the README, gaps list and spec | done | Judges ask about integration and the future; the model should read the same pages they do |
+| L3 | Retrieval reads Hindi, Hinglish and house abbreviations by normalising the question the way a description is normalised before searching | done | "वीटो लेयर क्या करती है" and "BRG" now find the right passages |
+| L4 | Answer in the language of the question; Hindi in Devanagari, Hinglish as typed | done | The people at the bin do not ask in English |
+| L5 | Two worked examples in the Tier-3 prompt so a small model writes one clean sentence | done | Few-shot lifts a 3B model more than any setting |
+| L6 | Answer memo per question and model for the life of the process; the 3B model's seven seconds happen once per question | done | A demo asks the same questions; a store asks them all day |
+| L7 | Acceptance counters per caller (assistant, Copilot, Tier 3), exposed on the assistant's model block: accepted, declined, invented figure, too long | done | Tells us, per model, how often its words survive the guards; the number to compare 3B against 7B |
+| L8 | Figure guard reads sentences: a trailing full stop no longer makes "0.9775." a different number from "0.9775" | done | A correct answer was being thrown away for punctuation |
+| L9 | Prefer a larger local model when the machine has one: `SAMAN_OLLAMA_PREFER=qwen2.5:7b,qwen2.5:3b` picks the first present | done (opt-in) | This laptop has the 7B pulled; a workstation should use it, a 4 GB box should not |
+| L10 | One bounded retry on a rate-limited remote call | done | A free tier meters tokens per minute; the demo must stutter, not stop |
+| L11 | Run L1 for `qwen2.5:3b` and `qwen2.5:7b` locally; publish all three rows in the README; choose the default per machine size from the numbers | next | The decision the harness exists for |
+| L12 | Stream the answer to the widget token by token | next | A 3B model reads as slow when the reader waits for the whole sentence; streaming makes seven seconds feel like two |
+| L13 | Warm the memo at start with the assistant's suggested questions | next | The first click in a demo should not pay the model's cold start |
+| L14 | Keep an eval log: every accepted answer with its sources, every refusal with its reason, so the harness grows from real questions people asked | next | A test set written by users beats one written by us |
+| L15 | Quantisation and hardware notes per model size (Q4 for 3B and 7B on CPU; a GPU makes the 7B the default) in the install guide | next | The size question is a deployment question |
+| L16 | Fine-tuning, only when the corpus is real: reviewer decisions and the documented question–answer pairs from L14, exported as JSONL (`make learn-corpus` exists); a LoRA on the local Qwen scored on the same harness before it is allowed to replace the base model | later | Today the corpus is mostly simulated labels; a model trained on them learns our generator. The harness is the gate |
+| L17 | Distil the remote model's accepted answers into the local eval set, never into the local model's weights | later | A cheap way to grow L14 with good examples while keeping the local model honest |
+
+### The learned pairwise model
+
+| # | Item | Status | Why |
+|---|---|---|---|
+| P1 | Champion/challenger auto-retrain: after every 25 reviewer labels (simulated ones do not count) a challenger is trained in the background, scored on the held-out split, and promoted only if it is not worse; every attempt is recorded in a history file and on the audit chain | done | The loop that turns decisions into a better queue order without anyone pressing a button, and a record of every model that ever served |
+| P2 | Richer, still readable features: 24 named features (the 15 plus identity coverage, held-for-review, equivalence flag, brand equal/differs, same CPSE, part number differs, token overlap, length ratio), kept because held-out AUC rose 0.9974 → 0.9986 and grey-band AUC 0.9655 → 0.9764 on the same labels; an old 15-feature model still loads by name | done | More signal for the same one-screen explanation, measured |
+| P3 | Per-class held-out AUC, precision and recall on the admin page | done | The bearing queue and the chemical queue are different problems |
+| P4 | Threshold suggestions per class from the labels, shown as suggestions with "not applied"; a registrar changes thresholds deliberately | done | The model may advise on policy; it may not set it |
+| P5 | Retrain on real labels only once they outnumber the simulated ones; show a confusion matrix on real labels | next | Judged on people's decisions, not the generator's |
+| P6 | Active learning in the queue: mix the most uncertain pairs with a few random ones so the model's blind spots are sampled too | next | Uncertainty sampling alone forgets what it never sees |
+
+### More automation, with a human gate on each
+
+| Item | Status | The gate |
+|---|---|---|
+| Auto-retrain (P1) | done | Promotion only if not worse; audited |
+| Scheduled per-CPSE report | doing | Sent to the CPSE's contact; every figure computed; assumptions attached |
+| Auto-issue codes for clusters that pass every gate (anchored, all attributes agree, held-out precision above target for that class) | next | Registrar sets the policy per family; every issue audited; nothing issued for a class below target |
+| Nightly incremental pipeline over new rows | next | Runs record their stats; the dashboard shows the run id and time |
+| Re-evaluate the held-out snapshot after each run | done | Already recorded on the run; the dashboard says when |
+| Retire an unused legacy code suggestion (no stock, no PO, no movement in 24 months) | next | Suggestion only; migration plan needs approval |
+
+## Reports to each CPSE
+
+| Item | Status | Why |
+|---|---|---|
+| One document per CPSE, computed from the database: catalogue size and coded share; duplicates inside their own catalogue with examples; duplicates shared with each other CPSE; pending reviews by band and decisions made; their quality scorecard row and the weakest rate; stock, dead stock, transfers where they are source or destination with only their side priced; joint tenders they are part of and the saving attributable to them at the stated capture; Smart-Create prevention by their users; a list of concrete next actions with the count behind each | doing | A steward should not have to open six screens to know what SAMAN found in their catalogue |
+| Delivery by e-mail when SMTP is configured; otherwise an `.eml` written to an outbox, so an offline installation and the demo still produce the artefact; every send on the audit chain | doing | Offline first, and a file a judge can open |
+| Preview and Send from the Admin page for any CPSE; a steward's own report from the Home page; a CLI and a weekly cron line | doing | On demand and on schedule |
+| A ministry roll-up: the same report across CPSEs with per-CPSE attribution redacted to bands | next | The reader above the CPSE |
+
+## Small add-ons judges ask about
+
+| Item | Status | Effort |
+|---|---|---|
+| Export any table (search results, queue, dashboard section) as CSV | next | 1 d |
+| A printable specification sheet from a golden record, for a GeM bid | next | 1 d |
+| "Why?" on every card and Copilot answer: the refusal or merge reason as one sentence, already computed | next | 1 d |
+| Keyboard shortcut help (`?`) on every screen | next | ½ d |
+| A "what runs where" panel on the health page listing each engine, its version and whether it is local or remote | next | ½ d |
+| Session activity per user on Admin (last sign-in, decisions, reports sent) | next | 1 d |
+| Provenance tooltip on every dashboard figure: computed at, from how many rows, memo version | next | 1 d |
+| Demo reset button for admins (restore the snapshot in under five seconds; exists as `make demo-restore`) | next | ½ d |
+
 ## What to improve in what already exists, regardless of stage
 
 - **Reruns.** The pipeline re-embeds and re-matches everything; make it

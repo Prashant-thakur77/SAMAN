@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { PageHeader } from '../components/PageHeader'
+import { ReportsSection } from '../components/ReportsPanel'
+import { RetrainingPanel } from '../components/RetrainingPanel'
 import { Button } from '../components/primitives/Button'
 import { StatusChip } from '../components/primitives/Chip'
 import { Input } from '../components/primitives/Field'
@@ -100,6 +102,8 @@ export default function Admin() {
         </p>
       )}
 
+      <ReportsSection />
+
       {health && (
         <section className="space-y-4">
           <h2 className="micro-label">Engine health</h2>
@@ -172,6 +176,7 @@ export default function Admin() {
           {learn && (
             <LearnedModelPanel status={learn} busy={busy} run={run} />
           )}
+          {learn && <RetrainingPanel status={learn} />}
 
           <div className="flex flex-wrap items-center gap-4 card p-4">
             <StatusChip tone={health.audit.valid ? 'ok' : 'danger'}>

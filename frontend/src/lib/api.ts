@@ -233,6 +233,10 @@ export type LearnStatus = {
       positives?: number
       model_auc: number | null
       pipeline_auc: number | null
+      grey_pairs?: number
+      grey_model_auc?: number | null
+      grey_pipeline_auc?: number | null
+      per_class?: LearnClassRow[]
     } | null
     path: string
   } | null
@@ -240,6 +244,67 @@ export type LearnStatus = {
   labels_since_training: number
   min_labels: number
   decides: false
+  note: string
+  load_error?: string | null
+  /** The champion/challenger loop: due after N reviewer labels; simulated ones never count. */
+  auto_retrain?: {
+    enabled: boolean
+    every: number
+    labels_since: number
+    due: boolean
+    running?: boolean
+  }
+  /** Every training attempt, newest first, promoted or kept. */
+  history?: RetrainAttempt[]
+  /** Per-class T_HIGH suggestions: computed, shown, never applied. */
+  suggestions?: ThresholdSuggestions
+}
+
+export type LearnClassRow = {
+  class_code: string
+  pairs: number
+  positives: number
+  model_auc: number | null
+  pipeline_auc: number | null
+  precision: number
+  recall: number
+}
+
+export type RetrainAttempt = {
+  ts: string
+  trigger: 'auto' | 'manual' | string
+  n_labels: number | null
+  labels: Record<string, number>
+  cv_auc: number | null
+  holdout_auc: number | null
+  grey_auc: number | null
+  holdout_pairs: number | null
+  champion_auc: number | null
+  promoted: boolean
+  reason: string
+  last_label_id: number
+  weights: Record<string, number> | null
+}
+
+export type ThresholdSuggestion = {
+  class_code: string
+  labelled_pairs: number
+  positives: number
+  suggested_t_high: number
+  suggested_precision: number
+  suggested_recall: number
+  suggested_f1: number
+  current_t_high: number
+  current_precision: number
+  current_recall: number
+  applied: false
+}
+
+export type ThresholdSuggestions = {
+  applied: false
+  current_t_high: number
+  min_labels: number
+  classes: ThresholdSuggestion[]
   note: string
 }
 
@@ -973,9 +1038,52 @@ export async function patchUser(id: number, body: { role?: string; active?: bool
   return parsed as AdminUser
 }
 
-export const getCpses = () => api.get<{ cpses: { code: string; name: string; items: number }[] }>('/cpses')
+export type CpseRow = { code: string; name: string; items: number; contact_email: string | null }
+
+export const getCpses = () => api.get<{ cpses: CpseRow[] }>('/cpses')
 export const createCpse = (code: string, name: string) =>
   api.post<{ code: string; name: string }>('/cpses', { code, name })
+export async function patchCpse(code: string, body: { name?: string; contact_email?: string | null }) {
+  const res = await sendRaw(`/api/cpses/${code}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const parsed = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, String(parsed?.detail ?? res.statusText), parsed)
+  return parsed as { code: string; name: string; contact_email: string | null }
+}
+
+// ---- per-CPSE catalogue report ----
+
+export type ReportListing = {
+  delivery: 'smtp' | 'outbox'
+  outbox_dir: string | null
+  cpses: {
+    code: string
+    name: string
+    contact_email: string | null
+    items: number
+    last_sent: { at: string | null; mode: string | null; to: string[] } | null
+  }[]
+}
+
+export type ReportSendResult = {
+  mode: 'smtp' | 'outbox'
+  host: string | null
+  path: string | null
+  cpse: string
+  to: string[]
+  sha256: string
+  sent_at: string
+  note: string
+}
+
+export const getReports = () => api.get<ReportListing>('/reports')
+/** The printable page, for a new tab. */
+export const reportHtmlUrl = (code: string) => `/api/reports/cpse/${code}?format=html`
+export const sendReport = (code: string, to: string[] | null = null) =>
+  api.post<ReportSendResult>(`/reports/cpse/${code}/send`, { to })
 
 export type HealthPanel = {
   capabilities: Health['capabilities']

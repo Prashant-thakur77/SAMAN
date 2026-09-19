@@ -812,6 +812,42 @@ consumption value ranked within that CPSE (A carries 70% of spend, B the next
 on every transfer suggestion, so the idle pallet worth chasing first is the
 A-class one.
 
+### A report for each CPSE
+
+The dashboards answer the ministry's question. A steward's is narrower: what
+did the platform find in *our* rows, what is waiting for *our* people, and
+what is it worth to *us*. `GET /api/reports/cpse/CPCL` answers it in one
+document (JSON, or `?format=html` for a printable page), computed from the
+database by the same functions the dashboards call: the catalogue and how much
+of it carries a code; duplicates inside the catalogue with example pairs, and
+rows another CPSE also has, per CPSE; the review queue by band and the
+conflicts that need an approver; the quality scorecard row with the weakest
+rate named and what would lift it; stock, dead stock and the transfers in and
+out with their rupee value; joint-tender candidates with the saving
+attributable to the CPSE at the stated capture, and the materials where it
+pays above the market band; Smart-Create checks by its users; and a list of
+next steps, each with the count that produced it. Whoever asks, the document
+is redacted as that CPSE's own steward would see it (§0.9b): the registrar may
+send CPCL its report, and it still carries no other CPSE's price, only the
+anonymised band. A steward sees their own; the registrar, admin and auditor
+any; the Administration page and the steward's Home both have Preview and Send.
+
+**Delivery.** `POST /api/reports/cpse/CPCL/send` mails the HTML with the JSON
+attached to the CPSE's contact address (set under Administration, seeded as a
+placeholder `materials@cpcl.example`) or to the addresses in the body. With
+`SAMAN_SMTP_HOST` set (and `SAMAN_SMTP_PORT`, `SAMAN_SMTP_USER`,
+`SAMAN_SMTP_PASSWORD`, `SAMAN_SMTP_FROM`, `SAMAN_SMTP_STARTTLS`) it goes by
+SMTP; without one it is written as an RFC-822 `.eml` into `data/outbox/` (or
+`SAMAN_OUTBOX_DIR`), so an offline installation and the demo still produce the
+artefact and the response says where it went. Every send is a `report.sent`
+audit event with the recipients, the mode and the SHA-256 of the document.
+`make report` writes every CPSE's HTML and JSON into the outbox; `make report
+CPSE=CPCL SEND=1` delivers one. A weekly send from cron, Monday 07:00:
+
+```
+0 7 * * 1  cd /opt/saman/backend && .venv/bin/python -m app.cli report --all --send >> /var/log/saman-report.log 2>&1
+```
+
 ### Review and governance
 
 The workbench covers all three confidence bands, not only the uncertain one: an
@@ -1004,12 +1040,19 @@ better with use. SAMAN's answer is a model small enough to print.
 
 Every approve and reject in the Workbench is written to `pair_label`. `make
 learn` (or **Train now** on the admin page) fits a logistic regression over
-fifteen features the pipeline already stores for each pair: the anchor, fuzzy
-and semantic scores, attribute agreement, how many identity-critical
-attributes matched, mismatched or were unknown, how many performance
-attributes sat in or out of band, whether the pair was vetoed. The result is
-`data/models/pairwise.json`: means, scales, fifteen weights and an intercept.
-No pickle, nothing a reviewer cannot read.
+twenty-four features the pipeline already stores for each pair or that the
+two items' rows carry: the anchor, fuzzy and semantic scores, attribute
+agreement, how many identity-critical attributes matched, mismatched or were
+unknown, what share of them could be compared, how many performance
+attributes sat in or out of band, whether the pair was vetoed, held back for
+thin evidence or recorded as an equivalence, whether the brands agree, whether
+the two rows come from the same CPSE, whether both carry a part number and
+they differ, and the token overlap and length ratio of the two normalised
+texts. The result is `data/models/pairwise.json`: means, scales, twenty-four
+weights and an intercept. No pickle, nothing a reviewer cannot read. A model
+saved with the original fifteen features still loads, because features are
+matched by name; one this version cannot score is refused with a note to
+retrain rather than scored wrongly.
 
 What it is allowed to do is deliberately narrow. It **never decides**: the
 veto layer stays absolute and the pipeline's confidence stays the number a
@@ -1024,17 +1067,46 @@ written as `source=simulated`, never a task and never the held-out split):
 
 | Held-out pairs with evidence | Learned model AUC | Pipeline confidence AUC |
 |---|---|---|
-| all bands (4,647) | **0.997** | 0.702 |
-| grey band only (698) | **0.965** | 0.222 |
+| all bands (4,647) | **0.999** (0.997 with the original fifteen features) | 0.702 |
+| grey band only (698) | **0.976** (0.965 with the original fifteen features) | 0.222 |
 
 The grey row is the honest one: inside the grey band the pipeline's own score
 is, by construction, the least informative number on the card, and the
-reviewers' labels are what separate the pairs. The largest weights are
-attribute agreement (positive) and the veto (negative), which is the platform
-learning back what the veto layer encodes.
+reviewers' labels are what separate the pairs. The largest weights are the
+veto and an equivalence candidate (both negative), attribute agreement
+(positive) and same-CPSE (negative: two rows in one catalogue are more often
+two products than two spellings), which is the platform learning back what the
+veto layer and the §2B engine encode. The feature set was widened from fifteen
+to twenty-four only after measuring both on the same labels; the numbers in
+brackets are what it replaced.
+
+The model retrains itself as a champion/challenger loop. After every
+`SAMAN_RETRAIN_EVERY` reviewer decisions (25 by default; simulated labels
+never count) a challenger is fitted on every label in a background thread and
+measured on the held-out split exactly as above. It replaces the champion only
+if its held-out AUC is not worse by more than 0.005 and is above chance;
+otherwise the champion stays. Every attempt, promoted or kept, is appended to
+`data/models/pairwise-history.jsonl` with its label counts, cross-validated
+and held-out AUC, the champion's AUC, the outcome and its reason, and the
+weights when it won; the same record goes into the audit chain as
+`model.retrained` or `model.kept` by `system`. The admin page shows the last
+twenty. `make learn` still trains by hand and always promotes, and writes the
+same line. `SAMAN_AUTO_RETRAIN=false` turns the loop off.
+
+The same evaluation is broken down per class on the admin page, and beside it
+sit **threshold suggestions**: for each class with at least thirty labelled
+pairs of both outcomes, the pipeline-confidence cut that would maximise F1 on
+the labels, the precision it gives, and the precision the current `T_HIGH`
+gives on the same pairs. They are marked *suggested, not applied* and nothing
+reads them back into `match.py`. Thresholds were tuned on the tuning split
+and frozen (§0.6); a cut that maximises F1 on whatever pairs happened to be
+reviewed is a different objective from one that keeps auto-merges precise,
+and the labels it is fitted to are not a random sample of the estate. A
+registrar who changes a threshold does it deliberately, with these numbers in
+front of them and the change in the audit log.
 
 Why this and not a fine-tuned language model: the decisions that matter are
-pairwise and attribute-driven, and fifteen weights can be audited where a 3B
+pairwise and attribute-driven, and two dozen weights can be audited where a 3B
 model cannot. The labelled pairs are exported as JSON lines from the admin
 page (**download the labelled corpus**), which is exactly the training set a
 future LoRA on the local LLM would need and did not exist before.

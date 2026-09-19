@@ -85,6 +85,23 @@ class Settings(BaseSettings):
     #: visitor does not wait for them. On by the deployments, off in development.
     saman_warm_dashboards: bool = False
 
+    #: Retrain the pairwise model on its own as reviewer decisions accumulate
+    #: (learn.py). The new model replaces the old one only if it is not worse
+    #: on the held-out split; every attempt is recorded either way. Simulated
+    #: labels never count toward the trigger.
+    saman_auto_retrain: bool = True
+    saman_retrain_every: int = 25
+
+    #: Delivery of the per-CPSE report (`reports.deliver`). With no host set
+    #: the report is written as an .eml into data/outbox/ (or SAMAN_OUTBOX_DIR),
+    #: so an offline installation still produces the artefact.
+    saman_smtp_host: str | None = None
+    saman_smtp_port: int = 587
+    saman_smtp_user: str | None = None
+    saman_smtp_password: str | None = None
+    saman_smtp_from: str = "saman@localhost"
+    saman_smtp_starttls: bool = True
+
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -112,8 +129,32 @@ class Settings(BaseSettings):
         # path even when one is present.
         if self.ollama_url is None and self.saman_ollama_autodetect:
             self.ollama_url = _local_ollama()
+        # A larger local model, when the machine has one. The default stays the
+        # 3B model that fits in 4 GB; a workstation with the 7B pulled says so
+        # here and the first present name in the list is used.
+        if self.ollama_url and self.saman_ollama_prefer:
+            present = _ollama_models(self.ollama_url)
+            for name in [n.strip() for n in self.saman_ollama_prefer.split(",") if n.strip()]:
+                if name in present or f"{name}:latest" in present:
+                    self.ollama_model = name
+                    break
 
     saman_ollama_autodetect: bool = True
+    #: Comma-separated local model names in order of preference, e.g.
+    #: "qwen2.5:7b,qwen2.5:3b"; the first one Ollama has is used.
+    saman_ollama_prefer: str = ""
+
+
+def _ollama_models(url: str) -> set[str]:
+    """The model names a local Ollama reports; empty when it does not answer."""
+    try:
+        import httpx
+
+        response = httpx.get(f"{url.rstrip('/')}/api/tags", timeout=1.5)
+        response.raise_for_status()
+        return {m.get("name", "") for m in response.json().get("models", [])}
+    except Exception:
+        return set()
 
 
 def _local_ollama() -> str | None:
