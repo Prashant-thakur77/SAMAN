@@ -793,3 +793,76 @@ class TestCompareAnyTwoRows:
     def test_the_same_row_twice_is_refused(self, as_viewer, pipeline_run):
         assert as_viewer.get("/api/compare?a=1&b=1").status_code == 422
         assert as_viewer.get("/api/compare?a=1&b=999999999").status_code == 404
+
+
+class TestAttachments:
+    """The datasheet an approver asks for first: stored by hash, served checked, voided not deleted."""
+
+    def _cluster(self, db):
+        return db.execute(select(GoldenRecord.cluster_id).limit(1)).scalar_one()
+
+    def test_attach_list_download_and_void(self, client, db, pipeline_run):
+        from app.models import AuditEvent
+
+        client.post("/api/auth/login", json={"email": "approver@min.gov.in", "password": "demo"})
+        cid = self._cluster(db)
+        pdf = b"%PDF-1.4\n%synthetic datasheet\n"
+        up = client.post(
+            f"/api/clusters/{cid}/attachments",
+            data={"kind": "datasheet", "note": "from the OEM site"},
+            files={"file": ("6205-datasheet.pdf", pdf, "application/pdf")},
+        )
+        assert up.status_code == 200, up.text
+        listed = up.json()["attachments"]
+        assert listed and listed[-1]["filename"] == "6205-datasheet.pdf"
+        assert listed[-1]["uploaded_by"] and listed[-1]["kind"] == "datasheet"
+        att = listed[-1]
+
+        again = client.get(f"/api/clusters/{cid}/attachments").json()
+        assert any(a["id"] == att["id"] for a in again["attachments"])
+
+        got = client.get(f"/api/clusters/attachments/{att['id']}/file")
+        assert got.status_code == 200 and got.content == pdf
+        assert got.headers["content-type"].startswith("application/pdf")
+
+        # The same bytes attached twice are one file on disk, two rows.
+        twice = client.post(
+            f"/api/clusters/{cid}/attachments",
+            files={"file": ("copy.pdf", pdf, "application/pdf")},
+        ).json()
+        assert sum(1 for a in twice["attachments"] if a["sha256"] == att["sha256"]) == 2
+
+        gone = client.delete(f"/api/clusters/attachments/{att['id']}?reason=wrong%20revision")
+        assert gone.status_code == 200
+        assert all(
+            a["id"] != att["id"]
+            for a in client.get(f"/api/clusters/{cid}/attachments").json()["attachments"]
+        )
+        assert client.get(f"/api/clusters/attachments/{att['id']}/file").status_code == 404
+        actions = {
+            e.action
+            for e in db.execute(
+                select(AuditEvent).where(
+                    AuditEvent.entity == f"golden:{att and again['golden_id']}"
+                )
+            ).scalars()
+        }
+        assert {"attachment.add", "attachment.void"} <= actions
+
+    def test_only_documents_and_pictures_and_only_from_those_who_may(
+        self, client, as_viewer, db, pipeline_run
+    ):
+        cid = self._cluster(db)
+        assert (
+            as_viewer.post(
+                f"/api/clusters/{cid}/attachments",
+                files={"file": ("x.pdf", b"%PDF", "application/pdf")},
+            ).status_code
+            == 403
+        )
+        client.post("/api/auth/login", json={"email": "steward@cpcl.in", "password": "demo"})
+        refused = client.post(
+            f"/api/clusters/{cid}/attachments",
+            files={"file": ("run.exe", b"MZ", "application/octet-stream")},
+        )
+        assert refused.status_code == 422

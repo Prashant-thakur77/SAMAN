@@ -950,6 +950,15 @@ on screen are recorded with the decision and shown on the executive
 dashboard as a median and a 90th percentile, the first number a pilot is
 judged on.
 
+Approvers ask for the datasheet first, so a golden record carries
+**attachments**: a datasheet, drawing, photograph or certificate (PDF or an
+image, 25 MB), attached from the cluster page by a steward, engineer,
+approver or registrar. Files are stored under `data/uploads/` by their SHA-256
+(the same drawing attached twice is one file), served back with the hash
+re-checked, and withdrawn by voiding the row, never by deleting the file, so
+an audit can still find what an approver looked at; both actions are on the
+chain.
+
 Approvers ask about pairs the pipeline never chose: two rows in one cluster
 that look wrong together, two in different clusters that look the same.
 **Compare** (`/compare?a=&b=`, reached by ticking two members on a cluster

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import { Attachments } from '../components/Attachments'
 import { PageHeader } from '../components/PageHeader'
 import { ItemPanel } from '../components/workbench/ItemPanel'
 import { Button } from '../components/primitives/Button'
@@ -287,6 +288,8 @@ export default function Cluster() {
           })}
         </div>
       </section>
+
+      <Attachments clusterId={clusterId} />
 
       {/* Merge */}
       {!locked && (

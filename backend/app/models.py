@@ -409,6 +409,32 @@ class MigrationChange(Base):
     state: Mapped[str] = mapped_column(String(16), default="planned")  # applied|held|rolled_back
 
 
+class GoldenAttachment(Base):
+    """A datasheet, drawing or photograph attached to a golden record (§6.6).
+
+    Approvers ask for the datasheet first. The file sits under data/uploads/
+    by its SHA-256, so the same drawing attached twice is stored once and a
+    tampered file is caught on the way out; the row keeps the name the
+    uploader gave it. Deleting is a `void`: the row is marked, never removed,
+    like every other record here.
+    """
+
+    __tablename__ = "golden_attachment"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    golden_id: Mapped[int] = mapped_column(ForeignKey("golden_record.id"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(128))
+    size: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    #: datasheet | drawing | photo | certificate | other
+    kind: Mapped[str] = mapped_column(String(16), default="datasheet")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class BinBinding(Base):
     """ "This bin holds this material": a shelf label bound to a cluster (§5).
 

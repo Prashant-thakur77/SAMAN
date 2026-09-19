@@ -70,8 +70,16 @@ def get_cluster(cluster_id: int, db: Session = Depends(get_db)) -> dict:
     members = []
     fusion_members = []
     for (
-        item_id, norm_text, class_code, attrs_json, mpn,
-        legacy_code, description, uom, plant, cpse_code,
+        item_id,
+        norm_text,
+        class_code,
+        attrs_json,
+        mpn,
+        legacy_code,
+        description,
+        uom,
+        plant,
+        cpse_code,
     ) in rows:
         attrs = json.loads(attrs_json or "{}")
         members.append(
@@ -151,11 +159,119 @@ def get_cluster(cluster_id: int, db: Session = Depends(get_db)) -> dict:
         "members": members,
         # §2D: what changed from each legacy description to the golden text.
         "standardization_delta": (
-            [
-                standardization_delta(member, golden.std_description)
-                for member in fusion_members
-            ]
+            [standardization_delta(member, golden.std_description) for member in fusion_members]
             if golden
             else []
         ),
     }
+
+
+# --------------------------------------------------------------------------
+# Attachments: the datasheet an approver asks for first
+# --------------------------------------------------------------------------
+
+from typing import Annotated  # noqa: E402
+
+from fastapi import File, Form, UploadFile  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+
+from .. import attachments  # noqa: E402
+from ..auth import require_roles, require_user  # noqa: E402
+from ..models import User  # noqa: E402
+
+ATTACHERS = ("steward", "approver", "engineer", "registrar", "admin")
+
+
+def _golden_of(db: Session, cluster_id: int) -> GoldenRecord:
+    golden = db.execute(
+        select(GoldenRecord).where(GoldenRecord.cluster_id == cluster_id)
+    ).scalar_one_or_none()
+    if golden is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"No golden record for cluster {cluster_id}."
+        )
+    return golden
+
+
+@router.get("/{cluster_id}/attachments")
+def list_attachments(
+    cluster_id: int,
+    _user: Annotated[User, Depends(require_user)],
+    db: Session = Depends(get_db),
+) -> dict:
+    golden = _golden_of(db, cluster_id)
+    return {
+        "golden_id": golden.id,
+        "attachments": attachments.listing(db, golden.id),
+        "kinds": list(attachments.KINDS),
+        "accepts": sorted(attachments.ALLOWED_TYPES),
+        "max_bytes": attachments.MAX_BYTES,
+    }
+
+
+@router.post("/{cluster_id}/attachments")
+async def add_attachment(
+    cluster_id: int,
+    user: Annotated[User, Depends(require_roles(*ATTACHERS))],
+    file: Annotated[UploadFile, File()],
+    kind: Annotated[str, Form()] = "datasheet",
+    note: Annotated[str | None, Form()] = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Attach a datasheet, drawing or photograph to the golden record.
+    Stored by content hash, audited, and served back hash-checked."""
+    golden = _golden_of(db, cluster_id)
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(1024 * 1024):
+        total += len(chunk)
+        if total > attachments.MAX_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "The file is too large.")
+        chunks.append(chunk)
+    try:
+        row = attachments.attach(
+            db,
+            golden,
+            user,
+            file.filename or "attachment",
+            file.content_type or "",
+            b"".join(chunks),
+            kind,
+            note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    return {"attached": row.id, "attachments": attachments.listing(db, golden.id)}
+
+
+@router.get("/attachments/{attachment_id}/file")
+def download_attachment(
+    attachment_id: int,
+    _user: Annotated[User, Depends(require_user)],
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    try:
+        row, path = attachments.open_file(db, attachment_id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return FileResponse(
+        path,
+        media_type=row.content_type,
+        filename=row.filename,
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.delete("/attachments/{attachment_id}")
+def void_attachment(
+    attachment_id: int,
+    user: Annotated[User, Depends(require_roles(*ATTACHERS))],
+    reason: str | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Withdraw an attachment: the row is voided and audited, the file kept."""
+    try:
+        row = attachments.void(db, attachment_id, user, reason)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return {"voided": row.id}

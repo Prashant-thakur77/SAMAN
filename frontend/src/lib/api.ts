@@ -2025,3 +2025,52 @@ export const setAutoIssuePolicy = (family: string, enabled: boolean, min_precisi
   )
 export const runAutoIssue = (dry_run: boolean, family?: string) =>
   api.post<AutoIssueRun>('/autoissue/run', { dry_run, family })
+
+// ---- attachments on a golden record ----
+
+export type Attachment = {
+  id: number
+  filename: string
+  content_type: string
+  size: number
+  sha256: string
+  kind: string
+  note: string | null
+  uploaded_by: string
+  uploaded_at: string
+}
+
+export type AttachmentListing = {
+  golden_id: number
+  attachments: Attachment[]
+  kinds: string[]
+  accepts: string[]
+  max_bytes: number
+}
+
+export const getAttachments = (clusterId: number) =>
+  api.get<AttachmentListing>(`/clusters/${clusterId}/attachments`)
+
+export async function addAttachment(
+  clusterId: number,
+  file: File,
+  kind: string,
+  note?: string,
+): Promise<{ attached: number; attachments: Attachment[] }> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('kind', kind)
+  if (note) form.append('note', note)
+  const res = await sendRaw(`/api/clusters/${clusterId}/attachments`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, String(body?.detail ?? res.statusText), body)
+  return body as { attached: number; attachments: Attachment[] }
+}
+
+export const attachmentUrl = (id: number) => `/api/clusters/attachments/${id}/file`
+
+export const voidAttachment = (id: number, reason?: string) =>
+  request<{ voided: number }>(
+    `/clusters/attachments/${id}${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`,
+    { method: 'DELETE' },
+  )
