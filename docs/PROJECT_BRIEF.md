@@ -358,3 +358,9 @@ Related write-ups: `docs/ROADMAP.md` (beyond the hackathon: federation,
 GeM/SAP integration, a national registry), `docs/sap-integration.md` (the
 three integration doors), the demo scripts and pitch kept as Claude artifacts
 by the owner.
+
+---
+
+*Companion documents: `docs/HOW_IT_WORKS.md` (the practical questions),
+`docs/ARCHITECTURE.md` (the system in diagrams), `docs/INSTALL.md`,
+`docs/REFINEMENT_PLAN.md` (the plan forward), `KNOWN_GAPS.md`.*

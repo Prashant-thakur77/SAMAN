@@ -247,7 +247,7 @@ never a feeling.
 
 - **Reruns.** Incremental runs score only the rows that arrived since the
   last run; decided pairs, attachments and bin bindings survive a rerun (done).
-- **Frontend test depth.** 135 unit tests cover the state machines; `make e2e`
+- **Frontend test depth.** 141 unit tests cover the state machines; `make e2e`
   drives the five demo moves in a real browser (done).
 - **The learned model's story.** Show its confusion matrix on real labels and
   hide it while labels are simulated.

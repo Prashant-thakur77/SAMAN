@@ -13,6 +13,7 @@ Requires the optional documentation tooling::
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from collections.abc import Callable
@@ -165,7 +166,14 @@ def capture(base_url: str, role: str, password: str) -> int:
     written, failed = [], []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        # Playwright's own download when it has one; otherwise a Chromium
+        # already under ~/.cache/ms-playwright, as e2e_demo.py does.
+        import glob
+
+        found = sorted(
+            glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome"))
+        )
+        browser = p.chromium.launch(executable_path=found[-1]) if found else p.chromium.launch()
         context = browser.new_context(viewport=VIEWPORT, device_scale_factor=2)
         page = context.new_page()
 
