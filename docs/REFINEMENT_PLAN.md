@@ -50,7 +50,7 @@ and at a desk.*
 | Onboard | improve · **done** (progress bar: pipeline only) | Excel input, long-text tables, a downloadable rejection report, progress for large files | Real extracts are .xlsx with MAKTX in one sheet and long text in another | 3 d |
 | Item / Cluster | add · **done** | Side-by-side compare of any two rows; attachments (datasheet, drawing) on a golden record | Approvers ask for the datasheet first | 3 d |
 | Assistant | improve · **done** | Hindi answers when asked in Hindi; clickable citations; the last five turns as context | The people at the bin do not write English questions | 2 d |
-| Whole site | improve · **Hindi toggle done** (chrome, Workbench, Scan, shell); loading states and a11y pass next | Hindi interface toggle; loading states on every fetch; an accessibility pass with a screen reader | A government instrument is used by everyone | 4 d |
+| Whole site | improve · **done as far as measured**: Hindi toggle; every route has one h1, a main landmark, named buttons and labelled inputs (checked in a browser); a screen-reader walkthrough is still a person's afternoon | Hindi interface toggle; loading states on every fetch; an accessibility pass with a screen reader | A government instrument is used by everyone | 4 d |
 
 **Gate:** a steward clears a page of the high band in under a minute; the
 Scan app resolves a label with the phone in flight mode; every dashboard bar

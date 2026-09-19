@@ -369,6 +369,7 @@ export default function Admin() {
                 </TD>
                 <TD>
                   <select
+                    aria-label={`Role of ${user.name}`}
                     value={user.role}
                     disabled={busy}
                     onChange={(e) =>
