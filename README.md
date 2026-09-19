@@ -236,7 +236,7 @@ actually renders.
 | ![Opportunity](docs/screenshots/opportunity.png) | ![Workbench](docs/screenshots/workbench.png) |
 | **Opportunity.** joint-tender candidates with the discount assumption stated inline and adjustable, price variance per base unit, inventory sharing. | **Workbench.** two records side by side, tier scores, attribute comparison with identity-critical fields marked. Keyboard-first: `A` approve, `R` reject, `J`/`K` move. |
 | ![Migration](docs/screenshots/migration.png) | ![Search](docs/screenshots/search.png) |
-| **Migration.** plan, dry run, a safe/held/conflict traffic light, apply, and a journal that can roll the batch back. | **Search.** one field across every CPSE's catalogue; a row opens the item in a drawer beside the results, and `⌘K` opens the same search anywhere. |
+| **Migration.** plan, dry run, a safe/held/conflict traffic light, apply, and a journal that can roll the batch back. | **Search.** one field across every CPSE's catalogue, read the way a description is read: Hindi terms, house abbreviations (`brg` finds bearings and says so) and, when nothing matches, the spelling the catalogue does use. Relevance puts the whole phrase first; the last few searches wait under the box. A row opens the item in a drawer beside the results, and `⌘K` opens the same search anywhere. |
 | ![Copilot](docs/screenshots/copilot.png) | ![Audit](docs/screenshots/audit.png) |
 | **Copilot.** answers with citations and the query behind them. Never free-form SQL, and it cannot see what its viewer may not. | **Audit.** the hash-chained event stream, verifiable from the page. |
 | ![Admin](docs/screenshots/admin.png) | ![Smart-Create](docs/screenshots/smart-create.png) |

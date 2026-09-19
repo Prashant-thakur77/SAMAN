@@ -338,3 +338,32 @@ class TestUserActivity:
         # An account that never signed in has no activity row, not a row of zeros.
         never = [u for u in body["users"] if u["activity"] is None]
         assert all(u["email"] != "registrar@min.gov.in" for u in never)
+
+
+class TestSearchReadsTheQueryLikeADescription:
+    def test_a_house_abbreviation_finds_the_expanded_word(self, as_viewer, pipeline_run):
+        plain = as_viewer.get("/api/items?search=bearing&limit=1").json()
+        abbreviated = as_viewer.get("/api/items?search=brg&limit=1").json()
+        assert plain["total"] > 0
+        assert abbreviated["total"] == plain["total"]
+        assert abbreviated["read_as"] == "BEARING"
+        assert abbreviated["rewritten"] == [{"from": "BRG", "to": "BEARING"}]
+        assert plain["read_as"] is None
+
+    def test_a_misspelling_that_finds_nothing_gets_a_suggestion(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/items?search=gaskte%20wuond&limit=1").json()
+        assert body["total"] == 0
+        assert body["did_you_mean"] == "GASKET WOUND"
+        assert as_viewer.get("/api/items?search=GASKET%20WOUND&limit=1").json()["total"] > 0
+
+    def test_no_suggestion_when_there_are_results(self, as_viewer, pipeline_run):
+        assert as_viewer.get("/api/items?search=bearing&limit=1").json()["did_you_mean"] is None
+
+    def test_relevance_puts_the_whole_phrase_first(self, as_viewer, pipeline_run):
+        body = as_viewer.get("/api/items?search=BEARING%20BALL&limit=5&sort=relevance").json()
+        assert body["sort"] == "relevance"
+        assert body["items"] and " BEARING BALL" in f" {body['items'][0]['normalized']}"
+        newest = as_viewer.get("/api/items?search=BEARING&limit=3&sort=newest").json()
+        ids = [i["item_id"] for i in newest["items"]]
+        assert ids == sorted(ids, reverse=True)
+        assert as_viewer.get("/api/items?search=BEARING&sort=sideways").json()["sort"] == "relevance"

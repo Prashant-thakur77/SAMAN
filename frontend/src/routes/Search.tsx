@@ -14,10 +14,35 @@ import {
   searchItems,
   type Facets,
   type SearchResponse,
+  type SearchSort,
 } from '../lib/api'
 import { cn } from '../lib/cn'
 
 const PAGE = 25
+
+/** The last few searches, kept in this browser only; a convenience, never state. */
+const RECENT_KEY = 'saman.search.recent'
+const RECENT_MAX = 8
+
+function readRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY)
+    const list = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function remember(term: string): string[] {
+  const next = [term, ...readRecent().filter((t) => t !== term)].slice(0, RECENT_MAX)
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+  } catch {
+    /* not persisting is survivable */
+  }
+  return next
+}
 
 /**
  * /search — spec §6.3.
@@ -31,13 +56,21 @@ export default function Search() {
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [term, setTerm] = useState(params.get('q') ?? '')
+  const [recent, setRecent] = useState<string[]>(() => readRecent())
   //  A row opens the item beside the results rather than navigating away (§6.3).
   const [drawerItem, setDrawerItem] = useState<number | null>(null)
 
   const cpse = params.get('cpse') ?? ''
   const klass = params.get('class') ?? ''
   const coded = params.get('cnmc') ?? ''
+  const sort = (params.get('sort') as SearchSort | null) ?? 'relevance'
   const offset = Number(params.get('offset') ?? 0)
+  const q = params.get('q') ?? ''
+
+  // A search that was actually run is worth remembering; typing is not.
+  useEffect(() => {
+    if (q.trim()) setRecent(remember(q.trim()))
+  }, [q])
 
   useEffect(() => {
     getFacets().then(setFacets).catch(() => setFacets(null))
@@ -51,6 +84,7 @@ export default function Search() {
           cpse: cpse || undefined,
           class: klass || undefined,
           has_cnmc: coded === '' ? undefined : coded === 'yes',
+          sort,
           limit: PAGE,
           offset,
         }),
@@ -59,7 +93,7 @@ export default function Search() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Search failed.')
     }
-  }, [params, cpse, klass, coded, offset])
+  }, [params, cpse, klass, coded, sort, offset])
 
   useEffect(() => {
     void load()
@@ -101,6 +135,52 @@ export default function Search() {
           Search
         </Button>
       </form>
+
+      {recent.length > 0 && !q && (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Recent searches">
+          <span className="micro-label">recent</span>
+          {recent.map((entry) => (
+            <button
+              key={entry}
+              type="button"
+              onClick={() => {
+                setTerm(entry)
+                update({ q: entry })
+              }}
+              className="rounded-full border border-hairline px-3 py-1 font-mono text-xs text-muted hover:text-ink"
+            >
+              {entry}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                localStorage.removeItem(RECENT_KEY)
+              } catch {
+                /* nothing to clear */
+              }
+              setRecent([])
+            }}
+            className="text-xs text-muted underline-offset-2 hover:underline"
+          >
+            clear
+          </button>
+        </div>
+      )}
+
+      {results?.read_as && (
+        <p className="text-sm text-muted" role="status">
+          Read as <span className="font-mono text-ink">{results.read_as}</span>
+          {results.rewritten && results.rewritten.length > 0 && (
+            <>
+              {' '}
+              ({results.rewritten.map((r) => `${r.from} → ${r.to}`).join(', ')})
+            </>
+          )}
+          .
+        </p>
+      )}
 
       <div className="flex flex-wrap items-end gap-4">
         <label className="space-y-2">
@@ -145,6 +225,19 @@ export default function Search() {
             <option value="no">Not yet coded</option>
           </select>
         </label>
+        <label className="space-y-2">
+          <span className="micro-label block">Sort</span>
+          <select
+            value={sort}
+            onChange={(e) => update({ sort: e.target.value === 'relevance' ? '' : e.target.value })}
+            className="h-10 border border-hairline bg-bg px-3 text-sm"
+            title="Relevance: the whole phrase first, then part-number hits, then the shortest text."
+          >
+            <option value="relevance">Relevance</option>
+            <option value="shortest">Shortest first</option>
+            <option value="newest">Newest first</option>
+          </select>
+        </label>
         {results && (
           <p className="pb-2.5 text-xs text-muted">
             {results.total.toLocaleString('en-IN')} match
@@ -158,17 +251,34 @@ export default function Search() {
       {results && results.items.length === 0 ? (
         <EmptyState
           title="Nothing matched"
-          description="Every word you type must appear in the row. Try fewer words, or clear the filters."
+          description={
+            results.did_you_mean
+              ? 'Every word you type must appear in the row. The catalogue spells it differently.'
+              : 'Every word you type must appear in the row. Try fewer words, or clear the filters.'
+          }
           action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setTerm('')
-                setParams(new URLSearchParams())
-              }}
-            >
-              Clear search
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {results.did_you_mean && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setTerm(results.did_you_mean!)
+                    update({ q: results.did_you_mean! })
+                  }}
+                >
+                  Did you mean <span className="font-mono">{results.did_you_mean}</span>?
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setTerm('')
+                  setParams(new URLSearchParams())
+                }}
+              >
+                Clear search
+              </Button>
+            </div>
           }
         />
       ) : (

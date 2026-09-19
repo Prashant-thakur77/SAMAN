@@ -1030,10 +1030,18 @@ export type SearchHit = {
   cnmc: string | null
 }
 
+export type SearchSort = 'relevance' | 'shortest' | 'newest'
+
 export type SearchResponse = {
   total: number
   offset: number
   limit: number
+  sort?: SearchSort
+  /** The query as the catalogue spells it, when an abbreviation was expanded. */
+  read_as?: string | null
+  rewritten?: { from: string; to: string }[]
+  /** A spelling the catalogue does use, when the typed one found nothing. */
+  did_you_mean?: string | null
   items: SearchHit[]
 }
 
@@ -1048,11 +1056,13 @@ export const searchItems = (params: {
   cpse?: string
   class?: string
   has_cnmc?: boolean
+  sort?: SearchSort
   limit?: number
   offset?: number
 }) => {
   const query = new URLSearchParams()
   if (params.search) query.set('search', params.search)
+  if (params.sort) query.set('sort', params.sort)
   if (params.cpse) query.set('cpse', params.cpse)
   if (params.class) query.set('class', params.class)
   if (params.has_cnmc !== undefined) query.set('has_cnmc', String(params.has_cnmc))

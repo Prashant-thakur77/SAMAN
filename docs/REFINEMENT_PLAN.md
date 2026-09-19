@@ -40,7 +40,7 @@ and at a desk.*
 | Workbench | add · **done** | Bulk confirm for the high band: select a page, one reason, one audit event per row | 7,381 policy confirmations one card at a time is not a steward's afternoon | 2 d |
 | Workbench | add · **done** | Seconds per decision recorded on the card; shown on the dashboard | The first number a pilot is judged on | 2 d |
 | Workbench | improve · **done** | Filters (class, CPSE, band, assigned to me); undo within five minutes | Queues are worked by family, and everyone mis-clicks | 2 d |
-| Search | improve | Sort by relevance, recent searches, "did you mean" from the abbreviation table | Half of real queries are misspelt abbreviations | 2 d |
+| Search | improve · **done** | Sort by relevance, recent searches, "did you mean" from the abbreviation table | Half of real queries are misspelt abbreviations | 2 d |
 | Scan | add | Installable app (PWA) with the OCR engine cached; works with no signal, syncs later | Stores have no signal; the phone must still answer | 3 d |
 | Scan | add | Stock-count mode (scan, count, next); bin binding ("this bin holds this code") | The storekeeper's real daily job | 3 d |
 | Scan | improve | Torch toggle, scan history, a "wrong item?" report | Dim stores; mistakes need a path back | 1 d |
