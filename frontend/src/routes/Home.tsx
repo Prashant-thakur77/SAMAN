@@ -128,7 +128,7 @@ export default function Home() {
             <ReportCard cpse={user.cpse_code} />
           )}
 
-          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-hairline bg-hairline shadow-card md:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1 md:[&>*:last-child:nth-child(3n+1)]:col-span-3">
             {(headline ?? []).map((kpi) => (
               <div key={kpi.key} className="space-y-2 bg-surface p-5">
                 <dt className="micro-label">{kpi.label}</dt>
@@ -158,7 +158,9 @@ export default function Home() {
                     <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted">
                       {event.entity}
                     </span>
-                    <span className="text-xs text-muted">{event.user}</span>
+                    <span className="w-full truncate text-xs text-muted sm:ml-auto sm:w-auto">
+                      {event.user}
+                    </span>
                   </li>
                 ))}
               </ol>
