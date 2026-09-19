@@ -58,6 +58,10 @@ class Capabilities:
     erp_engine: str = ""
     erp_degraded: bool = False
     degraded: list[str] = field(default_factory=list)
+    #: Deliberate choices and optional inputs that are absent (a pinned engine,
+    #: no local voice, no OCR): shown on the health panel, never counted as a
+    #: degraded tier.
+    notes: list[str] = field(default_factory=list)
     #: True when Tier 1 is on the fallback because an operator chose it, not
     #: because splink is missing. A deliberate choice is not a degradation, and
     #: reporting it as one trains people to ignore the indicator.
@@ -116,6 +120,7 @@ class Capabilities:
             },
             "sovereign_mode": self.sovereign_mode,
             "degraded": self.degraded,
+            "notes": self.notes,
         }
 
 
@@ -205,8 +210,10 @@ def detect() -> Capabilities:
         erp_degraded=erp_status["degraded"],
         sovereign_mode=sovereign,
         # Notes about deliberate choices are worth showing on the health panel,
-        # but they are not degradations and must not be counted as such.
-        degraded=degraded + notes,
+        # but they are not degradations and must not be counted as such: the
+        # chip says "2 of 3", and a missing voice pack is not a tier.
+        degraded=degraded,
+        notes=notes,
         linkage_pinned=linkage_pinned,
     )
 

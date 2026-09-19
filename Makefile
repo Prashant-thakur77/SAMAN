@@ -140,7 +140,7 @@ check:  ## Everything CI runs: lint, both test suites, type-check, licenses
 	cd backend && ../$(PY) -m ruff check .
 	cd backend && ../$(PYTEST) -q
 	cd frontend && npx tsc --noEmit && npm run test
-	cd backend && ../$(PY) scripts/licenses.py --check
+	cd backend && ../$(PY) scripts/licenses.py --check && ../$(PY) scripts/licenses.py --drift
 
 test-web:  ## Run the frontend test suite
 	cd frontend && npm run test
@@ -203,8 +203,8 @@ demo-restore:  ## Reset to the pre-baked demo snapshot in under 5s
 licenses:  ## Regenerate THIRD_PARTY_LICENSES.md and fail on any GPL/AGPL dep
 	cd backend && ../$(PY) scripts/licenses.py
 
-licenses-check:  ## Verify licenses without rewriting the file (CI gate)
-	cd backend && ../$(PY) scripts/licenses.py --check
+licenses-check:  ## Verify licenses without rewriting the file, then that the committed file still holds (CI gate)
+	cd backend && ../$(PY) scripts/licenses.py --check && ../$(PY) scripts/licenses.py --drift
 
 clean:  ## Remove build artefacts and caches (leaves data/ alone)
 	rm -rf frontend/dist frontend/node_modules/.vite

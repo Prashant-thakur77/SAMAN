@@ -45,7 +45,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -76,7 +76,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -93,8 +93,9 @@ jobs:
       - name: Fail on GPL or AGPL in the required dependency set
         run: python backend/scripts/licenses.py --check
 
-      - name: THIRD_PARTY_LICENSES.md is up to date
-        run: |
-          python backend/scripts/licenses.py
-          git diff --exit-code THIRD_PARTY_LICENSES.md \
-            || (echo "::error::THIRD_PARTY_LICENSES.md is stale — run 'make licenses'" && exit 1)
+      # Versions are unpinned and this runner installs the optional set, so a
+      # byte comparison fails on every fresh resolve; what must not drift is
+      # the licence each package is recorded under, and that every required
+      # package is listed.
+      - name: THIRD_PARTY_LICENSES.md is still true
+        run: python backend/scripts/licenses.py --drift

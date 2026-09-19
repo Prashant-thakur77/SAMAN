@@ -51,6 +51,8 @@ def test_all_optional_present_upgrades_every_tier(monkeypatch):
     assert caps.linkage_mode == "splink"
     assert caps.embedding_mode == "sentence-transformers"
     assert caps.llm_mode == "ollama"
+    # Voice packs and OCR weights on disk are not tiers; a machine without
+    # them (CI) is not degraded.
     assert caps.degraded == []
     assert caps.all_optional_present
 
@@ -68,9 +70,12 @@ def test_nothing_present_degrades_every_tier(monkeypatch):
     # One note per tier, plus the OCR reader. Asserted by content rather than by
     # count so that adding an optional component does not silently change what
     # this test is checking.
-    notes = " | ".join(caps.degraded)
+    notes = " | ".join(caps.degraded + caps.notes)
     for expected in ("splink", "sentence-transformers", "Tier 3", "OCR reader"):
         assert expected in notes
+    # The OCR reader and the voice packs are notes, not degraded tiers: the
+    # chip's "N of 3" must stay a count of tiers wherever the suite runs.
+    assert len(caps.degraded) == 3
 
 
 def test_sovereign_mode_overrides_ollama_url(monkeypatch):

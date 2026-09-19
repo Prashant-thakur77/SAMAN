@@ -84,6 +84,8 @@ export type Health = {
     stt?: { mode: string; engine: string; available: boolean }
     sovereign_mode: boolean
     degraded: string[]
+    /** Deliberate choices and absent optional inputs; shown, not counted. */
+    notes?: string[]
   }
 }
 

@@ -137,13 +137,16 @@ export default function Admin() {
               )
             })}
           </div>
-          {health.capabilities.degraded.length > 0 && (
+          {(health.capabilities.degraded.length > 0 ||
+            (health.capabilities.notes?.length ?? 0) > 0) && (
             <ul className="space-y-1">
-              {health.capabilities.degraded.map((note) => (
-                <li key={note} className="text-xs text-muted">
-                  {note}
-                </li>
-              ))}
+              {[...health.capabilities.degraded, ...(health.capabilities.notes ?? [])].map(
+                (note) => (
+                  <li key={note} className="text-xs text-muted">
+                    {note}
+                  </li>
+                ),
+              )}
             </ul>
           )}
 

@@ -97,7 +97,7 @@ class TestTierOnePin:
         monkeypatch.setenv("SAMAN_TIER1_ENGINE", "rapidfuzz")
         detected = capabilities.refresh()
         assert detected.linkage_mode == "rapidfuzz"
-        assert any("pinned to rapidfuzz" in note for note in detected.degraded)
+        assert any("pinned to rapidfuzz" in note for note in detected.notes)
 
     def test_a_deliberate_pin_is_not_reported_as_degradation(self, monkeypatch):
         """An indicator that cries wolf about a chosen configuration is one

@@ -311,6 +311,56 @@ def render(python: list[dict], node: list[dict]) -> str:
     return "\n".join(parts)
 
 
+_ROW = re.compile(
+    r"^\| (?:\[(?P<linked>[^\]]+)\]\([^)]*\)|(?P<plain>[^|]+?)) "
+    r"\| `[^`]*` \| (?P<license>[^|]+) \|$"
+)
+
+
+def committed_licenses() -> dict[str, str]:
+    """Package name -> licence text, as THIRD_PARTY_LICENSES.md records it."""
+    out: dict[str, str] = {}
+    for line in OUTPUT.read_text().splitlines():
+        m = _ROW.match(line.strip())
+        if m:
+            out[_normalise(m.group("linked") or m.group("plain"))] = m.group("license").strip()
+    return out
+
+
+def drift(python: list[dict], node: list[dict]) -> int:
+    """Is the committed file still true of this environment?
+
+    Versions are unpinned and a machine may lack an optional accelerator, so a
+    byte-for-byte comparison would fail on every fresh resolve. What must not
+    drift is the licence a package is recorded under, and every package the
+    required set installs must be listed.
+    """
+    recorded = committed_licenses()
+    changed, missing = [], []
+    for package in python + node:
+        name = _normalise(package["name"])
+        was = recorded.get(name)
+        if was is None:
+            if package["scope"] == "required":
+                missing.append(f"  {package['name']} — {package['license']}")
+            continue
+        if classify(was) != classify(package["license"]):
+            changed.append(f"  {package['name']}: recorded {was!r}, now {package['license']!r}")
+    if changed:
+        print("Licence changed since THIRD_PARTY_LICENSES.md was written — run 'make licenses':")
+        print("\n".join(changed))
+    if missing:
+        print("Required packages missing from THIRD_PARTY_LICENSES.md — run 'make licenses':")
+        print("\n".join(missing))
+    if changed or missing:
+        return 1
+    print(
+        f"THIRD_PARTY_LICENSES.md still holds: {len(recorded)} recorded packages, "
+        f"{len(python) + len(node)} in this environment, no licence changed."
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -321,10 +371,21 @@ def main() -> int:
         "--strict", action="store_true",
         help="also fail on copyleft in an optional accelerator",
     )
+    parser.add_argument(
+        "--drift", action="store_true",
+        help=(
+            "compare the committed file with this environment by package and licence, "
+            "ignoring versions and packages only one side has; fail on a licence that "
+            "changed or a required package the file does not list"
+        ),
+    )
     args = parser.parse_args()
 
     python = python_packages()
     node = node_packages()
+
+    if args.drift:
+        return drift(python, node)
 
     if not args.check:
         OUTPUT.write_text(render(python, node))
