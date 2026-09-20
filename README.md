@@ -6,7 +6,7 @@
   <a href="https://github.com/Prashant-thakur77/SAMAN/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Prashant-thakur77/SAMAN/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="tests" src="https://img.shields.io/badge/tests-1%2C320%20backend%20%C2%B7%20141%20frontend-111">
   <img alt="offline" src="https://img.shields.io/badge/runs-offline%2C%20no%20cloud-111">
-  <img alt="licence" src="https://img.shields.io/badge/licence-MIT%20%C2%B7%20permissive%20deps%20only-111">
+  <img alt="dependencies" src="https://img.shields.io/badge/dependencies-permissive%20licences%20only-111">
   <a href="https://saman-wymm.onrender.com"><img alt="demo" src="https://img.shields.io/badge/live%20demo-saman--wymm.onrender.com-111"></a>
 </p>
 
@@ -99,7 +99,7 @@ measures, and why it was built the way it was.
 - [Results](#results)
 - [Problem-statement traceability](#problem-statement-traceability)
 - [Built with](#built-with)
-- [License](#license)
+- [Licensing](#licensing)
 
 </details>
 
@@ -1676,8 +1676,9 @@ it, and above 900px of viewport height the text stands its spacing down. The
 fort now runs the full width of every screen from a phone to 2560px, base flush
 with the hero's edge, entirely above the fold.
 
-## License
+## Licensing
 
-MIT, in [LICENSE](LICENSE). Every required dependency is permissively
+All rights reserved by the authors; no licence is granted for the SAMAN
+code itself at this time. Every required dependency is permissively
 licensed and the licence gate in CI keeps it that way; the full inventory is
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
