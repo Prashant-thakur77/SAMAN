@@ -75,6 +75,7 @@ scoped request, deployment shapes, ledger), is
 | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | the practical questions: offline first, who the users are, how CPSEs and the registry see each other, how a catalogue comes in and codes go back |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | the system in diagrams and where things live in the repository |
 | [docs/INSTALL.md](docs/INSTALL.md) | installing in a CPSE: the two shapes, sizing, every setting, sizing the language model |
+| [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | the four-minute demo as a story, with clicks, timings and the answers to the questions that follow |
 | [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md) | a one-page brief for anyone joining the project |
 | [docs/REFINEMENT_PLAN.md](docs/REFINEMENT_PLAN.md) | the plan forward with finish lines, and what needs an outside input |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | who this is for and why |
@@ -331,6 +332,11 @@ actually renders.
 ---
 
 ## Demo script
+
+The **four-minute version, told as a story with a storekeeper in it**, with
+the clicks and the timings written in, is
+[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md). What follows is the twelve-minute
+walk through every screen.
 
 Twelve minutes, in order, with what to say and what to click. Every number below
 is what a freshly seeded `make demo` actually shows. Take a snapshot first with
