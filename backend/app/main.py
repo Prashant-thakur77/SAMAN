@@ -194,6 +194,31 @@ def warm_dashboards():
 
     jobs.append(("autoissue status", memoised("autoissue.status", autoissue.status)))
     jobs.append(("learn status", memoised("learn.status", learn.status)))
+
+    # The Workbench's first grey page. With a model configured, the card in
+    # front of the reviewer has its Tier-3 sentence worded by that model, and
+    # the first reader would otherwise wait for it (eight seconds on a local
+    # 3B, longer on a small host). The wording is cached per pair, so warming
+    # the page anyone opens first costs the demo nothing.
+    def warm_queue(db):
+        from .routers.workbench import queues
+
+        # Every parameter explicitly: called directly, FastAPI's Query
+        # defaults are unresolved objects rather than values.
+        queues(
+            band="grey",
+            state="pending",
+            limit=50,
+            offset=0,
+            order="id",
+            klass=None,
+            cpse=None,
+            mine=False,
+            user=None,
+            db=db,
+        )
+
+    jobs.append(("workbench (grey page 1)", job(warm_queue)))
     if get_settings().saman_warm_answers:
         jobs.append(("assistant answers", warm_answers))
     return cache.warm(jobs)
