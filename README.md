@@ -120,9 +120,10 @@ quality check. `make check` runs everything CI does: ruff, 1,320 backend tests,
 and `make demo-restore` take and reinstate a restore point in under a second,
 for when a demo goes somewhere unplanned.
 
-Sign in with any seeded account: `steward@cpcl.in`, `registrar@min.gov.in`,
-`approver@min.gov.in`, `engineer@cpcl.in` and others are listed on the login screen. Every one uses
-the password `demo`.
+Sign in by clicking any seeded account on the login screen — `steward@cpcl.in`,
+`registrar@min.gov.in`, `approver@min.gov.in`, `engineer@cpcl.in` and the
+others. In demo mode there is no password to type; the accounts also keep the
+password `demo` for the API and for an install with the picker turned off.
 
 Or with Docker:
 
@@ -170,6 +171,15 @@ SAMAN is a normal web application: one API process and one static frontend.
 The `deploy/` directory holds a production stack that runs anywhere Docker
 runs and needs no internet at runtime except, with a domain, the HTTPS
 certificate.
+
+**The public demo** is split the same way. The frontend is on Vercel at
+**https://saman-alpha.vercel.app**, built from `main` by `vercel.json` at the
+repository root; every `/api/*` request is proxied from there to the API's
+single container on Render, so the browser sees one origin and the session
+cookie belongs to the Vercel domain. The API cannot live on Vercel itself: a
+serverless function has a read-only filesystem and a 250 MB size limit, and
+SAMAN is a long-running process with a writable SQLite database of its own.
+To redeploy the frontend: `vercel deploy --prod` from the repository root.
 
 ```bash
 cd deploy && cp .env.example .env    # set SAMAN_SECRET_KEY; set SAMAN_DOMAIN for HTTPS
@@ -264,8 +274,9 @@ computed, and sovereign mode switches both paths off.
 **What changes for a real deployment, and where it is enforced.** A random
 `SAMAN_SECRET_KEY` (the API logs a warning on the development default when
 secure cookies are on). `SAMAN_SECURE_COOKIES=true` behind HTTPS.
-`SAMAN_DEMO_LOGIN=false`, which turns the account picker into an email field
-and stops advertising the shared password. Real accounts created on the admin
+`SAMAN_DEMO_LOGIN=false`, which turns the one-click account picker into an
+email and a password, and shuts the one-click sign-in on the server as well
+(`POST /api/auth/demo-login` answers 403). Real accounts created on the admin
 page. One API process, which is what the compose file runs, because login
 throttling is in memory. SQLite is a single-writer database, right for one
 CPSE's node and wrong for a national multi-writer registry, which is what the

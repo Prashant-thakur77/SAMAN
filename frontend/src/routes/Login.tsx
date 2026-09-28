@@ -11,6 +11,7 @@ import {
   getDemoUsers,
   getLoginMode,
   getPipelineStatus,
+  demoLogin,
   loadDemoData,
   login,
   type DemoUser,
@@ -25,7 +26,11 @@ import { useSession } from '../lib/session'
  * tagline beneath it (spec §1.2).
  *
  * The picker lists the seeded users returned by the API — it invents nobody
- * (spec §10). A failed sign-in shakes the card by 4px, collapsing to an
+ * (spec §10). In demo mode a click on an account signs in at once: the
+ * picker already listed everyone and the shared password was printed under
+ * the field, so asking for it protected nothing. With demo login off the
+ * page is an email and a password, and the one-click door is shut on the
+ * server too. A failed sign-in shakes the card by 4px, collapsing to an
  * opacity pulse under prefers-reduced-motion.
  */
 export default function Login() {
@@ -34,6 +39,8 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // The account being signed into by one click, so only its row says so.
+  const [signingIn, setSigningIn] = useState<string | null>(null)
   const controls = useAnimationControls()
   const reduce = useReducedMotion() ?? false
   const navigate = useNavigate()
@@ -100,6 +107,41 @@ export default function Login() {
     }
   }
 
+  function signInFailed(err: unknown) {
+    setError(
+      err instanceof ApiError && err.status === 401
+        ? 'Incorrect user or password.'
+        : err instanceof ApiError
+          ? err.message
+          : 'Sign-in failed.',
+    )
+    controls.start(shakeAnimation(reduce))
+  }
+
+  async function signInAs(account: string) {
+    if (signingIn) return
+    setError(null)
+    setEmail(account)
+    setSigningIn(account)
+    try {
+      try {
+        await demoLogin(account)
+      } catch (err) {
+        // An API from before one-click sign-in has no such route and answers
+        // 404; its seeded accounts all take the shared password, so sign in
+        // that way. The frontend can then deploy before the API or after it.
+        if (err instanceof ApiError && err.status === 404) await login(account, 'demo')
+        else throw err
+      }
+      await refresh()
+      navigate(cameFrom)
+    } catch (err) {
+      signInFailed(err)
+    } finally {
+      setSigningIn(null)
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -109,18 +151,15 @@ export default function Login() {
       await refresh()
       navigate(cameFrom)
     } catch (err) {
-      setError(
-        err instanceof ApiError && err.status === 401
-          ? 'Incorrect user or password.'
-          : err instanceof ApiError
-            ? err.message
-            : 'Sign-in failed.',
-      )
-      controls.start(shakeAnimation(reduce))
+      signInFailed(err)
     } finally {
       setBusy(false)
     }
   }
+
+  // Demo mode is the API's call. Until it answers, assume the picker, which
+  // is what an empty or demo database shows.
+  const oneClick = !mode || mode.demo_login
 
   return (
     <div className="flex min-h-screen flex-col bg-bg text-ink">
@@ -147,7 +186,11 @@ export default function Login() {
             <Field
               label="Sign in as"
               htmlFor={mode && !mode.demo_login ? 'email' : undefined}
-              hint={mode && !mode.demo_login ? 'Your account email.' : 'Seeded demo accounts.'}
+              hint={
+                mode && !mode.demo_login
+                  ? 'Your account email.'
+                  : 'Seeded demo accounts. Click one to sign in.'
+              }
             >
               {mode && !mode.demo_login && mode.has_users ? (
                 <Input
@@ -169,21 +212,26 @@ export default function Login() {
                     <li key={u.email}>
                       <button
                         type="button"
-                        onClick={() => setEmail(u.email)}
-                        aria-pressed={email === u.email}
+                        onClick={() => void signInAs(u.email)}
+                        disabled={signingIn !== null}
+                        aria-label={`Sign in as ${u.name}, ${u.role}${u.cpse_code ? `, ${u.cpse_code}` : ''}`}
                         className={cn(
-                          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
-                          email === u.email ? 'bg-surface text-ink' : 'text-muted hover:text-ink',
+                          'flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors',
+                          'hover:bg-surface hover:text-ink focus-visible:bg-surface focus-visible:text-ink',
+                          'disabled:cursor-wait',
+                          signingIn === u.email ? 'bg-surface text-ink' : 'text-muted',
                         )}
                       >
                         <span
                           aria-hidden
                           className={cn(
                             'h-1.5 w-1.5 shrink-0 rounded-full',
-                            email === u.email ? 'bg-ink' : 'bg-hairline',
+                            signingIn === u.email ? 'animate-pulse bg-ink' : 'bg-hairline',
                           )}
                         />
-                        <span className="min-w-0 flex-1 truncate">{u.name}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {signingIn === u.email ? 'Signing in…' : u.name}
+                        </span>
                         <span className="micro-label shrink-0">
                           {u.role}
                           {u.cpse_code ? ` · ${u.cpse_code}` : ''}
@@ -231,20 +279,18 @@ export default function Login() {
               )}
             </Field>
 
-            <Field
-              label="Password"
-              htmlFor="password"
-              hint={mode && !mode.demo_login ? undefined : 'Every seeded account uses “demo”.'}
-            >
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </Field>
+            {!oneClick && (
+              <Field label="Password" htmlFor="password">
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </Field>
+            )}
 
             {error && (
               <p role="alert" className="text-xs text-danger">
@@ -252,9 +298,11 @@ export default function Login() {
               </p>
             )}
 
-            <Button type="submit" variant="primary" className="w-full" disabled={busy || !email}>
-              {busy ? 'Signing in…' : 'Sign in'}
-            </Button>
+            {!oneClick && (
+              <Button type="submit" variant="primary" className="w-full" disabled={busy || !email}>
+                {busy ? 'Signing in…' : 'Sign in'}
+              </Button>
+            )}
           </form>
         </motion.div>
       </main>

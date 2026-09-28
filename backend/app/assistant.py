@@ -306,7 +306,8 @@ ROUTES: tuple[Route, ...] = (
             "switch account",
             "change user",
         ),
-        "Pick a seeded account. Every one uses the password demo.",
+        "Sign out, then click another seeded account on the sign-in screen. There is "
+        "no password to type in demo mode.",
     ),
 )
 
@@ -611,9 +612,9 @@ TOPICS: tuple[Topic, ...] = (
             "how do i log in",
             "kaise login",
         ),
-        "Every seeded account uses the password demo. The sign-in screen lists them: "
-        "steward@cpcl.in, registrar@min.gov.in, approver@min.gov.in, auditor@cag.gov.in and "
-        "admin@saman.gov.in. Pick one and type demo.",
+        "The sign-in screen lists the seeded accounts: steward@cpcl.in, "
+        "registrar@min.gov.in, approver@min.gov.in, auditor@cag.gov.in and "
+        "admin@saman.gov.in. Click one to sign in; in demo mode there is no password.",
         "/login",
         "Go to sign in",
     ),

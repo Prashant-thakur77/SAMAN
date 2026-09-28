@@ -22,7 +22,7 @@ from ..auth import (
 from ..config import get_settings
 from ..db import get_db
 from ..models import User
-from ..schemas import DemoUser, LoginRequest, UserOut
+from ..schemas import DemoLoginRequest, DemoUser, LoginRequest, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -74,6 +74,51 @@ def login(
     return _to_out(user)
 
 
+@router.post("/demo-login", response_model=UserOut)
+def demo_login(
+    body: DemoLoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> UserOut:
+    """Sign in as a seeded account with one click, no password.
+
+    Exists only while `SAMAN_DEMO_LOGIN` is on, which it must never be in a
+    CPSE: the picker already listed every account and printed the shared
+    password on the screen, so a password field protected nothing and cost a
+    presenter a keystroke per switch. With demo login off this refuses, and
+    `/login` with a real password is the only way in. The sign-in is audited
+    like any other, marked as a demo sign-in.
+    """
+    if not get_settings().saman_demo_login:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "One-click sign-in is a demo setting and is off here. Sign in with your password.",
+        )
+    email = body.email.strip().lower()
+    user = db.execute(
+        select(User).where(func.lower(User.email) == email, User.active.is_(True))
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No such account.")
+
+    client = request.client.host if request.client else "unknown"
+    issue_session(response, user)
+    audit.record(
+        db,
+        action="auth.login",
+        entity=f"user:{user.id}",
+        payload={
+            "role": user.role,
+            "cpse_id": user.cpse_id,
+            "client": client,
+            "method": "demo",
+        },
+        user=user.email,
+    )
+    return _to_out(user)
+
+
 @router.post("/logout")
 def logout(response: Response) -> dict:
     # Returns a body rather than 204 so the cookie-clearing headers ride on the
@@ -98,9 +143,9 @@ def session(user: Annotated[User | None, Depends(current_user_optional)]) -> Use
 def demo_users(db: Session = Depends(get_db)) -> list[DemoUser]:
     """Seeded users for the login picker (spec §6.1).
 
-    Exposes name, role and CPSE only. Every seeded account uses the password
-    `demo`, which is stated on the login screen — this is a local prototype
-    with synthetic data, not a deployment.
+    Exposes name, role and CPSE only. In demo mode a click on one signs in
+    through `/demo-login` without a password; this is a local prototype with
+    synthetic data, not a deployment.
     """
     if not get_settings().saman_demo_login:
         # Real accounts are not a menu. The page asks for an email instead.

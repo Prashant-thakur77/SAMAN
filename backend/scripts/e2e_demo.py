@@ -36,10 +36,12 @@ def _chromium() -> str | None:
 
 
 def sign_in(page, base: str, role: str, password: str) -> None:
+    """Demo mode signs in on one click; a real install asks for a password."""
     page.goto(f"{base}/login", wait_until="networkidle")
     page.click(f"li:has-text('{role}') button")
-    page.fill("input[type=password]", password)
-    page.click("button[type=submit]")
+    if page.locator("input[type=password]").count():
+        page.fill("input[type=password]", password)
+        page.click("button[type=submit]")
     page.wait_for_url(f"{base}/", timeout=20_000)
 
 

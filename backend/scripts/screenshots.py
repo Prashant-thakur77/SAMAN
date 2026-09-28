@@ -198,9 +198,11 @@ def capture(base_url: str, role: str, password: str) -> int:
         written.append("login.png")
         print(f"  {(OUTPUT / 'login.png').relative_to(REPO)}  (light)")
 
+        # Demo mode signs in on one click; a real install asks for a password.
         page.click(f"li:has-text('{role}') button")
-        page.fill("input[type=password]", password)
-        page.click("button[type=submit]")
+        if page.locator("input[type=password]").count():
+            page.fill("input[type=password]", password)
+            page.click("button[type=submit]")
         page.wait_for_url(f"{base_url}/", timeout=15_000)
 
         for shot in SHOTS:

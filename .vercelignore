@@ -1,0 +1,8 @@
+# Vercel builds the frontend only; the API stays on its own host.
+backend/.venv
+backend/native/saman_core/target
+data
+deploy
+docs/screenshots
+**/node_modules
+**/__pycache__

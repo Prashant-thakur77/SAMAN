@@ -238,6 +238,50 @@ class TestLoginThrottle:
         )
 
 
+class TestOneClickDemoSignIn:
+    """In demo mode an account on the picker signs in with one click. Off,
+    the door must not exist: a CPSE's accounts need their passwords."""
+
+    def test_a_click_signs_in_without_a_password(self, client, seeded):
+        client.cookies.clear()
+        r = client.post("/api/auth/demo-login", json={"email": "Registrar@min.gov.in"})
+        assert r.status_code == 200 and r.json()["role"] == "registrar"
+        assert client.get("/api/auth/me").json()["email"] == "registrar@min.gov.in"
+
+    def test_it_is_on_the_ledger_as_a_demo_sign_in(self, client, seeded, db):
+        from sqlalchemy import select
+
+        from app.models import AuditEvent
+
+        client.post("/api/auth/demo-login", json={"email": "steward@cpcl.in"})
+        event = db.execute(
+            select(AuditEvent)
+            .where(AuditEvent.action == "auth.login")
+            .order_by(AuditEvent.seq.desc())
+        ).scalars().first()
+        assert event.user == "steward@cpcl.in"
+        assert '"method":"demo"' in event.payload_json.replace(" ", "")
+
+    def test_an_unknown_account_is_refused(self, client, seeded):
+        r = client.post("/api/auth/demo-login", json={"email": "nobody@nowhere"})
+        assert r.status_code == 401
+
+    def test_with_demo_login_off_the_door_is_shut(self, client, seeded, monkeypatch):
+        from app.config import get_settings
+
+        monkeypatch.setenv("SAMAN_DEMO_LOGIN", "false")
+        get_settings.cache_clear()
+        try:
+            client.cookies.clear()
+            r = client.post("/api/auth/demo-login", json={"email": "admin@saman.gov.in"})
+            assert r.status_code == 403
+            assert "password" in r.json()["detail"]
+            assert client.get("/api/auth/me").status_code == 401
+        finally:
+            monkeypatch.delenv("SAMAN_DEMO_LOGIN")
+            get_settings.cache_clear()
+
+
 class TestDeploymentSwitches:
     def test_demo_login_off_hides_the_picker_but_not_the_door(self, client, seeded, monkeypatch):
         from app.config import get_settings

@@ -47,8 +47,9 @@ pretending.
 | **Viewer** | anyone else in the ministry | the public dashboards, no prices attributed |
 
 Accounts are created by the admin on the Admin page and belong to people. The
-"pick an account, the password is demo" screen is a demo setting
-(`SAMAN_DEMO_LOGIN=false` in a real install turns it off). Sign-in with the
+"click an account to sign in" screen is a demo setting
+(`SAMAN_DEMO_LOGIN=false` in a real install turns it off, and the one-click
+sign-in is then refused on the server, not merely hidden). Sign-in with the
 government directory (Parichay or the CPSE's own SSO) is **planned**.
 
 ## 3. How CPSEs and the registry see each other

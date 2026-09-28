@@ -81,7 +81,7 @@ All are environment variables (`deploy/.env` for compose; the shell for
 | `SAMAN_DB_PATH` | `data/app.db` | the SQLite file; the mock ERP sits beside it as `erp_mock.db` |
 | `SAMAN_SECRET_KEY` | a development value | signs sessions; **set it** on any machine that is not yours |
 | `SAMAN_SECURE_COOKIES` | `false` | `true` behind HTTPS (compose sets it); adds HSTS |
-| `SAMAN_DEMO_LOGIN` | `true` | the account picker with the shared password `demo`; **`false` in a CPSE**, where accounts are created on the Admin page |
+| `SAMAN_DEMO_LOGIN` | `true` | the one-click account picker, no password; **`false` in a CPSE**, which shuts one-click sign-in on the server and asks for an email and password; accounts are created on the Admin page |
 | `SAMAN_SOVEREIGN_MODE` | `false` | ignore any configured model; the Copilot answers from reviewed queries alone |
 | `SAMAN_TIER1_ENGINE` | `auto` | `splink` or `rapidfuzz` to pin Tier 1 |
 | `SAMAN_DISABLE_OPTIONAL` | `false` | run with the required set only |

@@ -115,6 +115,8 @@ export const getLoginMode = () =>
   api.get<{ demo_login: boolean; has_users: boolean }>('/auth/login-mode')
 export const login = (email: string, password: string) =>
   api.post<User>('/auth/login', { email, password })
+/** One click on the demo picker, no password. The API refuses it unless demo login is on. */
+export const demoLogin = (email: string) => api.post<User>('/auth/demo-login', { email })
 export const logout = () => api.post<{ ok: boolean }>('/auth/logout')
 export const getSession = () => api.get<User | null>('/auth/session')
 

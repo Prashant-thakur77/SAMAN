@@ -12,6 +12,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class DemoLoginRequest(BaseModel):
+    """One click on the demo picker: the account, no password (demo mode only)."""
+
+    email: str
+
+
 class UserOut(BaseModel):
     id: int
     email: str

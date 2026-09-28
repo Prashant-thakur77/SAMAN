@@ -12,6 +12,8 @@ from app.main import app
 PUBLIC = {
     ("GET", "/api/health"),  # what runs, and in what mode
     ("POST", "/api/auth/login"),
+    # One click on the picker, no password: demo mode only, 403 otherwise.
+    ("POST", "/api/auth/demo-login"),
     ("POST", "/api/auth/logout"),
     ("GET", "/api/auth/session"),  # "am I signed in?" for the app shell
     ("GET", "/api/auth/demo-users"),  # the account picker, demo mode only

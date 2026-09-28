@@ -41,3 +41,7 @@ deploy/.env
 # (frontend/scripts/ocr-assets.mjs); only the language model is kept in git.
 frontend/public/ocr/*
 !frontend/public/ocr/eng.traineddata.gz
+
+# The Vercel CLI's local project link and the env file it pulls
+.vercel
+.env.local

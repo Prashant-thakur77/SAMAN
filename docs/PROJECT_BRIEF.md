@@ -97,8 +97,10 @@ profile. **All data is synthetic** and every screen says so.
 
 ## 3. Who uses it (roles) and the seeded demo accounts
 
-All seeded accounts use the password `demo` (demo mode only; the login page
-says so). Role is what the API enforces; the UI only reflects it.
+In demo mode a click on an account signs in, with no password; the seeded
+accounts also carry the password `demo` for the API. With demo login off the
+picker becomes an email and a password and the one-click sign-in is refused
+on the server. Role is what the API enforces; the UI only reflects it.
 
 | Account | Role | Sees / may do |
 |---|---|---|
