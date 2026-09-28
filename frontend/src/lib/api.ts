@@ -18,8 +18,12 @@ export class ApiError extends Error {
 
 /** Statuses a host or proxy answers while the API is waking or restarting. */
 const WAKING = new Set([429, 502, 503, 504])
-/** Back-off between attempts, about half a minute in all: a free host wakes in that. */
-export const WAKE_RETRY_MS = [1000, 2000, 4000, 8000, 15000]
+/**
+ * Pauses between attempts, half a minute in all: a free host wakes in that.
+ * Never more than five seconds apart, so a host that has woken is noticed
+ * within five seconds rather than at the end of a doubling back-off.
+ */
+export const WAKE_RETRY_MS = [1000, 2000, 3000, 4000, 5000, 5000, 5000, 5000]
 
 /**
  * Did the host answer instead of SAMAN? SAMAN's own errors are JSON; a

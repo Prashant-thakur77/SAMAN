@@ -666,6 +666,12 @@ can say the database is empty (an empty one returns an empty list, not an
 error); until one arrives the page shows placeholder rows, says the server is
 waking once the wait outlasts a page load, and asks again every four seconds.
 
+Replaying a sleeping host against the build showed a second, smaller fault:
+the request layer's retries doubled (1, 2, 4, 8, 15 s), so a host that woke
+at 8 s was not asked again until 15 s. The pauses are now never more than
+five seconds apart, still half a minute in all; the accounts appeared at
+10.6 s instead of 15.7 s.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

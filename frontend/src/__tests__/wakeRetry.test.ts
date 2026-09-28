@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, api } from '../lib/api'
+import { ApiError, WAKE_RETRY_MS, api } from '../lib/api'
 
 const text = (status: number) =>
   new Response('Too Many Requests', { status, headers: { 'content-type': 'text/plain' } })
@@ -47,7 +47,27 @@ describe('a waking host', () => {
     const err = await result
     expect(err).toBeInstanceOf(ApiError)
     expect((err as ApiError).status).toBe(503)
-    expect(fetchMock).toHaveBeenCalledTimes(6)
+    expect(fetchMock).toHaveBeenCalledTimes(WAKE_RETRY_MS.length + 1)
+  })
+
+  it('notices a host that has woken within five seconds of it waking', async () => {
+    // Asleep for eight seconds, then awake. A back-off that doubles would
+    // next ask at fifteen, and the page would wait seven seconds for nothing.
+    const start = Date.now()
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async () =>
+        Date.now() - start < 8000 ? text(503) : json(200, { ok: true }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    let answered = false
+    const result = api.get('/health').then((body) => {
+      answered = true
+      return body
+    })
+    await vi.advanceTimersByTimeAsync(8000 + 5000)
+    expect(answered).toBe(true)
+    await expect(result).resolves.toEqual({ ok: true })
   })
 
   it('does not retry an unreachable network, so offline mode hears at once', async () => {
