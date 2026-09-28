@@ -30,7 +30,7 @@ def learn_status(
 ) -> dict:
     # Out-of-sample confusion over every reviewer label is seconds of work;
     # memoised on the estate's version, which a new label or a retrain moves.
-    return cache.memo(db, ("learn.status",), lambda: learn.status(db))
+    return cache.memo(db, ("learn.status",), lambda: learn.status(db), refresh=learn.status)
 
 
 @router.post("/train")

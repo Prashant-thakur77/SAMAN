@@ -26,6 +26,15 @@ export function ProvenanceLine({ provenance }: { provenance: DashboardProvenance
       computed {when} · {provenance.seconds}s · {provenance.rows.items.toLocaleString('en-IN')}{' '}
       items · {provenance.rows.decisions.toLocaleString('en-IN')} decisions · audit #
       {provenance.audit_seq} · run {provenance.match_run} · synthetic
+      {provenance.stale && (
+        <span
+          role="status"
+          className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-accent"
+          title="The estate has changed since these figures were computed. Fresh ones are being computed and will replace these on their own."
+        >
+          updating · these are the figures at audit #{provenance.audit_seq}
+        </span>
+      )}
     </p>
   )
 }

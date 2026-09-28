@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { PageHeader } from '../components/PageHeader'
@@ -7,7 +7,8 @@ import { formatRupees } from '../components/charts/CountUp'
 import { StatusChip } from '../components/primitives/Chip'
 import { EmptyState } from '../components/primitives/EmptyState'
 import { TBody, TD, TH, THead, TR, Table } from '../components/primitives/Table'
-import { ApiError, getOpportunity, type OpportunityDashboard } from '../lib/api'
+import { getOpportunity } from '../lib/api'
+import { useFreshData } from '../lib/useFreshData'
 import { cn } from '../lib/cn'
 
 const TABS = [
@@ -28,24 +29,15 @@ type Tab = (typeof TABS)[number]['key']
  * rescales in the browser without a refetch.
  */
 export default function DashOpportunity() {
-  const [data, setData] = useState<OpportunityDashboard | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [capture, setCapture] = useState(0.6)
   const [tab, setTab] = useState<Tab>('tenders')
   // The purchase window behind the money sections; stock is a position and
   // does not move with it.
   const [months, setMonths] = useState(12)
 
-  useEffect(() => {
-    let alive = true
-    // Fetched once per window at the baseline assumption; the slider rescales locally.
-    getOpportunity(0.6, months)
-      .then((d) => alive && setData(d))
-      .catch((err) => alive && setError(err instanceof ApiError ? err.message : 'Unavailable.'))
-    return () => {
-      alive = false
-    }
-  }, [months])
+  // Fetched once per window at the baseline assumption; the slider rescales
+  // locally. Asked again while the API is still recomputing after a change.
+  const { data, error } = useFreshData(() => getOpportunity(0.6, months), [months])
 
   const scaled = useMemo(() => {
     if (!data) return null

@@ -65,3 +65,63 @@ class TestMemo:
         thread = cache.warm([("bad", bad), ("good", lambda: ran.append(1))])
         thread.join(timeout=5)
         assert ran == [1]
+
+
+class TestStaleWhileRevalidate:
+    """A slow host gets the last figures at once, marked stale, and the fresh
+    ones as soon as they are computed; a fast host never sees stale ones."""
+
+    @staticmethod
+    def _value(n):
+        return {"n": n, "provenance": {"audit_seq": n}}
+
+    def _change(self, db):
+        audit.record(db, action="test.estate", entity="test", payload={}, user="tests")
+
+    def test_a_slow_recompute_serves_the_last_figures_marked_stale(self, db, seeded, monkeypatch):
+        import time
+
+        monkeypatch.setattr(cache, "_stale_wait", lambda: 0.05)
+        key = ("swr", "slow")
+        assert cache.memo(db, key, lambda: self._value(1)) == self._value(1)
+        self._change(db)
+
+        def slow(_session):
+            time.sleep(0.5)
+            return self._value(2)
+
+        started = time.perf_counter()
+        served = cache.memo(db, key, lambda: self._value(2), refresh=slow)
+        assert time.perf_counter() - started < 0.4, "the reader must not wait for the recompute"
+        assert served["n"] == 1 and served["provenance"]["stale"] is True
+        cache.drain()
+        fresh = cache.memo(db, key, lambda: self._value(3), refresh=slow)
+        assert fresh == self._value(2), "the background recompute is what the next reader gets"
+
+    def test_a_fast_recompute_is_served_fresh(self, db, seeded, monkeypatch):
+        monkeypatch.setattr(cache, "_stale_wait", lambda: 5.0)
+        key = ("swr", "fast")
+        cache.memo(db, key, lambda: self._value(1))
+        self._change(db)
+        served = cache.memo(db, key, lambda: self._value(9), refresh=lambda _s: self._value(2))
+        assert served == self._value(2)
+        assert "stale" not in served["provenance"]
+
+    def test_without_a_previous_value_the_first_reader_computes(self, db, seeded, monkeypatch):
+        monkeypatch.setattr(cache, "_stale_wait", lambda: 0.0)
+        key = ("swr", "first")
+        served = cache.memo(db, key, lambda: self._value(7), refresh=lambda _s: self._value(8))
+        assert served == self._value(7), "nothing stale to serve, so nothing is"
+
+    def test_the_cached_value_is_not_mutated_by_marking_it_stale(self, db, seeded, monkeypatch):
+        import time
+
+        monkeypatch.setattr(cache, "_stale_wait", lambda: 0.0)
+        key = ("swr", "immutable")
+        cache.memo(db, key, lambda: self._value(1))
+        self._change(db)
+        cache.memo(db, key, lambda: self._value(2), refresh=lambda _s: (time.sleep(0.2), self._value(2))[1])
+        cache.drain()
+        with cache._guard:
+            stored = cache._entries[key][1]
+        assert "stale" not in stored["provenance"]

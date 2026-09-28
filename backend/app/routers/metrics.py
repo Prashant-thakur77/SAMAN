@@ -21,4 +21,4 @@ def metrics(db: Session = Depends(get_db)) -> dict:
 
 def metrics_for(db: Session) -> dict:
     """Over a second of scoring, memoised on the estate's version (see `cache`)."""
-    return cache.memo(db, ("metrics",), lambda: compute_metrics(db))
+    return cache.memo(db, ("metrics",), lambda: compute_metrics(db), refresh=compute_metrics)

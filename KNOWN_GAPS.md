@@ -637,6 +637,24 @@ that could not be true:
 - **The Audit page's first screen was sign-ins.** Folded by default, with a
   checkbox and a count; the chain is untouched.
 
+### A decision made the next dashboard view slow on the free host (28 Sept 2026)
+
+Every decision changes the estate, which correctly invalidates the dashboard
+memo; the next reader then waited for the recompute on Render's tenth of a
+CPU. Measured on the live site, before and after one approve-and-undo:
+executive dashboard 0.26 s → 12.6 s, opportunity 0.34 s → 11.9 s, the Admin
+page's learning status 0.26 s → 29.7 s. It was also why two of the five demo
+moves failed against the live site while passing locally: the test waits for
+the network to go quiet, and a thirty-second recompute never let it.
+
+Now a key with a previous value is recomputed in the background and the
+request waits 1.5 s for it (`SAMAN_STALE_WAIT_S`). A fast machine always
+finishes inside that and the reader sees nothing different; a slow host
+serves the previous figures at once, marked stale, with the audit sequence
+they were computed at, and the page says "updating" and asks again until the
+fresh ones arrive. Reproduced with the built app capped at 10% of one CPU
+before the change went live (see below).
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**

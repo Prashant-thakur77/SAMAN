@@ -39,7 +39,9 @@ def read_status(
     the one who sets it."""
     # Every draft cluster is gated; memoised on the estate's version, which
     # a policy change, a decision or an issue moves.
-    return cache.memo(db, ("autoissue.status",), lambda: autoissue.status(db))
+    return cache.memo(
+        db, ("autoissue.status",), lambda: autoissue.status(db), refresh=autoissue.status
+    )
 
 
 @router.put("/policy/{family}")

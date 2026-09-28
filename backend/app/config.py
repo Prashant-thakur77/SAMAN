@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     #: is long enough to notice and short enough that nothing downstream has
     #: been built on the decision.
     saman_undo_window_s: int = 300
+    #: How long a request waits for a dashboard being recomputed before it is
+    #: given the previous figures, marked stale (see cache.memo). Fresh figures
+    #: on any machine that recomputes within this; never a long "Loading".
+    saman_stale_wait_s: float = 1.5
 
     #: Delivery of the per-CPSE report (`reports.deliver`). With no host set
     #: the report is written as an .eml into data/outbox/ (or SAMAN_OUTBOX_DIR),

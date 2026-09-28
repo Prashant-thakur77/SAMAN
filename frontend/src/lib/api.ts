@@ -901,6 +901,8 @@ export type StockAge = {
 
 /** Where a dashboard's figures came from (cache.stamped). */
 export type DashboardProvenance = {
+  /** The previous figures, served while fresh ones are computed (cache.memo). */
+  stale?: boolean
   computed_at: string
   seconds: number
   audit_seq: number

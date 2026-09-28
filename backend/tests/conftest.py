@@ -20,6 +20,9 @@ from pathlib import Path
 TEST_DB = Path(tempfile.gettempdir()) / "saman-test.db"
 os.environ["SAMAN_DB_PATH"] = str(TEST_DB)
 os.environ["SAMAN_SECRET_KEY"] = "test-secret"
+# Tests read what a request would read after a change, so give every
+# background refresh time to land; tests of the stale path shorten it.
+os.environ["SAMAN_STALE_WAIT_S"] = "600"
 # The learned model is a file; the suite must not write into data/models.
 os.environ["SAMAN_LEARN_MODEL_PATH"] = str(Path(tempfile.gettempdir()) / "saman-test-pairwise.json")
 # The retrain loop starts a background thread after a reviewer's decision;

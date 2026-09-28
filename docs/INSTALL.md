@@ -96,6 +96,7 @@ All are environment variables (`deploy/.env` for compose; the shell for
 | `SAMAN_ANSWER_LOG` | `eval/assistant-answers.jsonl` | every model answer and refusal; empty turns it off |
 | `SAMAN_AUTO_RETRAIN`, `SAMAN_RETRAIN_EVERY` | `true`, `25` | the champion/challenger loop on reviewer labels |
 | `SAMAN_UNDO_WINDOW_S` | `300` | how long a Workbench decision can be taken back |
+| `SAMAN_STALE_WAIT_S` | `1.5` | how long a request waits for a dashboard being recomputed after a change before it is given the previous figures, marked updating |
 | `SAMAN_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM`, `_STARTTLS` | unset | report delivery; without a host, reports go to `data/outbox/` as `.eml` |
 | `SAMAN_OUTBOX_DIR` | `data/outbox` | where those `.eml` files go |
 

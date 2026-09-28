@@ -7,8 +7,16 @@ is either an audited action or a pipeline run, so the memo is keyed on the
 audit ledger's head, the latest run, and the day (the dead-stock and purchase
 windows are anchored to today). A handful of row counts join the key so that
 a table edited behind the ledger's back, as tests do, still misses. Anything
-that would change a figure therefore changes the key, and a stale answer
-cannot be served: the dashboard is exactly as fresh as the last event.
+that would change a figure therefore changes the key.
+
+After a change, the dashboards on a slow host would be a long wait for the
+first reader (twelve seconds for the executive dashboard, thirty for the
+learning status, measured on a tenth of a CPU). So a key that has a previous
+value is recomputed in the background and the reader waits
+`SAMAN_STALE_WAIT_S` (1.5 s) for it: fresh figures whenever the machine is
+fast enough, otherwise the previous ones, marked stale, whose provenance
+names the audit sequence they were computed at. The page says "updating" and
+asks again until the fresh figures arrive. Nothing stale is ever unmarked.
 
 One process, one memo. The compose stack and the single-container image both
 run one API process, which is what login throttling already assumes.
@@ -95,15 +103,86 @@ def version(db: Session) -> tuple:
     )
 
 
-def memo(db: Session, key: tuple, compute: Callable[[], T]) -> T:
+#: key -> the thread recomputing it in the background, while one runs.
+_refreshing: dict[tuple, threading.Thread] = {}
+
+
+def _stale_wait() -> float:
+    from .config import get_settings
+
+    return get_settings().saman_stale_wait_s
+
+
+def _refresh(key: tuple, lock: threading.Lock, refresh: Callable[[Session], T]) -> threading.Thread:
+    """Recompute `key` in the background on a session of its own, unless a
+    recompute of it is already running. Returns the thread doing the work."""
+    with _guard:
+        running = _refreshing.get(key)
+        if running is not None and running.is_alive():
+            return running
+
+        def run() -> None:
+            from .db import SessionLocal
+
+            try:
+                with lock, SessionLocal() as session:
+                    current = version(session)
+                    with _guard:
+                        hit = _entries.get(key)
+                    if hit is not None and hit[0] == current:
+                        return
+                    value = refresh(session)
+                    with _guard:
+                        _entries[key] = (current, value)
+            except Exception:  # a failed refresh leaves the last value standing
+                log.exception("could not refresh %s", key)
+
+        thread = threading.Thread(target=run, name="saman-refresh", daemon=True)
+        _refreshing[key] = thread
+        thread.start()
+        return thread
+
+
+def _mark_stale(value):
+    """The last value, saying so: the page shows it as updating."""
+    if not isinstance(value, dict):
+        return value
+    if isinstance(value.get("provenance"), dict):
+        return {**value, "provenance": {**value["provenance"], "stale": True}}
+    return {**value, "stale": True}
+
+
+def memo(
+    db: Session,
+    key: tuple,
+    compute: Callable[[], T],
+    refresh: Callable[[Session], T] | None = None,
+) -> T:
     """The value for `key` at the estate's current version, computed at most
-    once per version even when two requests ask at the same moment."""
+    once per version even when two requests ask at the same moment.
+
+    With `refresh` (the same computation, taking a session of its own), a key
+    whose figures the estate has moved past is recomputed in the background,
+    and the request waits `SAMAN_STALE_WAIT_S` for it. On a fast machine the
+    recompute finishes inside that and the reader gets fresh figures, exactly
+    as without `refresh`. On a slow host (a tenth of a CPU recomputes the
+    executive dashboard in about twelve seconds) the reader gets the previous
+    figures at once, marked stale, whose provenance names the audit sequence
+    they were computed at; the fresh ones replace them when they are ready.
+    """
     current = version(db)
     with _guard:
         hit = _entries.get(key)
         lock = _computing.setdefault(key, threading.Lock())
     if hit is not None and hit[0] == current:
         return hit[1]  # type: ignore[return-value]
+    if refresh is not None and hit is not None:
+        _refresh(key, lock, refresh).join(timeout=_stale_wait())
+        with _guard:
+            newest = _entries.get(key)
+        if newest is not None and newest[0] == current:
+            return newest[1]  # type: ignore[return-value]
+        return _mark_stale((newest or hit)[1])  # type: ignore[return-value]
     with lock:
         with _guard:
             hit = _entries.get(key)
@@ -161,6 +240,14 @@ def stamped(db: Session, compute: Callable[[], dict]) -> dict:
 def clear() -> None:
     with _guard:
         _entries.clear()
+
+
+def drain(timeout: float = 120.0) -> None:
+    """Wait for every background refresh to finish (tests, and shutdown)."""
+    with _guard:
+        threads = list(_refreshing.values())
+    for thread in threads:
+        thread.join(timeout=timeout)
 
 
 def warm(jobs: list[tuple[str, Callable[[], object]]]) -> threading.Thread:

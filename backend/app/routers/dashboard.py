@@ -57,6 +57,7 @@ def executive_for(db: Session, scope: Scope) -> dict:
         db,
         ("executive", *scope.view_key),
         lambda: cache.stamped(db, lambda: _executive(db, scope)),
+        refresh=lambda s: cache.stamped(s, lambda: _executive(s, scope)),
     )
 
 
@@ -315,6 +316,7 @@ def opportunity_for(
         db,
         ("opportunity", *scope.view_key, capture, months),
         lambda: cache.stamped(db, lambda: _opportunity(db, scope, capture, months)),
+        refresh=lambda s: cache.stamped(s, lambda: _opportunity(s, scope, capture, months)),
     )
 
 

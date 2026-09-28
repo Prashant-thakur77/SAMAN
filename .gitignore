@@ -9,6 +9,8 @@ venv/
 
 # Node
 node_modules/
+# ...and as a symlink, which the pattern above does not match
+node_modules
 dist/
 .vite/
 

@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -19,7 +19,8 @@ import { formatDay } from '../components/charts/ChartParts'
 import { CountUp, formatRupees } from '../components/charts/CountUp'
 import { EmptyState } from '../components/primitives/EmptyState'
 import { StatusChip } from '../components/primitives/Chip'
-import { ApiError, getExecutive, type ExecutiveDashboard, type QualityRate, type QualityScorecard} from '../lib/api'
+import { getExecutive, type QualityRate, type QualityScorecard } from '../lib/api'
+import { useFreshData } from '../lib/useFreshData'
 import { cn } from '../lib/cn'
 import { listItemVariants, listVariants } from '../lib/motion'
 import { useSession } from '../lib/session'
@@ -49,8 +50,6 @@ const KPI_TARGET: Record<string, { to: string; label: string }> = {
  * savings ladder, inventory and stock age), and data quality to close.
  */
 export default function DashExecutive() {
-  const [data, setData] = useState<ExecutiveDashboard | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const reduce = useReducedMotion() ?? false
   const { user } = useSession()
   // The same page serves a steward and a ministry reader: a steward can fold
@@ -60,15 +59,8 @@ export default function DashExecutive() {
   const [mineOnly, setMineOnly] = useState(false)
   const showCpse = (cpse: string) => !mineOnly || !own || cpse === own
 
-  useEffect(() => {
-    let alive = true
-    getExecutive()
-      .then((d) => alive && setData(d))
-      .catch((err) => alive && setError(err instanceof ApiError ? err.message : 'Unavailable.'))
-    return () => {
-      alive = false
-    }
-  }, [])
+  // Asks again while the API is still recomputing after a change.
+  const { data, error } = useFreshData(getExecutive, [])
 
   if (error) {
     return (
