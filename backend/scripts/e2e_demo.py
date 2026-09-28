@@ -110,16 +110,17 @@ def move_5_audit_admin(page, base: str) -> str:
     verify = page.locator("button:has-text('Verify')")
     if verify.count():
         verify.first.click()
-        page.wait_for_timeout(1_500)
-        assert (
-            "intact" in page.inner_text("main").lower()
-            or "verified" in page.inner_text("main").lower()
-        )
+        # Wait for the verdict chip, whichever it says, rather than a fixed
+        # pause: re-hashing the chain takes seconds on a free host's tenth of
+        # a CPU. (Not a looser pattern: the page's own description already
+        # mentions tampering.)
+        chip = page.wait_for_selector("text=/Chain (intact|broken)/", timeout=60_000)
+        assert chip.inner_text() == "Chain intact", chip.inner_text()
     page.goto(f"{base}/admin", wait_until="networkidle")
     page.wait_for_selector("text=What runs where", timeout=30_000)
     text = page.inner_text("main").lower()
-    assert "local" in text and "browser" in text
-    assert "automatic issue" in text
+    assert "local" in text and "browser" in text, "the engines table should say where each runs"
+    assert "automatic issue" in text, "the auto-issue policy panel should be shown"
     return "ledger verified, engines and policy shown"
 
 

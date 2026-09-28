@@ -179,7 +179,15 @@ single container on Render, so the browser sees one origin and the session
 cookie belongs to the Vercel domain. The API cannot live on Vercel itself: a
 serverless function has a read-only filesystem and a 250 MB size limit, and
 SAMAN is a long-running process with a writable SQLite database of its own.
-To redeploy the frontend: `vercel deploy --prod` from the repository root.
+`main` deploys there on every push; any other branch gets a preview URL.
+
+Render's free plan sleeps after fifteen idle minutes, and while it sleeps it
+answers requests that arrive through the proxy with 429. Two things keep the
+site answering: a scheduled workflow (`.github/workflows/keepalive.yml`)
+wakes the API directly every ten minutes, and the page retries any request
+the host answered instead of SAMAN (a 429, 502, 503 or 504 that is not
+SAMAN's own JSON) for about half a minute. SAMAN's own refusals, such as the
+sign-in throttle, are never retried.
 
 ```bash
 cd deploy && cp .env.example .env    # set SAMAN_SECRET_KEY; set SAMAN_DOMAIN for HTTPS

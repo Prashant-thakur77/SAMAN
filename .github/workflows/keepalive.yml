@@ -1,0 +1,33 @@
+# Keep the public demo's API awake.
+#
+# Render's free plan puts a service to sleep after fifteen idle minutes, and
+# while it sleeps its router answers requests arriving through the Vercel
+# proxy with 429 "hibernate-rate-limited": the sign-in list comes up empty
+# until something wakes the API directly. This wakes it directly every ten
+# minutes. One always-on free service fits inside Render's 750 free instance
+# hours a month. GitHub may run a schedule late when it is busy; the page
+# itself retries a waking host for about half a minute (frontend/src/lib/api.ts).
+
+name: keep the demo awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Wake the API directly
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 https://saman-wymm.onrender.com/api/health || true)
+            if [ "$code" = "200" ]; then echo "API awake"; exit 0; fi
+            echo "attempt $attempt: $code"; sleep 20
+          done
+          exit 1
+
+      - name: The public page answers
+        run: curl -sf -o /dev/null --max-time 30 https://saman-alpha.vercel.app/

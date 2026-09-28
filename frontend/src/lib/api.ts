@@ -16,18 +16,41 @@ export class ApiError extends Error {
   }
 }
 
+/** Statuses a host or proxy answers while the API is waking or restarting. */
+const WAKING = new Set([429, 502, 503, 504])
+/** Back-off between attempts, about half a minute in all: a free host wakes in that. */
+export const WAKE_RETRY_MS = [1000, 2000, 4000, 8000, 15000]
+
+/**
+ * Did the host answer instead of SAMAN? SAMAN's own errors are JSON; a
+ * sleeping free host's router (Render answers 429 "hibernate-rate-limited")
+ * or a proxy's 502 are not. Such a request never reached the application,
+ * so sending it again is safe whatever its method, and SAMAN's own 429 (the
+ * sign-in throttle) is never retried, so a lockout is never extended.
+ */
+function hostIsWaking(res: Response): boolean {
+  return WAKING.has(res.status) && !res.headers.get('content-type')?.includes('application/json')
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
-  try {
-    res = await fetch(`/api${path}`, {
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-      ...init,
-    })
-  } catch (cause) {
-    // Backend down or unreachable — surface it as a normal API failure so the
-    // UI can render an empty state instead of a blank screen.
-    throw new ApiError(0, 'Cannot reach the SAMAN backend.', cause)
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(`/api${path}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+        ...init,
+      })
+    } catch (cause) {
+      // Backend down or unreachable — surface it as a normal API failure so the
+      // UI can render an empty state instead of a blank screen. Not retried:
+      // the Scan screen's offline mode depends on hearing this at once.
+      throw new ApiError(0, 'Cannot reach the SAMAN backend.', cause)
+    }
+    if (!hostIsWaking(res) || attempt >= WAKE_RETRY_MS.length) break
+    await sleep(WAKE_RETRY_MS[attempt])
   }
 
   const body = res.headers.get('content-type')?.includes('application/json')
