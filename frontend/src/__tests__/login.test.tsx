@@ -4,9 +4,9 @@
  * picker to click, only an email and a password.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const demoLogin = vi.fn()
 const login = vi.fn()
@@ -39,6 +39,7 @@ vi.mock('../lib/session', () => ({
 vi.mock('../components/Assistant', () => ({ Assistant: () => null }))
 vi.mock('../components/ThemeToggle', () => ({ ThemeToggle: () => null }))
 
+import { getDemoUsers, getLoginMode } from '../lib/api'
 import Login from '../routes/Login'
 
 const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true }
@@ -116,5 +117,51 @@ describe('the sign-in page', () => {
 
     await waitFor(() => expect(login).toHaveBeenCalledWith('steward@cpcl.in', 's3cret'))
     expect(demoLogin).not.toHaveBeenCalled()
+  })
+
+  describe('before the API has answered', () => {
+    beforeEach(() => {
+      demoMode = true
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('waits, and says the server is waking once the wait is long', async () => {
+      vi.mocked(getDemoUsers).mockImplementationOnce(() => new Promise(() => {}))
+      renderLogin()
+
+      expect(screen.getByRole('status')).toHaveTextContent(/loading accounts/i)
+      expect(screen.queryByText(/database is empty/i)).not.toBeInTheDocument()
+      await act(() => vi.advanceTimersByTimeAsync(2500))
+      expect(screen.getByRole('status')).toHaveTextContent(/waking the server/i)
+      expect(screen.queryByRole('button', { name: /load demo data/i })).not.toBeInTheDocument()
+    })
+
+    it('never calls a sleeping host an empty database, and signs in once it wakes', async () => {
+      const { ApiError } = await import('../lib/api')
+      vi.mocked(getDemoUsers).mockRejectedValueOnce(new ApiError(429, 'Too Many Requests'))
+      renderLogin()
+
+      expect(await screen.findByText(/waking the server/i)).toBeInTheDocument()
+      expect(screen.queryByText(/database is empty/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /load demo data/i })).not.toBeInTheDocument()
+
+      await act(() => vi.advanceTimersByTimeAsync(4000))
+      expect(
+        await screen.findByRole('button', { name: /sign in as a\. ramesh/i }),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('offers the demo estate only when the API answers that there is nobody', async () => {
+    demoMode = true
+    vi.mocked(getDemoUsers).mockResolvedValueOnce([])
+    vi.mocked(getLoginMode).mockResolvedValueOnce({ demo_login: true, has_users: false })
+    renderLogin()
+
+    expect(await screen.findByRole('button', { name: /load demo data/i })).toBeInTheDocument()
+    expect(screen.getByText(/database is empty/i)).toBeInTheDocument()
   })
 })

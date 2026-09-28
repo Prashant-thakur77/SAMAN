@@ -21,6 +21,11 @@ import { cn } from '../lib/cn'
 import { shakeAnimation } from '../lib/motion'
 import { useSession } from '../lib/session'
 
+// A first answer slower than this is a sleeping host waking up, and the page
+// says so; after a failed answer it asks again this often.
+const SLOW_MS = 2500
+const RETRY_MS = 4000
+
 /**
  * /login — spec §6.1. The wordmark is expanded exactly once, here, with the
  * tagline beneath it (spec §1.2).
@@ -51,7 +56,14 @@ export default function Login() {
   const { refresh } = useSession()
   const [seeding, setSeeding] = useState<PipelineStatus | null>(null)
   const [seedError, setSeedError] = useState<string | null>(null)
-  const [unreachable, setUnreachable] = useState(false)
+  // Where the account list stands. Only an answer from the API can say the
+  // database is empty; until one arrives the page says it is waiting.
+  const [accounts, setAccounts] = useState<'loading' | 'ready' | 'waking' | 'unreachable'>(
+    'loading',
+  )
+  const [failures, setFailures] = useState(0)
+  // A first answer slower than a page load is a host waking up.
+  const [slow, setSlow] = useState(false)
 
   // Demo picker or email field: the API decides (SAMAN_DEMO_LOGIN).
   const [mode, setMode] = useState<{ demo_login: boolean; has_users: boolean } | null>(null)
@@ -61,13 +73,16 @@ export default function Login() {
       const [list, loginMode] = await Promise.all([getDemoUsers(), getLoginMode()])
       setUsers(list)
       setMode(loginMode)
+      setAccounts('ready')
       setEmail((current) => current || list[0]?.email || '')
       return loginMode.has_users ? Math.max(list.length, 1) : 0
     } catch (err) {
-      // No seeded users yet is a normal first-run state, not an error. An
-      // unreachable API is neither: say so rather than offer to seed.
-      setUsers([])
-      setUnreachable(err instanceof ApiError && err.status === 0)
+      // An empty database answers with an empty list, so a failure never
+      // means "no accounts" and must not offer to seed. No answer at all is
+      // the connection; any other is the host (one that sleeps when idle
+      // answers 429 or 503 while it wakes) or the API still starting.
+      setAccounts(err instanceof ApiError && err.status === 0 ? 'unreachable' : 'waking')
+      setFailures((n) => n + 1)
       return 0
     }
   }, [])
@@ -75,6 +90,20 @@ export default function Login() {
   useEffect(() => {
     void loadUsers()
   }, [loadUsers])
+
+  useEffect(() => {
+    if (accounts !== 'loading') return
+    const timer = window.setTimeout(() => setSlow(true), SLOW_MS)
+    return () => window.clearTimeout(timer)
+  }, [accounts])
+
+  // Until the API answers, ask again every few seconds, so a visitor who
+  // arrives while the host sleeps never has to know to reload.
+  useEffect(() => {
+    if (accounts !== 'waking' && accounts !== 'unreachable') return
+    const timer = window.setTimeout(() => void loadUsers(), RETRY_MS)
+    return () => window.clearTimeout(timer)
+  }, [accounts, failures, loadUsers])
 
   // While a first-run seed is running, poll until it finishes and then bring
   // the accounts in behind it, so nobody has to know to reload the page.
@@ -192,7 +221,7 @@ export default function Login() {
                   : 'Seeded demo accounts. Click one to sign in.'
               }
             >
-              {mode && !mode.demo_login && mode.has_users ? (
+              {accounts === 'ready' && mode && !mode.demo_login && mode.has_users ? (
                 <Input
                   id="email"
                   type="email"
@@ -201,11 +230,13 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
-              ) : unreachable ? (
-                <p className="card px-3 py-4 text-sm text-muted">
-                  The server cannot be reached from here. Check the connection and try
-                  again; nothing can be signed in to until it answers.
+              ) : accounts === 'unreachable' ? (
+                <p role="status" className="card px-3 py-4 text-sm text-muted">
+                  The server cannot be reached from here. Check the connection; this page
+                  tries again by itself, and nothing can be signed in to until it answers.
                 </p>
+              ) : accounts !== 'ready' ? (
+                <WaitingForAccounts waking={accounts === 'waking' || slow} />
               ) : users.length > 0 ? (
                 <ul className="card divide-y divide-hairline overflow-hidden">
                   {users.map((u) => (
@@ -314,6 +345,33 @@ export default function Login() {
       {/* The assistant meets people here too. Ask it to open a screen and it
           says to sign in first; once signed in, it takes you there. */}
       <Assistant />
+    </div>
+  )
+}
+
+/** The account list before the API has answered: placeholder rows where the
+ *  accounts will be and, once the wait is longer than a page load, why. Never
+ *  the empty-database offer, which only an answer can justify. */
+function WaitingForAccounts({ waking }: { waking: boolean }) {
+  return (
+    <div role="status" className="card overflow-hidden">
+      {waking ? (
+        <p className="border-b border-hairline px-3 py-3 text-sm text-muted">
+          Waking the server. It sleeps when nobody has used it for a while and can take up
+          to a minute to answer; the accounts appear here as soon as it does.
+        </p>
+      ) : (
+        <span className="sr-only">Loading accounts</span>
+      )}
+      <ul aria-hidden className="divide-y divide-hairline">
+        {[0, 1, 2, 3].map((row) => (
+          <li key={row} className="flex items-center gap-3 px-3 py-3">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-hairline" />
+            <span className="h-3 w-32 animate-pulse rounded bg-hairline" />
+            <span className="ml-auto h-3 w-16 animate-pulse rounded bg-hairline" />
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

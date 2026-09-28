@@ -655,6 +655,17 @@ they were computed at, and the page says "updating" and asks again until the
 fresh ones arrive. Reproduced with the built app capped at 10% of one CPU
 before the change went live (see below).
 
+### The sign-in page said the database was empty when the host was asleep (29 Sept 2026)
+
+The page had three states — accounts, "cannot be reached", and "this database
+is empty, load demo data" — and chose the third whenever it had no accounts
+in hand. That included the moment before the API answered, and every answer
+that was not the list: the free host answers 429 while it wakes. So a
+visitor saw an offer to seed a database that held 12,000 rows. Only an answer
+can say the database is empty (an empty one returns an empty list, not an
+error); until one arrives the page shows placeholder rows, says the server is
+waking once the wait outlasts a page load, and asks again every four seconds.
+
 ### Measurement honesty
 
 - Thresholds come from `make tune`, which sweeps on the **60% tuning split**
